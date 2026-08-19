@@ -203,3 +203,29 @@ iframe { width: 300px; height: 120px; border: 1px solid #2b3341; background: #1b
   font: inherit; font-size: 12px; padding: 6px 12px;
   color: #cbd3e1; background: #232a36; border: 1px solid #3d4757;
 }
+
+/* 14 ── overflow and awkward pairs ─────────────────────────────────────── */
+/* a child larger than its own parent, hanging off every side */
+.frame.engulfed { width: 160px; height: 60px; margin: 20px; }
+.frame.engulfed .kid { position: absolute; left: -20px; top: -10px;
+                       width: 200px; height: 80px; opacity: 0.55; }
+
+/* clipped out of sight, but its box is still 240 wide */
+.frame.clipper { width: 160px; height: 60px; overflow: hidden; }
+.frame.clipper .kid { position: absolute; left: 8px; top: 10px;
+                      width: 240px; height: 40px; }
+
+/* two tiles crossing: neither one contains the other */
+.crossers { position: relative; width: 260px; height: 100px; }
+.crossers > div {
+  position: absolute; width: 140px; height: 70px;
+  display: grid; place-items: center; font-size: 11px;
+  border: 1px solid #3d4757; background: #1b2029;
+}
+.tile-a { left: 0; top: 0; }
+.tile-b { left: 90px; top: 18px; background: #2a3342; }
+
+/* a transformed child: the rect follows the transform, the layout does not */
+.frame.scaled { width: 200px; height: 100px; display: flex;
+                align-items: center; justify-content: center; margin: 20px; }
+.frame.scaled .kid { width: 100px; height: 40px; transform: scale(1.5); }

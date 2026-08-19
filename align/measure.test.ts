@@ -40,8 +40,10 @@ describe('gapSegments', () => {
     expect(segs.map((s) => s.axis)).toEqual(['x', 'y']);
   });
 
-  it('draws nothing when the boxes overlap on both axes', () => {
-    expect(gapSegments(box(0, 0), box(10, 10))).toEqual([]);
+  it('measures edges rather than a gap when the boxes overlap', () => {
+    // Same size, offset by 10: inside by 10 on two edges, past by 10 on the others.
+    expect(gapSegments(box(0, 0), box(10, 10)).map((s) => s.label))
+      .toEqual(['10', '-10', '10', '-10']);
   });
 
   it('reports zero for boxes that touch', () => {
@@ -125,12 +127,52 @@ describe('nested boxes', () => {
     expect(gapSegments(outer, inner).map((s) => s.axis)).toEqual(['x', 'x', 'y', 'y']);
   });
 
-  it('says nothing when they overlap without one enclosing the other', () => {
-    expect(gapSegments(box(0, 0, 100, 100), box(50, 50, 100, 100))).toEqual([]);
+  it('measures overflow as a negative rather than saying nothing', () => {
+    // 200x80 frame, child inset 102 from the left but 62 past the right edge.
+    const frame = box(0, 0, 200, 80);
+    const spill = box(102, 16, 160, 40);
+    expect(gapSegments(frame, spill).map((s) => s.label))
+      .toEqual(['102', '-62', '16', '24']);
+  });
+
+  it('treats the larger box as the container when neither encloses', () => {
+    const big = box(0, 0, 200, 200);
+    const off = box(150, 150, 100, 100);      // hangs off the bottom-right
+    expect(gapSegments(big, off).map((s) => s.label))
+      .toEqual(['150', '-50', '150', '-50']);
   });
 
   it('reports all zeros for boxes that coincide exactly', () => {
     expect(gapSegments(outer, box(0, 0, 200, 100)).map((s) => s.label))
       .toEqual(['0', '0', '0', '0']);
+  });
+});
+
+describe('awkward pairs', () => {
+  it('treats the larger box as the container when the child engulfs its parent', () => {
+    const parent = box(0, 0, 160, 60);
+    const child = box(-18, -8, 200, 80);      // hangs off every side
+    expect(gapSegments(parent, child).map((s) => s.label))
+      .toEqual(['18', '22', '8', '12']);
+  });
+
+  it('measures a clipped child by its real box, not what is visible', () => {
+    const clipper = box(0, 0, 160, 60);
+    const wide = box(10, 12, 240, 40);
+    expect(gapSegments(clipper, wide).map((s) => s.label))
+      .toEqual(['10', '-90', '12', '8']);
+  });
+
+  it('never prints a negative zero', () => {
+    // Edges that coincide can land on -0 through the subtraction.
+    const a = box(0, 0, 100, 100);
+    const b = box(0, 0.0001, 100, 100);
+    for (const seg of gapSegments(a, b)) expect(seg.label).not.toContain('-0');
+  });
+
+  it('survives a box with no area', () => {
+    const empty = box(50, 50, 0, 0);
+    expect(() => gapSegments(box(0, 0, 200, 200), empty)).not.toThrow();
+    expect(gapSegments(box(0, 0, 200, 200), empty)).toHaveLength(4);
   });
 });

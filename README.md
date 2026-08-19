@@ -130,13 +130,15 @@ element draws nothing, since there is no gap to report.
 Guides last for the session — kept across toggling the tool off and on, gone on
 reload. Nothing is written to the host page's storage.
 
-**Nested elements report insets, not gaps.** Two things side by side have a gap
-between them; something inside its container does not — it has four insets, and
-that is the number you want: how much room surrounds this inside that. Lock a
-container, hover a child, and all four are drawn and labelled. A zero is kept
-rather than dropped, because flush against an edge is information too. Two
-boxes that overlap without one enclosing the other draw nothing, since no
-single number honestly describes that.
+**Overlapping elements report insets, not gaps.** Two things side by side have
+a gap between them; something inside its container does not — it has four edge
+distances, and those are the numbers you want: how much room surrounds this
+inside that. Lock a container, hover a child, and all four are drawn.
+
+Positive is room inside. **Negative means it spills past that edge**, which is
+usually the most interesting number on the screen — content escaping its
+container is exactly the thing worth catching. Zeros are kept too, because
+flush against an edge is information.
 
 **Locking more than one** is how you check a row at a glance: click the first
 element, right-click the rest, and every gutter between them is measured at

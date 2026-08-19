@@ -240,10 +240,44 @@
         <tr><th>centred</th><td>50 · 50 · 30 · 30</td></tr>
         <tr><th>flush left</th><td>0 · 140 · 0 · 0</td>
             <td class="note">zeros are drawn, not hidden</td></tr>
-        <tr><th>overflows right</th><td>nothing</td>
-            <td class="note">overlapping without enclosing has no honest number</td></tr>
+        <tr><th>overflows right</th><td>102 · −62 · 16 · 24</td>
+            <td class="note">negative means it spills past that edge</td></tr>
         <tr><th>toolbar</th><td>95.78 · 11 · 9 · 9</td>
             <td class="note">a real control in a padded bar — the left inset is fractional</td></tr>
+      </table>
+    </section>
+
+    <!-- 14 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>14 · Overflow, clipping and other awkward pairs</h2>
+      <p>Every edge has an honest distance even when the boxes are a mess.
+        Positive is room inside; negative means it spills past that edge. Lock
+        the outlined box, hover the filled one.</p>
+
+      <div class="row2">
+        <div class="frame engulfed"><div class="kid">bigger than its parent</div></div>
+        <div class="frame clipper"><div class="kid">clipped by overflow</div></div>
+      </div>
+
+      <div class="row2" style="margin-top: 40px">
+        <div class="crossers">
+          <div class="tile-a">tile a</div>
+          <div class="tile-b">tile b</div>
+        </div>
+        <div class="frame scaled"><div class="kid">scale(1.5)</div></div>
+      </div>
+
+      <table class="expect">
+        <tr><th>bigger than parent</th><td>18 · 22 · 8 · 12</td>
+            <td class="note">the larger box is treated as the container, so these are the
+              parent measured inside the child</td></tr>
+        <tr><th>clipped</th><td>10 · −90 · 12 · 8</td>
+            <td class="note"><code>overflow: hidden</code> hides it, but the box is still
+              240 wide and still measured</td></tr>
+        <tr><th>crossing tiles</th><td>90 · −90 · 18 · −18</td>
+            <td class="note">neither contains the other; two edges in, two out</td></tr>
+        <tr><th>scale(1.5)</th><td>25 · 25 · 20 · 20</td>
+            <td class="note">the visual box, not the laid-out one</td></tr>
       </table>
     </section>
 

@@ -74,19 +74,19 @@ export function bandsOf(el: Element): Bands {
   };
 }
 
-/** Does `outer` enclose `inner` on every side? Pure. */
-function contains(outer: Box, inner: Box): boolean {
-  return outer.left <= inner.left && outer.right >= inner.right
-      && outer.top <= inner.top && outer.bottom >= inner.bottom;
+/** Which of two overlapping boxes is the container? The larger one. Pure. */
+function outerOf(a: Box, b: Box): [Box, Box] {
+  return a.width * a.height >= b.width * b.height ? [a, b] : [b, a];
 }
 
 /**
- * The four distances from an inner box's edges out to the box enclosing it.
+ * The four edge-to-edge distances between a box and the one around it.
  *
- * Nested boxes have no gap between them, but they do have insets, and that is
- * the number you actually want: how much room is around this thing inside its
- * container. Zeros are kept rather than dropped — flush against an edge is
- * information too. Pure.
+ * Overlapping boxes have no gap, but every edge still has a well-defined
+ * distance, and that is the number you want: how much room is around this
+ * thing inside that one. Positive is room inside; negative means the inner box
+ * spills past that edge, which is usually the most interesting number on the
+ * screen. Zeros are kept — flush against an edge is information too. Pure.
  */
 export function insetSegments(outer: Box, inner: Box): Segment[] {
   const cx = inner.left + inner.width / 2;
@@ -116,11 +116,12 @@ export function gapSegments(a: Box, b: Box): Segment[] {
   const overlapY = a.top < b.bottom && b.top < a.bottom;
 
   if (overlapX && overlapY) {
-    if (contains(a, b)) return insetSegments(a, b);
-    if (contains(b, a)) return insetSegments(b, a);
-    // Overlapping without enclosing: no single number describes that, so it
-    // says nothing rather than something misleading.
-    return [];
+    // Enclosure is not required. Each edge has an honest distance whether the
+    // inner box sits inside it or spills past it, and refusing to draw three
+    // good numbers because a fourth is negative hides the overflow that is
+    // usually the thing worth knowing about.
+    const [outer, inner] = outerOf(a, b);
+    return insetSegments(outer, inner);
   }
 
   if (!overlapX) {

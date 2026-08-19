@@ -13,24 +13,31 @@ bundles.
 Cmd/Ctrl + Shift + A    toggle
 hover                   outline + dotted edge guides + size tooltip
 click                   lock it, and open the box model panel
-Shift + click           add to the locked set (or drop one already in it)
+right-click             add to the locked set (or drop one already in it)
 hover with locks set    distance from the newest lock to what you point at
 drag the panel header   move the box model anywhere on screen
 Escape                  clear the locks; again to close
 ```
 
 **Locking more than one** is how you check a row at a glance: click the first
-tag, then Shift-click the rest, and every gutter between them is measured at
+tag, then right-click the rest, and every gutter between them is measured at
 once. The set is ordered along whichever axis it actually varies on, so a row
 reads left-to-right and a column top-to-bottom without being told which.
-Shift-clicking something already locked drops it, so a mis-click costs nothing.
+Right-clicking something already locked drops it, so a mis-click costs nothing.
 
-A small badge sits top-right whenever the tool is running, with a count of what
-is locked, so it can never be on without you knowing. It's inert — no pointer
-events, nothing to click by accident.
+*Why the second button:* every modifier+click pairing is already spoken for by
+the browser — Shift opens a new window, Ctrl/Cmd a new tab, Alt downloads — so
+the right button is the one gesture left to take. The context menu is
+suppressed while the tool is on to make room for it.
 
-While the tool is on, a click means "lock this", so it doesn't reach the page —
-the same bargain DevTools' inspect mode makes. Toggle off to use the app.
+A badge sits top-right whenever the tool is running, with a count of what is
+locked, so it can never be on without you knowing. Click it for the full list
+of keys.
+
+While the tool is on it swallows clicks — plain, modified, and middle — so
+nothing navigates out from under you. That takes preventing the `click` event,
+not just `mousedown`: a link activates on click, so stopping mousedown alone
+still lets the page navigate. Toggle off to use the app.
 
 ## What you see
 
@@ -175,7 +182,7 @@ align/
   index.ts      init, hotkey, hover/lock state, lifecycle
   overlay.ts    canvas: outlines, guides, distances, tooltip
   boxmodel.ts   the draggable box model panel
-  indicator.ts  the top-right "running" badge
+  indicator.ts  the top-right badge and its key list
   measure.ts    geometry, hit-testing, computed styles
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad

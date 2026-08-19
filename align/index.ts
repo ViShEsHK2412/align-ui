@@ -57,28 +57,60 @@ function onMouseMove(e: MouseEvent) {
   render({ x: e.clientX, y: e.clientY });
 }
 
+/** Lock exactly this one, dropping whatever was locked before. */
 function onMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return;
+  const hit = hitTest(e.clientX, e.clientY, cfg);
+  if (!hit) return;                       // our own UI — let it have the event
+  swallow(e);
+  indicator?.closeHelp();
+  pinned = [hit];
+  hover = hit;
+  boxmodel?.show(hit);
+  render({ x: e.clientX, y: e.clientY });
+}
+
+/**
+ * Right-click builds the set: each one adds, and right-clicking something
+ * already locked drops it, so a mis-click costs nothing.
+ *
+ * This used to be shift+click, which Chrome reads as "open in a new window"
+ * on any link. Every modifier+click pairing is spoken for by some browser —
+ * new tab, new window, download — so the second button is the one gesture
+ * that is ours to take, and the context menu is suppressed while the tool is
+ * on to make room for it.
+ */
+function onContextMenu(e: MouseEvent) {
   const hit = hitTest(e.clientX, e.clientY, cfg);
   if (!hit) return;
-  // While the tool is on, a click means "lock this" — it must not also reach
-  // the page, the same bargain DevTools' inspect mode makes.
-  e.preventDefault();
-  e.stopPropagation();
-
-  if (e.shiftKey) {
-    // Hold shift to build a set: click each element in turn and the gaps
-    // between all of them are measured at once. Clicking a locked one again
-    // drops it, so a mis-click costs nothing.
-    const at = pinned.findIndex((b) => b.el === hit.el);
-    pinned = at >= 0 ? pinned.filter((_, i) => i !== at) : [...pinned, hit];
-  } else {
-    pinned = [hit];
-  }
+  swallow(e);
+  indicator?.closeHelp();
+  const at = pinned.findIndex((b) => b.el === hit.el);
+  pinned = at >= 0 ? pinned.filter((_, i) => i !== at) : [...pinned, hit];
 
   hover = hit;
   const last = pinned[pinned.length - 1];
   if (last) boxmodel?.show(last); else boxmodel?.hide();
   render({ x: e.clientX, y: e.clientY });
+}
+
+/**
+ * A link activates on `click`, not on `mousedown`, so preventing mousedown
+ * alone still lets the page navigate out from under the tool — and lets
+ * Chrome's modifier+click shortcuts fire. Both die here.
+ */
+function onClick(e: MouseEvent) {
+  if (hitTest(e.clientX, e.clientY, cfg)) swallow(e);
+}
+
+/** Middle-click opens a new tab of its own accord. */
+function onAuxClick(e: MouseEvent) {
+  if (hitTest(e.clientX, e.clientY, cfg)) swallow(e);
+}
+
+function swallow(e: Event) {
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 /** Rects move under the cursor on scroll and resize; re-measure the live two. */
@@ -99,6 +131,9 @@ function activate() {
   indicator.update(0);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
+  addEventListener('click', onClick, { capture: true });
+  addEventListener('auxclick', onAuxClick, { capture: true });
+  addEventListener('contextmenu', onContextMenu, { capture: true });
   addEventListener('resize', onViewportChange);
   addEventListener('scroll', onViewportChange, true);
 }
@@ -106,6 +141,9 @@ function activate() {
 function deactivate() {
   removeEventListener('mousemove', onMouseMove);
   removeEventListener('mousedown', onMouseDown, { capture: true });
+  removeEventListener('click', onClick, { capture: true });
+  removeEventListener('auxclick', onAuxClick, { capture: true });
+  removeEventListener('contextmenu', onContextMenu, { capture: true });
   removeEventListener('resize', onViewportChange);
   removeEventListener('scroll', onViewportChange, true);
   indicator?.destroy();

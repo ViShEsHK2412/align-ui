@@ -135,6 +135,12 @@ function onMouseUp(e: MouseEvent) {
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
 
+  // Our own panels sit over the page, and the box model's left edge overlaps
+  // the left rule. hitTest returns null over our own UI, so bailing here keeps
+  // a grab on the panel header from being read as a drag off the rule.
+  const onPage = hitTest(e.clientX, e.clientY, cfg);
+  if (!onPage) return;
+
   // Precedence, so the gestures never fight: a rule starts a new guide, a
   // guide under the cursor gets picked up, anything else locks an element.
   const fromRuler = inRuler(e.clientX, e.clientY);
@@ -152,13 +158,11 @@ function onMouseDown(e: MouseEvent) {
     return;
   }
 
-  const hit = hitTest(e.clientX, e.clientY, cfg);
-  if (!hit) return;                       // our own UI — let it have the event
   swallow(e);
   indicator?.closeHelp();
-  pinned = [hit];
-  hover = hit;
-  boxmodel?.show(hit);
+  pinned = [onPage];
+  hover = onPage;
+  boxmodel?.show(onPage);
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -267,6 +271,10 @@ function activate() {
   addEventListener('contextmenu', onContextMenu, { capture: true });
   addEventListener('resize', onViewportChange);
   watching = requestAnimationFrame(watch);
+  // Draw once on open: rulers and guides are sticky, and watch() only redraws
+  // when something moves, so without this they stay invisible until the first
+  // mouse move.
+  render();
 }
 
 function deactivate() {

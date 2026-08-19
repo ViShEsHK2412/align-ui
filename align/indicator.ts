@@ -55,6 +55,9 @@ const CSS = `
   .flag { box-shadow: ${surfaceShadow(3, true)}; }
 }
 .flag .count { color: ${themed(SEMANTIC.muted)}; }
+/* With nothing locked the count is empty but still a flex item, so the gap
+   before it padded the right side and the pill sat lopsided. */
+.flag .count:empty { display: none; }
 
 .help {
   position: fixed; top: 46px; right: 16px; width: 292px;

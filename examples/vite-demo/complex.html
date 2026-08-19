@@ -209,6 +209,44 @@
       </div>
     </section>
 
+    <!-- 13 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>13 · Insets — one thing inside another</h2>
+      <p>Nested boxes have no gap between them, so these report insets instead:
+        how far the child's edges sit inside the parent's. Lock the container,
+        then hover the child.</p>
+
+      <div class="row2">
+        <div class="frame offset"><div class="kid">absolute</div></div>
+        <div class="frame middle"><div class="kid">centred</div></div>
+      </div>
+
+      <div class="row2" style="margin-top: 24px">
+        <div class="frame flush"><div class="kid tall">flush left</div></div>
+        <div class="frame spill"><div class="kid">overflows right</div></div>
+      </div>
+
+      <div style="margin-top: 24px">
+        <div class="toolbar">
+          <span class="tb-label">Page 1 · 1/15</span>
+          <button class="tb-btn">+ page</button>
+        </div>
+      </div>
+
+      <table class="expect">
+        <tr><th></th><td class="note">insets read left · right · top · bottom</td></tr>
+        <tr><th>absolute</th><td>42 · 158 · 26 · 34</td>
+            <td class="note">2px border + the offsets</td></tr>
+        <tr><th>centred</th><td>50 · 50 · 30 · 30</td></tr>
+        <tr><th>flush left</th><td>0 · 140 · 0 · 0</td>
+            <td class="note">zeros are drawn, not hidden</td></tr>
+        <tr><th>overflows right</th><td>nothing</td>
+            <td class="note">overlapping without enclosing has no honest number</td></tr>
+        <tr><th>toolbar</th><td>95.78 · 11 · 9 · 9</td>
+            <td class="note">a real control in a padded bar — the left inset is fractional</td></tr>
+      </table>
+    </section>
+
     <div class="tail">end of page — scroll back up</div>
   </main>
 

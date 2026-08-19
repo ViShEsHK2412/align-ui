@@ -157,3 +157,49 @@ iframe { width: 300px; height: 120px; border: 1px solid #2b3341; background: #1b
 }
 
 .tail { padding: 28px 0 80px; color: #5c6a7d; font-size: 12px; }
+
+/* 13 ── insets ─────────────────────────────────────────────────────────── */
+.frame {
+  position: relative; border: 2px solid #3d4757; background: #1b2029;
+  font-size: 12px;
+}
+.kid {
+  background: #2f3a4a; display: grid; place-items: center;
+  font-size: 11px; color: #a8b3c4;
+}
+
+/* absolute offsets, so every inset is arithmetic rather than layout luck */
+.frame.offset { width: 320px; height: 100px; }
+.frame.offset .kid { position: absolute; left: 40px; top: 24px; width: 120px; height: 40px; }
+
+/* dead centre: equal on both axes */
+.frame.middle { width: 200px; height: 100px; display: flex;
+                align-items: center; justify-content: center; }
+.frame.middle .kid { width: 100px; height: 40px; }
+
+/* Hard against the left edge, so three insets are genuinely zero. The frame is
+   outlined rather than bordered: a border would sit inside the box and push the
+   child in by 2px, which is exactly the sort of thing this page exists to catch
+   — it did, on the first run. */
+.frame.flush {
+  width: 200px; height: 80px; display: flex;
+  border: 0; outline: 2px solid #3d4757; outline-offset: -2px;
+}
+.frame.flush .kid.tall { width: 60px; height: 100%; }
+
+/* sticks out one side, so neither box encloses the other */
+.frame.spill { width: 200px; height: 80px; overflow: visible; }
+.frame.spill .kid { position: absolute; left: 100px; top: 14px;
+                    width: 160px; height: 40px; }
+
+/* the shape that started this: a control inside a padded bar */
+.toolbar {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 16px;
+  background: #171a21; border: 1px solid #2b3341;
+}
+.tb-label { font-size: 12px; color: #cbd3e1; }
+.tb-btn {
+  font: inherit; font-size: 12px; padding: 6px 12px;
+  color: #cbd3e1; background: #232a36; border: 1px solid #3d4757;
+}

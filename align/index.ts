@@ -1,6 +1,7 @@
 import { audit } from './cluster';
 import { mergeConfig, type Config } from './config';
 import { mountOverlay, type Overlay } from './overlay';
+import { createPanel, type Panel } from './panel';
 import { invalidate, scan } from './scan';
 import type { Box, Violation } from './types';
 
@@ -21,6 +22,7 @@ declare global {
 
 let cfg: Config;
 let overlay: Overlay | null = null;
+let panel: Panel | null = null;
 let observer: MutationObserver | null = null;
 let boxes: Box[] = [];
 let violations: Violation[] = [];
@@ -41,6 +43,7 @@ function matchesHotkey(e: KeyboardEvent): boolean {
 function reaudit() {
   violations = audit(boxes, cfg, devicePixelRatio);
   overlay?.update({ violations, highlighted: null });
+  panel?.update(violations, { stale });
 }
 
 function rescan() {
@@ -51,7 +54,9 @@ function rescan() {
 }
 
 function markStale() {
+  if (stale) return;
   stale = true;
+  panel?.update(violations, { stale });
 }
 
 function onResizeOrScroll() {
@@ -65,6 +70,17 @@ function onResizeOrScroll() {
 function activate() {
   if (overlay) return;
   overlay = mountOverlay();
+  panel = createPanel(overlay.root, cfg, {
+    // The slider re-audits the boxes already measured — no rescan, no DOM reads.
+    onTol: (tol) => { cfg = { ...cfg, tol }; reaudit(); },
+    onHover: (v) => overlay?.update({ highlighted: v }),
+    onSelect: (v) => {
+      console.log('[align]', v.message, v.boxes.map((b) => b.el));
+      v.boxes[0]?.el.scrollIntoView({ block: 'center' });
+    },
+    onRescan: () => rescan(),
+    onClose: () => deactivate(),
+  });
   rescan();
 
   // Drop the cache and flag staleness, but DO NOT rescan: an animating page
@@ -84,6 +100,8 @@ function deactivate() {
   removeEventListener('resize', onResizeOrScroll);
   removeEventListener('scroll', onResizeOrScroll, true);
   clearTimeout(debounce);
+  panel?.destroy();
+  panel = null;
   overlay?.destroy();
   overlay = null;
   boxes = [];

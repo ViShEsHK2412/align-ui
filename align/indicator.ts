@@ -40,8 +40,8 @@ const CSS = `
   box-shadow: ${surfaceShadow(3, false)};
 }
 /* Scoped to .flag: this stylesheet shares a shadow root with the box model,
-   which has a .name of its own — an unscoped rule uppercased its header too. */
-.flag .name { text-transform: uppercase; letter-spacing: -0.01em; }
+   which has a .name of its own — an unscoped rule restyled its header too. */
+.flag .name { letter-spacing: -0.02em; }
 .flag:hover { background: ${nest(1)}; }
 @media (prefers-color-scheme: dark) {
   .flag { box-shadow: ${surfaceShadow(3, true)}; }
@@ -86,9 +86,7 @@ export function createIndicator(root: ShadowRoot): Indicator {
   flag.className = 'flag';
   const label = document.createElement('span');
   label.className = 'name';
-  // Stored in natural case and capitalised in CSS, so the copy never has to be
-  // rewritten if the treatment changes.
-  label.textContent = 'align';
+  label.textContent = 'Align';
   const count = document.createElement('span');
   count.className = 'count';
   flag.append(label, count);

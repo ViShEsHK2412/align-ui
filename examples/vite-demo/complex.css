@@ -1,0 +1,159 @@
+/* Deliberately not a design system — every value here exists to be measured. */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: #0f1115;
+  color: #cbd3e1;
+  font: 14px/1.6 system-ui, sans-serif;
+}
+a { color: #7aa2f7; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  padding: 12px 24px;
+  background: #171a21;
+  border-bottom: 1px solid #232833;
+  font-size: 13px;
+}
+
+main { max-width: 860px; margin: 0 auto; padding: 24px; }
+section {
+  padding: 20px 0 28px;
+  border-bottom: 1px solid #1c212b;
+}
+h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #e8edf6; }
+section > p { margin: 0 0 16px; font-size: 13px; color: #8b97a8; max-width: 62ch; }
+
+.expect { margin-top: 14px; border-collapse: collapse; font-size: 12px; }
+.expect th {
+  text-align: left; font-weight: 500; color: #6f8098;
+  padding: 2px 14px 2px 0; white-space: nowrap;
+}
+.expect td { padding: 2px 0; color: #a8b3c4; font-variant-numeric: tabular-nums; }
+.expect .note { padding-left: 14px; color: #5c6a7d; }
+
+.row2 { display: flex; align-items: flex-start; gap: 32px; flex-wrap: wrap; }
+
+/* 1 ── asymmetric box model ────────────────────────────────────────────── */
+#asym {
+  width: 240px; height: 120px;
+  margin: 24px 8px 16px 32px;
+  border-width: 4px 1px 8px 2px;
+  border-style: solid;
+  border-color: #3d4757;
+  padding: 20px 12px 6px 16px;
+  background: #1b2029;
+}
+#asym .inner {
+  width: 100%; height: 100%;
+  background: #252c38;
+  font-size: 12px; color: #8b97a8;
+  display: grid; place-items: center;
+}
+
+/* 2 ── box-sizing ──────────────────────────────────────────────────────── */
+.sizing {
+  width: 200px; padding: 24px; border: 6px solid #3d4757;
+  background: #1b2029; font-size: 12px; text-align: center;
+}
+.sizing.content-box { box-sizing: content-box; }
+.sizing.border-box { box-sizing: border-box; }
+.sizing span { display: block; background: #252c38; padding: 14px 0; }
+
+/* 3 ── flex gap ────────────────────────────────────────────────────────── */
+.chips { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center;
+  height: 30px; padding: 0 14px;
+  background: #1b2029; border: 1px solid #2b3341;
+  font-size: 12px;
+}
+.chip.wide { padding: 0 34px; }
+
+/* 4 ── grid ────────────────────────────────────────────────────────────── */
+.grid {
+  display: grid; grid-template-columns: repeat(3, 120px);
+  column-gap: 24px; row-gap: 16px;
+}
+.cell {
+  height: 56px; background: #1b2029; border: 1px solid #2b3341;
+  display: grid; place-items: center; font-size: 12px;
+}
+
+/* 5 ── negative margin ─────────────────────────────────────────────────── */
+.overlap { display: flex; align-items: center; }
+.slab {
+  height: 64px; padding: 0 18px; display: flex; align-items: center;
+  font-size: 12px; border: 1px solid #2b3341;
+}
+.slab.a { width: 200px; background: #1b2029; }
+.slab.b { width: 220px; margin-left: -20px; background: #232a36; position: relative; }
+.slab small { color: #6f8098; }
+
+/* 6 ── transforms ──────────────────────────────────────────────────────── */
+.tf {
+  width: 160px; height: 80px; padding: 16px;
+  background: #1b2029; border: 1px solid #2b3341;
+  font-size: 12px; display: grid; place-items: center;
+  margin: 24px 40px;
+}
+.tf.scale { transform: scale(1.25); }
+.tf.rot { transform: rotate(12deg); }
+
+/* 7 ── web components ──────────────────────────────────────────────────── */
+fancy-card { display: block; }
+
+/* 8 ── scroller ────────────────────────────────────────────────────────── */
+.scroller {
+  height: 180px; width: 320px; overflow: auto;
+  background: #14181f; border: 1px solid #2b3341; padding: 12px;
+}
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.strip {
+  height: 44px; background: #1b2029; border: 1px solid #2b3341;
+  display: flex; align-items: center; padding: 0 12px; font-size: 12px;
+}
+
+/* 9 ── fractional geometry ─────────────────────────────────────────────── */
+.thirds { display: flex; width: 700px; }
+.third {
+  width: 33.333%; height: 44px;
+  background: #1b2029; border: 1px solid #2b3341;
+  display: grid; place-items: center; font-size: 12px;
+}
+
+/* 10 ── deep nesting and stacking ──────────────────────────────────────── */
+.deep > div, .deep { padding: 6px; border: 1px solid #1e2530; }
+.deep { display: inline-block; background: #14181f; }
+.core {
+  display: inline-block; padding: 6px 12px;
+  background: #2a3342; font-size: 12px;
+}
+.stackers { position: relative; height: 90px; margin-top: 20px; }
+.tile {
+  position: absolute; width: 140px; height: 70px;
+  display: grid; place-items: center; font-size: 12px;
+  border: 1px solid #2b3341;
+}
+.tile.under { left: 0; top: 0; background: #1b2029; z-index: 1; }
+.tile.over { left: 90px; top: 18px; background: #2a3342; z-index: 2; }
+
+/* 11 ── svg and table ──────────────────────────────────────────────────── */
+svg rect, svg circle { fill: #1b2029; stroke: #2b3341; }
+.grid-table { border-collapse: separate; border-spacing: 8px; }
+.grid-table td {
+  width: 56px; height: 40px; text-align: center;
+  background: #1b2029; border: 1px solid #2b3341; font-size: 12px;
+}
+
+/* 12 ── iframe, fixed ──────────────────────────────────────────────────── */
+iframe { width: 300px; height: 120px; border: 1px solid #2b3341; background: #1b2029; }
+.pad-note { font-size: 12px; color: #6f8098; padding-top: 8px; }
+.fixed-pill {
+  position: fixed; right: 24px; bottom: 24px;
+  padding: 8px 14px; background: #232a36; border: 1px solid #2b3341;
+  font-size: 12px;
+}
+
+.tail { padding: 28px 0 80px; color: #5c6a7d; font-size: 12px; }

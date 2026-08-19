@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Align — hard cases</title>
+  <link rel="stylesheet" href="./complex.css" />
+</head>
+<body>
+  <header class="bar">
+    Align — hard cases &nbsp;·&nbsp; Ctrl/Cmd+Shift+A &nbsp;·&nbsp; click to lock &nbsp;·&nbsp; right-click to add
+    &nbsp;·&nbsp; <a href="/">simple page</a>
+  </header>
+
+  <main>
+    <!-- 1 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>1 · Asymmetric box model</h2>
+      <p>Every side different, and a border on top. Lock the inner box and read
+        the panel.</p>
+      <div class="probe" id="asym">
+        <div class="inner">content</div>
+      </div>
+      <table class="expect">
+        <tr><th>margin</th><td>24 · 8 · 16 · 32</td></tr>
+        <tr><th>border</th><td>4 · 1 · 8 · 2</td></tr>
+        <tr><th>padding</th><td>20 · 12 · 6 · 16</td></tr>
+        <tr><th>border box</th><td>240 × 120</td></tr>
+        <tr><th>content</th><td>209 × 82</td><td class="note">240−2−1−16−12 · 120−4−8−20−6</td></tr>
+      </table>
+    </section>
+
+    <!-- 2 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>2 · box-sizing</h2>
+      <p>Both declare <code>width: 200px; padding: 24px; border: 6px</code>.
+        Only one of them is 200px wide.</p>
+      <div class="row2">
+        <div class="sizing content-box"><span>content-box</span></div>
+        <div class="sizing border-box"><span>border-box</span></div>
+      </div>
+      <table class="expect">
+        <tr><th>content-box</th><td>260 × 107.19 outer, 200 × 47.19 content</td></tr>
+        <tr><th>border-box</th><td>200 × 107.19 outer, 140 × 47.19 content</td></tr>
+        <tr><th></th><td class="note">the .19 is the line box — heights are rarely round</td></tr>
+      </table>
+    </section>
+
+    <!-- 3 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>3 · Flex gap — the multi-lock case</h2>
+      <p>Five chips, <code>gap: 12px</code>, except one override. Lock the first,
+        right-click the rest: four gutters at once.</p>
+      <div class="chips">
+        <span class="chip">alpha</span>
+        <span class="chip">beta</span>
+        <span class="chip wide">gamma</span>
+        <span class="chip">delta</span>
+        <span class="chip">epsilon</span>
+      </div>
+      <table class="expect">
+        <tr><th>gutters</th><td>12 · 12 · 12 · 12</td></tr>
+        <tr><th>chip heights</th><td>all 30 — widths vary with the label</td></tr>
+      </table>
+    </section>
+
+    <!-- 4 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>4 · Grid, two axes at once</h2>
+      <p><code>column-gap: 24px; row-gap: 16px</code>. Lock a cell and its
+        right neighbour, then a cell and the one below it.</p>
+      <div class="grid">
+        <div class="cell">1</div><div class="cell">2</div><div class="cell">3</div>
+        <div class="cell">4</div><div class="cell">5</div><div class="cell">6</div>
+      </div>
+      <table class="expect">
+        <tr><th>column gap</th><td>24</td></tr>
+        <tr><th>row gap</th><td>16</td></tr>
+      </table>
+    </section>
+
+    <!-- 5 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>5 · Negative margin, overlap</h2>
+      <p>The second box is pulled 20px into the first. There is no gap to
+        measure on either axis, so no distance line should be drawn.</p>
+      <div class="overlap">
+        <div class="slab a">a</div>
+        <div class="slab b">b &nbsp;<small>margin-left: −20</small></div>
+      </div>
+    </section>
+
+    <!-- 6 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>6 · Transforms</h2>
+      <p>A rect follows the transform; computed padding does not. The panel's
+        outer size is the <em>visual</em> box, so scaled elements read larger
+        than their content maths — that is correct, and worth seeing.</p>
+      <div class="row2">
+        <div class="tf scale"><span>scale(1.25)</span></div>
+        <div class="tf rot"><span>rotate(12°)</span></div>
+      </div>
+      <table class="expect">
+        <tr><th>untransformed</th><td>160 × 80, padding 16</td></tr>
+        <tr><th>scaled rect</th><td>200 × 100</td></tr>
+        <tr><th>rotated rect</th><td>173.14 × 111.52 — the bounding box, not the element</td></tr>
+      </table>
+    </section>
+
+    <!-- 7 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>7 · Web components (shadow DOM)</h2>
+      <p>An open shadow root nests three levels inside a custom element. The
+        tool descends into it and measures the real inner node — a closed root
+        can't be pierced by anything, so it measures as the host.</p>
+      <div class="row2">
+        <fancy-card label="open root"></fancy-card>
+        <fancy-card label="closed root" closed></fancy-card>
+      </div>
+      <table class="expect">
+        <tr><th>open</th><td>hovering the inner pill reports <code>span.pill</code>, 96 × 26</td></tr>
+        <tr><th>closed</th><td>reports <code>fancy-card</code> — the whole host</td></tr>
+      </table>
+    </section>
+
+    <!-- 8 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>8 · Scrolling container</h2>
+      <p>Scroll inside the box, then measure. Rects are re-read on scroll, so
+        the numbers must follow the content rather than going stale.</p>
+      <div class="scroller">
+        <div class="stack">
+          <div class="strip">1</div><div class="strip">2</div><div class="strip">3</div>
+          <div class="strip">4</div><div class="strip">5</div><div class="strip">6</div>
+          <div class="strip">7</div><div class="strip">8</div>
+        </div>
+      </div>
+      <table class="expect">
+        <tr><th>strip gap</th><td>10, at any scroll position</td></tr>
+      </table>
+    </section>
+
+    <!-- 9 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>9 · Fractional geometry</h2>
+      <p>Three columns of <code>33.333%</code> inside 700px, so nothing lands on
+        a whole pixel. Fractions must survive to two decimals.</p>
+      <div class="thirds">
+        <div class="third">33.333%</div><div class="third">33.333%</div><div class="third">33.333%</div>
+      </div>
+      <table class="expect">
+        <tr><th>each</th><td>233.33 × 44</td></tr>
+        <tr><th>gutters</th><td>0 — they sit flush</td></tr>
+        <tr><th>the row</th><td>699.98, so it ends 0.02 short of its 700 parent</td>
+            <td class="note">lock the last third and the container to see it</td></tr>
+      </table>
+    </section>
+
+    <!-- 10 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>10 · Deep nesting and stacking</h2>
+      <p>Ten wrappers, each inset 6px, then two absolutely positioned tiles that
+        overlap. Hit-testing takes the topmost, not the deepest.</p>
+      <div class="deep"><div><div><div><div><div><div><div><div><div>
+        <span class="core">core</span>
+      </div></div></div></div></div></div></div></div></div>
+      <div class="stackers">
+        <div class="tile under">z 1</div>
+        <div class="tile over">z 2</div>
+      </div>
+    </section>
+
+    <!-- 11 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>11 · SVG and a table</h2>
+      <p>Neither is an ordinary block box. SVG shapes report their own rects;
+        table cells carry <code>border-spacing</code> rather than margins.</p>
+      <div class="row2">
+        <svg width="220" height="110" viewBox="0 0 220 110">
+          <rect x="10" y="10" width="80" height="40" rx="0" />
+          <rect x="120" y="10" width="80" height="40" rx="0" />
+          <circle cx="50" cy="80" r="20" />
+          <circle cx="160" cy="80" r="20" />
+        </svg>
+        <table class="grid-table">
+          <tr><td>a1</td><td>b1</td><td>c1</td></tr>
+          <tr><td>a2</td><td>b2</td><td>c2</td></tr>
+        </table>
+      </div>
+      <table class="expect">
+        <tr><th>svg rects</th><td>80 × 40 each, 30 apart</td></tr>
+        <tr><th>circles</th><td>40 × 40 each</td></tr>
+        <tr><th>cells</th><td>border-spacing 8 shows as an 8px gutter</td></tr>
+      </table>
+    </section>
+
+    <!-- 12 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>12 · Sticky, fixed, and an iframe</h2>
+      <p>The bar at the top is sticky and the pill bottom-right is fixed — both
+        measure normally. The iframe is a separate document: hit-testing stops
+        at its edge and reports the <code>iframe</code> element itself.</p>
+      <div class="row2">
+        <iframe title="nested document" srcdoc="
+          <body style='margin:0;background:#1b2029;font:12px system-ui;color:#8b97a8'>
+            <div style='margin:16px;padding:12px;border:2px solid #2b3341'>inside an iframe</div>
+          </body>"></iframe>
+        <div class="pad-note">Fixed pill is bottom-right &rarr;</div>
+      </div>
+    </section>
+
+    <div class="tail">end of page — scroll back up</div>
+  </main>
+
+  <div class="fixed-pill">fixed</div>
+  <script type="module" src="./complex.ts"></script>
+</body>
+</html>

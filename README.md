@@ -171,9 +171,27 @@ npm run typecheck
 npm run build && npm run size
 ```
 
-`examples/vite-demo` has elements with exact known dimensions — a 13.5px gap, a
-40px header with 16px side padding — so you can check a reading against
-DevTools. `?hmrprobe` tracks listener registrations across saves.
+`examples/vite-demo` has two pages. `/` holds simple fixtures of known size — a
+13.5px gap, a 40px header with 16px side padding — for checking a reading
+against DevTools. `/complex.html` is the hard cases, twelve sections each
+stating the numbers it should produce:
+
+| | |
+|---|---|
+| asymmetric box model | every side a different margin, border and padding |
+| `box-sizing` | two boxes declaring the same width, only one of them 200px |
+| flex gap | five chips — the multi-lock case |
+| grid | column and row gaps differing |
+| negative margin | overlapping, so there is no gap to draw |
+| transforms | a rect follows `scale`/`rotate`; computed padding does not |
+| web components | an open shadow root, and a closed one that can't be pierced |
+| scrolling container | rects must follow the content, not go stale |
+| fractional geometry | thirds of 700px, landing on `233.33` |
+| deep nesting, stacking | ten wrappers, then overlapping z-indexed tiles |
+| SVG and tables | neither is an ordinary block box |
+| sticky, fixed, iframe | hit-testing stops at the iframe boundary |
+
+`?hmrprobe` tracks listener registrations across saves.
 
 ## Architecture
 
@@ -190,8 +208,10 @@ align/
 ```
 
 Nothing walks the DOM and nothing is cached: guides come from the hovered
-element's own rect, distances from exactly two elements, all measured on demand
-through `elementFromPoint`. Since nothing is stored, nothing can go stale — an
+element's own rect, distances from the locked set, all measured on demand
+through `elementFromPoint` — descending through open shadow roots, so a page
+built from web components measures its real inner nodes rather than one opaque
+host per component. Since nothing is stored, nothing can go stale — an
 animating page can't show you a wrong number.
 
 Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only `index.ts` touches

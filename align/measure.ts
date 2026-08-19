@@ -30,14 +30,33 @@ export function boxOf(el: Element): Box {
   };
 }
 
+/** Up through the tree, crossing out of a shadow root via its host. */
+function up(el: Element): Element | null {
+  if (el.parentElement) return el.parentElement;
+  const root = el.getRootNode();
+  return root instanceof ShadowRoot ? root.host : null;
+}
+
 /**
  * What's under the cursor, skipping our own overlay and anything the user has
  * opted out. An ignored hit walks up rather than returning nothing.
+ *
+ * `document.elementFromPoint` stops at a shadow host, so a web component would
+ * otherwise only ever measure as one opaque box — no good on a page built from
+ * Lit or Shoelace components. Descending through open roots measures the real
+ * element instead. Closed roots stay closed, including our own overlay.
  */
 export function hitTest(x: number, y: number, cfg: Config): Box | null {
   const skip = skipSelector(cfg);
   let el = document.elementFromPoint(x, y);
-  while (el && el.matches(skip)) el = el.parentElement;
+
+  while (el?.shadowRoot) {
+    const inner = el.shadowRoot.elementFromPoint(x, y);
+    if (!inner || inner === el) break;
+    el = inner;
+  }
+
+  while (el && el.matches(skip)) el = up(el);
   return el && el !== document.documentElement ? boxOf(el) : null;
 }
 

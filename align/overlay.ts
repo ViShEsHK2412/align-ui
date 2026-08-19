@@ -1,5 +1,5 @@
 import { fmt } from './measure';
-import { alpha, ink, prefersDark, TYPE, type Ink } from './theme';
+import { alpha, ink, prefersDark, TYPE, WEIGHT, whenFontReady, type Ink } from './theme';
 import type { Box, Segment } from './types';
 
 /**
@@ -51,6 +51,10 @@ export function mountOverlay(): Overlay {
   const scheme = matchMedia('(prefers-color-scheme: dark)');
   const onScheme = () => { c = ink(scheme.matches); schedule(); };
   scheme.addEventListener('change', onScheme);
+
+  // Canvas measures text with whatever face is resolved at draw time, so redraw
+  // once Inter arrives — otherwise chips stay sized for the fallback.
+  whenFontReady(() => schedule());
 
   function fit() {
     const dpr = devicePixelRatio;
@@ -114,10 +118,10 @@ export function mountOverlay(): Overlay {
 
   /** `center` places the chip's midpoint at (x, y) instead of its top-left. */
   function chip(text: string, x: number, y: number, bg: string, center = false) {
-    ctx.font = `${TYPE.tooltip}px ${TYPE.mono}`;
+    ctx.font = `${WEIGHT.medium} ${TYPE.body}px ${TYPE.stack}`;
     ctx.textBaseline = 'middle';
     const w = ctx.measureText(text).width + PAD * 2;
-    const h = TYPE.tooltip + PAD * 2;
+    const h = TYPE.body + PAD * 2 + 2;
     const left = center ? x - w / 2 : x;
     const top = center ? y - h / 2 : y;
     const cx = Math.min(Math.max(left, EDGE), innerWidth - w - EDGE);

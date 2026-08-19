@@ -6,7 +6,7 @@ distance between them — fractions included.
 
 It measures. It doesn't judge: whether 25.5px is wrong is your call.
 
-No runtime dependencies, ~10KB minified, physically absent from production
+No runtime dependencies, ~13KB minified, physically absent from production
 bundles.
 
 ```
@@ -14,6 +14,7 @@ Cmd/Ctrl + Shift + A    toggle
 hover                   outline + dotted edge guides + size tooltip
 click                   pin it, and open the box model panel
 hover with a pin set    distance lines between the two, in px
+drag the panel header   move the box model anywhere on screen
 Escape                  clear the pin; again to close
 ```
 
@@ -27,11 +28,14 @@ the same bargain DevTools' inspect mode makes. Toggle off to use the app.
 - **Distance lines** are drawn with end caps and a px label, only between the
   pinned element and the hovered one.
 - **The tooltip** follows the cursor with `160 × 24` and nothing else.
-- **The box model panel**, bottom-left, shows margin, border, padding and
-  content for the pinned element. Zeros render as `–` so real numbers stand out.
+- **The box model panel** starts bottom-left and shows margin, border, padding
+  and content for the pinned element. Each band names itself in its own hue, so
+  a label can't be mistaken for the region above it. Zeros render as `–` so the
+  numbers that matter stand out. Drag it by the header to anywhere on screen —
+  it stays where you put it, clamped so it can never be lost off an edge.
 
-Everything is 1px. Numbers are monospace and tabular, so they don't jitter as
-the cursor moves.
+Everything is 1px. Numbers are tabular, so they don't jitter as the cursor
+moves.
 
 ## Install
 
@@ -95,11 +99,27 @@ it walks up to the nearest ancestor that isn't ignored.
 
 ## Design
 
-Colours are [Fluid Functionalism](https://fluidfunctionalism.com)'s tokens
+**Type** is Inter throughout, on a three-step scale named by use: 13px for the
+panel title, 12px for every number and the cursor tooltip, 11px for the band
+names — the only thing below the 12px floor, and it never carries a value.
+Numbers are `tabular-nums`, which matters more here than anywhere else: they
+change on every mousemove, and proportional digits make the readout jitter.
+`font-synthesis: none`, so a missing weight fails visibly instead of being
+faked.
+
+Inter is loaded from Google Fonts at document level, because `@font-face`
+inside a shadow root is ignored — a stylesheet in our own shadow CSS would
+never apply. It's fetched on first activation, not at import, and removed on
+teardown. If the host page blocks it, the system stack takes over and
+everything still reads correctly; it just isn't Inter.
+
+**Colour** is [Fluid Functionalism](https://fluidfunctionalism.com)'s tokens
 converted to OKLCH, written once as `light-dark()` pairs and flipped by
-`color-scheme`, so the panel follows your OS theme. The box model bands share
+`color-scheme`, so the panel follows your OS theme. The box model fills share
 one lightness and one chroma across four hues, so no band reads heavier than
-another.
+another. The band *labels* use the same hues at a different lightness — L 0.72
+on white reads about 2.4:1, well under the 4.5:1 floor for text, and contrast
+is fixed on the L channel alone so the hue still ties label to band.
 
 **The tool has exactly one animation** — the box model panel's entrance, 160ms
 in and 120ms out (slow in, faster out). Everything else is instant on purpose:
@@ -126,9 +146,9 @@ DevTools. `?hmrprobe` tracks listener registrations across saves.
 align/
   index.ts      init, hotkey, hover/pin state, lifecycle
   overlay.ts    canvas: outlines, guides, distances, tooltip
-  boxmodel.ts   the bottom-left panel
+  boxmodel.ts   the draggable box model panel
   measure.ts    geometry, hit-testing, computed styles
-  theme.ts      OKLCH tokens, light/dark resolution
+  theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
   config.ts     ignore selector, hotkey
 ```

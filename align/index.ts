@@ -2,6 +2,7 @@ import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
 import { boxOf, gapSegments, hitTest } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
+import { loadFont, unloadFont } from './theme';
 import type { Box } from './types';
 
 /**
@@ -69,6 +70,8 @@ function onViewportChange() {
 
 function activate() {
   if (overlay) return;
+  // Loaded here rather than at init, so the tool still costs nothing at rest.
+  loadFont();
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
   addEventListener('mousemove', onMouseMove);
@@ -86,6 +89,7 @@ function deactivate() {
   boxmodel = null;
   overlay?.destroy();
   overlay = null;
+  unloadFont();
   hover = null;
   pinned = null;
 }

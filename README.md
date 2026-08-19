@@ -8,6 +8,7 @@ It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 
 ![align-ui measuring the gutters between five chips](docs/screenshot.png)
 
+- One line to install, one line to wire up
 - No runtime dependencies
 - ~24 KB minified, 8.7 KB gzipped
 - Physically absent from production builds
@@ -175,6 +176,8 @@ cost is about 0.01 ms per frame.
 ```
 align/
   index.ts      init, hotkey, hover/lock state, lifecycle
+  vite.ts       the Vite plugin
+  auto.ts       one-line side-effecting entry
   overlay.ts    canvas: outlines, guides, distances, tooltip
   boxmodel.ts   the draggable box model panel
   indicator.ts  the badge and its key list
@@ -218,9 +221,24 @@ npm install
 npm run demo        # http://localhost:5173
 npm test            # unit tests on the geometry
 npm run typecheck
-npm run build       # dist/align.js
+npm run build       # dist/{align,auto,vite}.js + types
 npm run size        # fails over 32 KB
 ```
+
+`npm run build` runs on install too, via `prepare`, which is what lets the
+package be installed straight from git without any build output in the repo.
+
+To check a change to the packaging itself, install it somewhere real rather
+than trusting it:
+
+```bash
+npm pack                                    # align-ui-0.0.0.tgz
+cd <some other project>
+npm i -D <path>/align-ui-0.0.0.tgz
+```
+
+`npm pack` produces exactly what a `github:` install resolves to, so if it
+works from the tarball it works from the repo.
 
 Two example pages under `examples/vite-demo`:
 

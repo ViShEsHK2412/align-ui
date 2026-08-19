@@ -1,0 +1,4 @@
+# Build output ships verbatim. Without this, git rewrites line endings on
+# checkout and the file npm installs is not byte-for-byte the file that was
+# built and verified.
+dist/** -text

@@ -1,0 +1,30 @@
+{
+  "name": "align",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev-only alignment and spacing auditor that runs inside your own project.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/align.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "esbuild align/index.ts --bundle --format=esm --minify --outfile=dist/align.js && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "size": "node -e \"const s=require('fs').statSync('dist/align.js').size;console.log('dist/align.js',s,'bytes');if(s>20480)process.exit(1)\"",
+    "demo": "vite examples/vite-demo",
+    "demo:build": "vite build examples/vite-demo"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Align — demo page</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!--
+    SEEDED DEFECTS — a correct Phase 1 scan must report all of these:
+      1. left      · 6 cards · 5 at 24px, 1 at 25.5px      (#cards, .card.off)
+      2. gap-x     · 4 items · 16, 16, 18px                (#nav)
+      3. subpixel  · h2#drift-heading · top …0.5px         (#drift-heading)
+      4. right     · 4 bars · chain drift 224→225→226→227  (#bars)
+
+    CLEAN CONTROLS — none of these may be reported:
+      #clean-grid   3 cards, exact                  #sticky      sticky header
+      #hidden       display:none section            .divider     2px rules (< minSize)
+      #offscreen    positioned below the fold
+
+    #measure-pair is a Phase 5 fixture with a 13.5px gap; its half-pixel edges
+    are correctly reported as subpixel, so it is a true positive, not noise.
+
+    Add ?stress=2000 to append N extra elements and time the scan.
+  -->
+  <header id="sticky">align demo — press the hotkey, or run __alignAudit()</header>
+
+  <main class="stage">
+    <!-- 1. six cards, one 1.5px out ------------------------------------- -->
+    <section id="cards">
+      <div class="card" style="top: 0px"></div>
+      <div class="card" style="top: 32px"></div>
+      <div class="card" style="top: 64px"></div>
+      <div class="card off" style="top: 96px"></div>
+      <div class="card" style="top: 128px"></div>
+      <div class="card" style="top: 160px"></div>
+    </section>
+
+    <!-- 2. nav with a 18px gutter among 16s ------------------------------ -->
+    <nav id="nav">
+      <a class="tab" href="#">One</a>
+      <a class="tab" href="#">Two</a>
+      <a class="tab" href="#">Three</a>
+      <a class="tab" href="#">Four</a>
+    </nav>
+
+    <!-- 3. heading on a half pixel --------------------------------------- -->
+    <h2 id="drift-heading">Half-pixel heading</h2>
+
+    <!-- 4. right edges drifting 1px per row ------------------------------ -->
+    <section id="bars">
+      <div class="bar" style="width: 200px"></div>
+      <div class="bar" style="width: 201px"></div>
+      <div class="bar" style="width: 202px"></div>
+      <div class="bar" style="width: 203px"></div>
+    </section>
+
+    <hr class="divider" />
+
+    <!-- clean control: exact grid ---------------------------------------- -->
+    <section id="clean-grid">
+      <div class="cell"></div>
+      <div class="cell"></div>
+      <div class="cell"></div>
+    </section>
+
+    <!-- clean control: fractional gap fixture for Phase 5 ---------------- -->
+    <section id="measure-pair">
+      <div class="mark a"></div>
+      <div class="mark b"></div>
+    </section>
+
+    <section id="hidden">
+      <div class="card"></div><div class="card"></div><div class="card"></div>
+    </section>
+
+    <section id="offscreen">
+      <div class="card"></div><div class="card"></div><div class="card"></div>
+    </section>
+
+    <div id="stress"></div>
+  </main>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

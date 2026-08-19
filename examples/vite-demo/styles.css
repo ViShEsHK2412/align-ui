@@ -1,0 +1,108 @@
+/* An aggressive global font — Phase 3 checks none of it leaks into the panel. */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  font-family: "Comic Sans MS", cursive;
+  line-height: 2.4;
+  letter-spacing: 1px;
+  background: #0f1115;
+  color: #cbd3e1;
+}
+
+#sticky {
+  position: sticky;
+  top: 0;
+  height: 40px;
+  padding: 0 16px;
+  line-height: 40px;
+  background: #171a21;
+  font-size: 13px;
+  z-index: 5;
+}
+
+/* Absolute positioning throughout so the seeded numbers are exact, not
+   the product of the layout engine rounding a flex distribution. */
+.stage { position: relative; height: 1400px; }
+.stage section, .stage nav, .stage h2 { position: absolute; margin: 0; }
+
+/* 1 ── six cards at left:24, the fourth at 25.5 ───────────────────────────── */
+#cards { left: 0; top: 24px; width: 400px; height: 192px; }
+.card {
+  position: absolute;
+  left: 24px;
+  width: 160px;
+  height: 24px;
+  background: #232833;
+  border-radius: 4px;
+}
+.card.off { left: 25.5px; background: #2c2430; }
+
+/* 2 ── nav gutters 16 / 16 / 18 ───────────────────────────────────────────── */
+#nav { left: 440px; top: 24px; width: 420px; height: 32px; }
+.tab {
+  position: absolute;
+  top: 0;
+  width: 80px;
+  height: 28px;
+  background: #232833;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 28px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+}
+.tab:nth-child(1) { left: 40px; }   /* right 120 */
+.tab:nth-child(2) { left: 136px; }  /* gap 16 → right 216 */
+.tab:nth-child(3) { left: 232px; }  /* gap 16 → right 312 */
+.tab:nth-child(4) { left: 330px; }  /* gap 18 ← the defect */
+
+/* 3 ── heading sitting on a half pixel ────────────────────────────────────── */
+#drift-heading {
+  left: 440px;
+  top: 100.5px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* 4 ── right edges drifting 224 → 225 → 226 → 227 ─────────────────────────── */
+#bars { left: 0; top: 260px; width: 400px; height: 120px; }
+.bar {
+  position: absolute;
+  left: 60px;
+  height: 20px;
+  background: #232833;
+  border-radius: 3px;
+}
+.bar:nth-child(1) { top: 0; }
+.bar:nth-child(2) { top: 28px; }
+.bar:nth-child(3) { top: 56px; }
+.bar:nth-child(4) { top: 84px; }
+
+/* clean controls ──────────────────────────────────────────────────────────── */
+.divider { position: absolute; left: 0; top: 400px; width: 900px; height: 2px;
+           border: 0; background: #1d2129; }
+
+#clean-grid { left: 0; top: 420px; width: 400px; height: 100px; }
+.cell {
+  position: absolute;
+  top: 0;
+  width: 96px;
+  height: 64px;
+  background: #1b2029;
+  border-radius: 4px;
+}
+.cell:nth-child(1) { left: 80px; }
+.cell:nth-child(2) { left: 192px; }  /* gap 16 */
+.cell:nth-child(3) { left: 304px; }  /* gap 16 */
+
+#measure-pair { left: 440px; top: 420px; width: 400px; height: 100px; }
+.mark { position: absolute; top: 0; width: 80px; height: 40px; background: #1b2029; }
+.mark.a { left: 100px; }             /* right 180 */
+.mark.b { left: 193.5px; }           /* 13.5px gap — Phase 5 fixture */
+
+#hidden { display: none; }
+#offscreen { left: 0; top: 1200px; }
+
+#stress { position: absolute; left: 0; top: 560px; }
+.px { position: absolute; width: 8px; height: 8px; background: #171b22; }

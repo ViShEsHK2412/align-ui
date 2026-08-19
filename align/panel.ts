@@ -87,7 +87,8 @@ export function createPanel(root: ShadowRoot, cfg: { tol: number },
   let current: Violation[] = [];
   let isStale = false;
 
-  const tabButtons = (['all', 'align', 'spacing', 'subpixel'] as Filter[]).map((name) => {
+  const FILTERS = ['all', 'align', 'spacing', 'subpixel'] as const satisfies readonly Filter[];
+  const tabButtons = FILTERS.map((name) => {
     const b = button(name);
     b.onclick = () => { filter = name; syncTabs(); render(); };
     tabs.appendChild(b);

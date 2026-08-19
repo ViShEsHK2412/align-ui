@@ -8,7 +8,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ margin: 0, background: '#0f1115', color: '#cbd3e1',
                      fontFamily: 'system-ui, sans-serif' }}>
         {children}
-        {process.env.NODE_ENV !== 'production' && <AlignDev />}
+        {process.env.NODE_ENV !== 'production' ? <AlignDev /> : null}
       </body>
     </html>
   );

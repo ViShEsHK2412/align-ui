@@ -7,10 +7,13 @@ import type { Box } from './types';
  * bands; the geometry itself is pure so it can be reasoned about and tested.
  */
 
+/** Top, right, bottom, left — the order every CSS shorthand uses. */
+export type Quad = readonly [number, number, number, number];
+
 export interface Bands {
-  padding: number[];   // top, right, bottom, left
-  border: number[];
-  margin: number[];
+  padding: Quad;
+  border: Quad;
+  margin: Quad;
 }
 
 /** Walk up from a hit element to the nearest one present in the scan set. */

@@ -152,9 +152,9 @@ export function mountOverlay(): Overlay {
 
   /** Content, padding, border and margin, drawn as nested translucent bands. */
   function drawBands(box: Box, b: Bands) {
-    const [mt, mr, mb, ml] = b.margin as [number, number, number, number];
-    const [bt, br, bb, bl] = b.border as [number, number, number, number];
-    const [pt, pr, pb, pl] = b.padding as [number, number, number, number];
+    const [mt, mr, mb, ml] = b.margin;
+    const [bt, br, bb, bl] = b.border;
+    const [pt, pr, pb, pl] = b.padding;
 
     const band = (x: number, y: number, w: number, h: number, color: string) => {
       ctx.fillStyle = color;

@@ -28,7 +28,7 @@ let observer: MutationObserver | null = null;
 let boxes: Box[] = [];
 let violations: Violation[] = [];
 let stale = false;
-let debounce = 0;
+let debounce: ReturnType<typeof setTimeout> | undefined;
 let byEl = new Map<Element, Box>();
 let anchor: Box | null = null;
 let measureShown = false;
@@ -109,7 +109,7 @@ function onResizeOrScroll() {
   debounce = setTimeout(() => {
     markStale();
     overlay?.resize();
-  }, 150) as unknown as number;
+  }, 150);
 }
 
 function activate() {
@@ -148,7 +148,7 @@ function deactivate() {
   removeEventListener('resize', onResizeOrScroll);
   removeEventListener('scroll', onResizeOrScroll, true);
   removeEventListener('mousemove', onMouseMove);
-  removeEventListener('mousedown', onMouseDown, { capture: true } as EventListenerOptions);
+  removeEventListener('mousedown', onMouseDown, { capture: true });
   removeEventListener('keyup', onKeyUp);
   clearTimeout(debounce);
   panel?.destroy();
@@ -197,7 +197,7 @@ export function initAlign(partial: Partial<Config> = {}): void {
   if (hot) {
     hot.dispose(() => {
       deactivate();
-      removeEventListener('keydown', onKey, { capture: true } as EventListenerOptions);
+      removeEventListener('keydown', onKey, { capture: true });
       delete window.__align;
       delete window.__alignAudit;
     });

@@ -104,5 +104,3 @@ html, body {
 #hidden { display: none; }
 #offscreen { left: 0; top: 1200px; }
 
-#stress { position: absolute; left: 0; top: 560px; }
-.px { position: absolute; width: 8px; height: 8px; background: #171b22; }

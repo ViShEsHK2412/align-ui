@@ -1,3 +1,4 @@
+import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
 import { boxOf, gapSegments, hitTest } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
@@ -17,6 +18,7 @@ declare global {
 
 let cfg: Config;
 let overlay: Overlay | null = null;
+let boxmodel: BoxModel | null = null;
 let hover: Box | null = null;
 let pinned: Box | null = null;
 
@@ -53,6 +55,7 @@ function onMouseDown(e: MouseEvent) {
   e.stopPropagation();
   pinned = hit;
   hover = hit;
+  boxmodel?.show(hit);
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -67,6 +70,7 @@ function onViewportChange() {
 function activate() {
   if (overlay) return;
   overlay = mountOverlay();
+  boxmodel = createBoxModel(overlay.root);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('resize', onViewportChange);
@@ -78,6 +82,8 @@ function deactivate() {
   removeEventListener('mousedown', onMouseDown, { capture: true });
   removeEventListener('resize', onViewportChange);
   removeEventListener('scroll', onViewportChange, true);
+  boxmodel?.destroy();
+  boxmodel = null;
   overlay?.destroy();
   overlay = null;
   hover = null;
@@ -90,7 +96,7 @@ function onKey(e: KeyboardEvent) {
     overlay ? deactivate() : activate();
   } else if (e.key === 'Escape' && overlay) {
     // Escape backs out one step: drop the pin first, close second.
-    if (pinned) { pinned = null; render(); }
+    if (pinned) { pinned = null; boxmodel?.hide(); render(); }
     else deactivate();
   }
 }

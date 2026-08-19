@@ -1,25 +1,4 @@
-// ?stress=2000 tiles N extra elements across the viewport to time a full scan
-// against the §11 budget (2000 elements < 100ms).
-const stress = Number(new URLSearchParams(location.search).get('stress') ?? 0);
-if (stress > 0) {
-  const host = document.getElementById('stress')!;
-  host.style.cssText = 'position: fixed; inset: 0; z-index: 0;';
-  const cols = Math.floor(window.innerWidth / 12) || 1;
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < stress; i++) {
-    const d = document.createElement('div');
-    d.className = 'px';
-    // Exact multiples of 12 — these must cluster cleanly and report nothing.
-    d.style.left = (i % cols) * 12 + 'px';
-    d.style.top = Math.floor(i / cols) * 12 + 'px';
-    frag.appendChild(d);
-  }
-  host.appendChild(frag);
-}
-
-// Phase 6 harness: track the keydown listeners actually registered on window,
-// so `?hmrprobe` can prove the tool leaves exactly one after N saves. A Set of
-// function refs, not a counter — a removal that matches nothing must not skew it.
+// Demo harness. The tool itself is imported at the bottom.
 if (new URLSearchParams(location.search).has('hmrprobe')) {
   const w = window as unknown as { __keydowns: Set<unknown> };
   if (!w.__keydowns) {

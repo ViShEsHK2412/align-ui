@@ -8,23 +8,18 @@
 </head>
 <body>
   <!--
-    SEEDED DEFECTS — a correct Phase 1 scan must report all of these:
-      1. left      · 6 cards · 5 at 24px, 1 at 25.5px      (#cards, .card.off)
-      2. gap-x     · 4 items · 16, 16, 18px                (#nav)
-      3. subpixel  · h2#drift-heading · top …0.5px         (#drift-heading)
-      4. right     · 4 bars · chain drift 224→225→226→227  (#bars)
+    A page with known, exact geometry to measure against.
 
-    CLEAN CONTROLS — none of these may be reported:
-      #clean-grid   3 cards, exact                  #sticky      sticky header
-      #hidden       display:none section            .divider     2px rules (< minSize)
-      #offscreen    positioned below the fold
+      #cards        six 160x24 cards at left 24px, the fourth at 25.5px
+      #nav          four 80x28 tabs, gutters 16 / 16 / 18px
+      #bars         four bars whose right edges run 224 -> 227px
+      #measure-pair two marks with a 13.5px gap
+      #sticky       40px header, padding 0 16px  (the box model fixture)
+      #clean-grid   three 96x64 cells, 16px gutters
 
-    #measure-pair is a Phase 5 fixture with a 13.5px gap; its half-pixel edges
-    are correctly reported as subpixel, so it is a true positive, not noise.
-
-    Add ?stress=2000 to append N extra elements and time the scan.
+    Add ?hmrprobe to track keydown listeners across hot updates.
   -->
-  <header id="sticky">align demo — press the hotkey, or run __alignAudit()</header>
+  <header id="sticky">align demo — Ctrl/Cmd+Shift+A, then hover · click to pin · Esc to clear</header>
 
   <main class="stage">
     <!-- 1. six cards, one 1.5px out ------------------------------------- -->
@@ -79,7 +74,6 @@
       <div class="card"></div><div class="card"></div><div class="card"></div>
     </section>
 
-    <div id="stress"></div>
   </main>
 
   <script type="module" src="./main.ts"></script>

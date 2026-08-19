@@ -117,12 +117,6 @@ function swallow(e: Event) {
   e.stopPropagation();
 }
 
-function toggleRulers() {
-  rulers = !rulers;
-  indicator?.setRulers(rulers);
-  render();
-}
-
 function sameRect(a: Box, b: Box): boolean {
   return a.left === b.left && a.top === b.top &&
          a.width === b.width && a.height === b.height;
@@ -175,9 +169,8 @@ function activate() {
   loadFont();
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
-  indicator = createIndicator(overlay.root, { onToggleRulers: toggleRulers });
+  indicator = createIndicator(overlay.root);
   indicator.update(0);
-  indicator.setRulers(rulers);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('click', onClick, { capture: true });
@@ -213,7 +206,8 @@ function onKey(e: KeyboardEvent) {
     overlay ? deactivate() : activate();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();
-    toggleRulers();
+    rulers = !rulers;
+    render();
   } else if (overlay && e.key.toLowerCase() === cfg.panelKey) {
     // A plain letter is safe here: while the tool is on it swallows clicks, so
     // nothing on the page can hold focus and receive the keystroke instead.

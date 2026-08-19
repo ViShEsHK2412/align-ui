@@ -9,7 +9,7 @@ It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 ![align-ui measuring the gutters between five chips](docs/screenshot.png)
 
 - No runtime dependencies
-- ~22 KB minified, 8 KB gzipped
+- ~21 KB minified, 7.7 KB gzipped
 - Physically absent from production builds
 - Vite, Next.js, CRA, Remix, Astro, SvelteKit
 
@@ -71,16 +71,17 @@ If `align/` sits outside your Next project root, set
 | right-click | add to the locked set, or drop one from it |
 | drag the panel header | move the box model |
 | `B`, or the `×` | hide the box model, and bring it back |
-| `R`, or the badge button | rulers along the top and left edges |
+| `R` | rulers along the top and left edges |
 | `Esc` | close the key list, then the locks, then the tool |
 
 Clicking the **Align** badge, top-right, shows this list in the page.
 
 **Rulers** run along the top and left edges in *page* coordinates, counting from
 the top-left of the document rather than the viewport, so the numbers keep
-meaning something as you scroll. Ticks step 10 / 50 / 100 px, the cursor is
-marked on both rules, and whatever is locked or hovered is shaded on them so a
-selection stays findable.
+meaning something as you scroll. Ticks step 10 / 50 / 100 px and the cursor is
+marked on both rules. Locked elements are shaded on them, so a selection stays
+findable once it scrolls off — the hovered element is not, since a band
+repainting on every mouse move is noise rather than information.
 
 **Locking more than one** is how you check a row at a glance: click the first
 element, right-click the rest, and every gutter between them is measured at

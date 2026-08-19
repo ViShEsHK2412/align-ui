@@ -163,12 +163,13 @@ export function mountOverlay(): Overlay {
     ctx.font = `${WEIGHT.regular} 9px ${TYPE.stack}`;
     ctx.fillStyle = c.muted;
 
-    // Shade what is locked or hovered, so a selection is findable on the rule.
-    const marks = [...state.pinned, ...(state.hover ? [state.hover] : [])];
+    // Shade what is LOCKED, so a selection stays findable when it scrolls off.
+    // Deliberately not the hovered element: that repaints on every mouse move,
+    // and a band flashing across the rule as you sweep the page is noise.
     ctx.save();
     ctx.globalAlpha = 0.16;
     ctx.fillStyle = c.accent;
-    for (const b of marks) {
+    for (const b of state.pinned) {
       ctx.fillRect(b.left, -0.5, b.width, RULER);
       ctx.fillRect(-0.5, b.top, RULER, b.height);
     }

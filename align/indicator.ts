@@ -8,15 +8,9 @@ import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 
 export interface Indicator {
   update(locked: number): void;
-  /** Reflect ruler state, whether it was changed by the button or the key. */
-  setRulers(on: boolean): void;
   /** True if it was open — lets Escape dismiss the topmost layer first. */
   closeHelp(): boolean;
   destroy(): void;
-}
-
-export interface IndicatorHandlers {
-  onToggleRulers(): void;
 }
 
 /** Kept next to the handlers they describe, so they can't drift apart. */
@@ -56,15 +50,6 @@ const CSS = `
   .flag { box-shadow: ${surfaceShadow(3, true)}; }
 }
 .flag .count { color: ${themed(SEMANTIC.muted)}; }
-.flag .rulers {
-  display: grid; place-items: center;
-  width: 20px; height: 18px; margin: -3px 0;
-  padding: 0; border: 0; border-radius: 0; background: none;
-  color: ${themed(SEMANTIC.muted)}; cursor: pointer;
-}
-.flag .rulers:hover { color: ${themed(SEMANTIC.fg)}; background: ${nest(2)}; }
-.flag .rulers[data-on] { color: ${themed(SEMANTIC.fg)}; background: ${nest(3)}; }
-.flag .rulers svg { display: block; }
 
 .help {
   position: fixed; top: 46px; right: 16px; width: 292px;
@@ -95,27 +80,7 @@ const CSS = `
 .help dd { margin: 0; align-self: center; color: ${themed(SEMANTIC.muted)}; }
 `;
 
-const NS = 'http://www.w3.org/2000/svg';
-
-/** A corner of rule with three ticks — the same shape the feature draws. */
-function rulerIcon(): SVGElement {
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('width', '12');
-  svg.setAttribute('height', '12');
-  svg.setAttribute('viewBox', '0 0 12 12');
-  svg.setAttribute('fill', 'none');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d',
-    'M0.5 0.5 V11.5 H11.5 M3.5 0.5 V3 M6.5 0.5 V3.5 M9.5 0.5 V3 ' +
-    'M0.5 3.5 H3 M0.5 6.5 H3.5 M0.5 9.5 H3');
-  path.setAttribute('stroke', 'currentColor');
-  path.setAttribute('stroke-linecap', 'square');
-  svg.appendChild(path);
-  return svg;
-}
-
-export function createIndicator(root: ShadowRoot,
-                                handlers: IndicatorHandlers): Indicator {
+export function createIndicator(root: ShadowRoot): Indicator {
   const style = document.createElement('style');
   style.textContent = CSS;
   root.appendChild(style);
@@ -128,16 +93,7 @@ export function createIndicator(root: ShadowRoot,
   const count = document.createElement('span');
   count.className = 'count';
 
-  const rulers = document.createElement('button');
-  rulers.className = 'rulers';
-  rulers.title = 'rulers (R)';
-  rulers.appendChild(rulerIcon());
-  rulers.addEventListener('click', (e) => {
-    e.stopPropagation();               // the badge itself opens the key list
-    handlers.onToggleRulers();
-  });
-
-  flag.append(label, count, rulers);
+  flag.append(label, count);
 
   const help = document.createElement('div');
   help.className = 'help';
@@ -164,7 +120,6 @@ export function createIndicator(root: ShadowRoot,
     update(locked) {
       count.textContent = locked > 0 ? `${locked} locked` : '';
     },
-    setRulers(on) { rulers.toggleAttribute('data-on', on); },
     closeHelp() {
       const wasOpen = help.hasAttribute('data-open');
       help.removeAttribute('data-open');

@@ -1,4 +1,4 @@
-import { bandsOf, fmt } from './measure';
+import { bandsOf, fmt, scaleOf } from './measure';
 import { BAND_INK, nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 import type { Box, Quad } from './types';
 
@@ -101,6 +101,13 @@ header .name {
 header .size {
   font-size: ${TYPE.body}px; font-weight: ${WEIGHT.medium};
   color: var(--muted);
+}
+/* Only present when the element sits under a transform, so the panel never
+   claims a space it is not in. */
+header .scale {
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
+  padding: 2px 5px; margin-left: -2px;
+  color: ${themed(SEMANTIC.fg)}; background: ${nest(3)};
 }
 /* Padded well past its glyph so it is comfortably clickable, and outside the
    header's drag gesture. */
@@ -244,13 +251,22 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       const [bt, br, bb, bl] = b.border;
       const [pt, pr, pb, pl] = b.padding;
 
+      // Everything here is LAYOUT px — the numbers you would edit in CSS.
+      // getComputedStyle already reports layout values, so the size is divided
+      // back out of the rendered rect rather than mixing the two spaces, which
+      // made the content line wrong by (border + padding) x (1 - scale).
+      const s = scaleOf(box.el);
+      const w = box.width / s.x;
+      const h = box.height / s.y;
+      const scaled = Math.abs(s.x - 1) > 0.001 || Math.abs(s.y - 1) > 0.001;
+
       const header = document.createElement('header');
       const name = document.createElement('span');
       name.className = 'name';
       name.textContent = box.label;
       const size = document.createElement('span');
       size.className = 'size';
-      size.textContent = `${fmt(box.width)} × ${fmt(box.height)}`;
+      size.textContent = `${fmt(w)} × ${fmt(h)}`;
       const close = document.createElement('button');
       close.className = 'close';
       close.textContent = '×';
@@ -264,7 +280,16 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         dock.removeAttribute('data-open');
       });
 
-      header.append(name, size, close);
+      header.append(name, size);
+      if (scaled) {
+        // Say which space these numbers are in, and what they render as.
+        const badge = document.createElement('span');
+        badge.className = 'scale';
+        badge.textContent = `×${fmt(s.x)}`;
+        badge.title = `renders at ${fmt(box.width)} × ${fmt(box.height)}`;
+        header.appendChild(badge);
+      }
+      header.appendChild(close);
       header.addEventListener('pointerdown', onPointerDown);
       header.addEventListener('pointermove', onPointerMove);
       header.addEventListener('pointerup', onPointerUp);
@@ -272,8 +297,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
 
       const content = document.createElement('div');
       content.className = 'content';
-      content.textContent =
-        `${fmt(box.width - bl - br - pl - pr)} × ${fmt(box.height - bt - bb - pt - pb)}`;
+      content.textContent = `${fmt(w - bl - br - pl - pr)} × ${fmt(h - bt - bb - pt - pb)}`;
 
       panel.replaceChildren(
         header,

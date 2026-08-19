@@ -132,6 +132,11 @@ element draws nothing, since there is no gap to report.
 Guides last for the session — kept across toggling the tool off and on, gone on
 reload. Nothing is written to the host page's storage.
 
+One thing worth knowing when the two disagree: an inset is measured **border
+box to border box**, so it includes the container's border *and* its padding.
+A panel reading `padding: 3` next to an inset of `3.8` is not a contradiction —
+the difference is the 0.8px border.
+
 **Overlapping elements report insets, not gaps.** Two things side by side have
 a gap between them; something inside its container does not — it has four edge
 distances, and those are the numbers you want: how much room surrounds this

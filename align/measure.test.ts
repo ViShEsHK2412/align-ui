@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chain, chainSegments, fmt, gapSegments } from './measure';
+import { chain, chainSegments, fmt, gapSegments, scaleFromTransform } from './measure';
 import type { Box } from './types';
 
 function box(left: number, top: number, width = 100, height = 40): Box {
@@ -174,5 +174,41 @@ describe('awkward pairs', () => {
     const empty = box(50, 50, 0, 0);
     expect(() => gapSegments(box(0, 0, 200, 200), empty)).not.toThrow();
     expect(gapSegments(box(0, 0, 200, 200), empty)).toHaveLength(4);
+  });
+});
+
+describe('scaleFromTransform', () => {
+  it('reads 1 when there is no transform', () => {
+    expect(scaleFromTransform('none')).toEqual({ x: 1, y: 1 });
+    expect(scaleFromTransform('')).toEqual({ x: 1, y: 1 });
+  });
+
+  it('ignores a pure translate — the case that started this', () => {
+    // Exactly what the reported toolbar had; it is not scaled at all.
+    expect(scaleFromTransform('matrix(1, 0, 0, 1, -118.631, 0)'))
+      .toEqual({ x: 1, y: 1 });
+  });
+
+  it('reads a scale', () => {
+    expect(scaleFromTransform('matrix(0.8, 0, 0, 0.8, 0, 0)'))
+      .toEqual({ x: 0.8, y: 0.8 });
+  });
+
+  it('reads each axis separately', () => {
+    expect(scaleFromTransform('matrix(2, 0, 0, 0.5, 0, 0)'))
+      .toEqual({ x: 2, y: 0.5 });
+  });
+
+  it('does not mistake a rotation for a squash', () => {
+    // 45 degrees: every term is 0.707, but nothing is scaled.
+    const s = scaleFromTransform('matrix(0.7071, 0.7071, -0.7071, 0.7071, 0, 0)');
+    expect(s.x).toBeCloseTo(1, 3);
+    expect(s.y).toBeCloseTo(1, 3);
+  });
+
+  it('handles matrix3d', () => {
+    const s = scaleFromTransform(
+      'matrix3d(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)');
+    expect(s).toEqual({ x: 0.5, y: 0.5 });
   });
 });

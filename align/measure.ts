@@ -253,3 +253,41 @@ export function guideSegments(box: Box, at: { axis: 'x' | 'y'; pos: number }[]):
   }
   return out;
 }
+
+// ── Scale ───────────────────────────────────────────────────────────────────
+
+export interface Scale { x: number; y: number }
+
+/**
+ * Scale factors out of a computed `transform` string. Pure.
+ *
+ * Taken from the matrix rather than from rect-over-offsetWidth: offsetWidth is
+ * rounded to whole pixels, so that ratio invents a scale of 1.0011 on an
+ * unscaled 237.26px element. The matrix is exact and says 1 when it means 1.
+ */
+export function scaleFromTransform(t: string): Scale {
+  const m = /matrix(3d)?\(([^)]+)\)/.exec(t || '');
+  if (!m) return { x: 1, y: 1 };
+  const v = m[2]!.split(',').map((n) => parseFloat(n));
+  // matrix(a,b,c,d,..) and matrix3d(m11,m12,..,m21,m22,..) hold the 2D terms
+  // in different slots. hypot rather than the raw term, so a rotation does not
+  // read as a squash.
+  const [a, b, c, d] = m[1]
+    ? [v[0], v[1], v[4], v[5]]
+    : [v[0], v[1], v[2], v[3]];
+  return {
+    x: Math.hypot(a ?? 1, b ?? 0) || 1,
+    y: Math.hypot(c ?? 0, d ?? 1) || 1,
+  };
+}
+
+/** Every scale between an element and the document, multiplied together. */
+export function scaleOf(el: Element): Scale {
+  let x = 1, y = 1;
+  for (let n: Element | null = el; n; n = up(n)) {
+    const s = scaleFromTransform(getComputedStyle(n).transform);
+    x *= s.x;
+    y *= s.y;
+  }
+  return { x, y };
+}

@@ -73,3 +73,17 @@ export declare function guideSegments(box: Box, at: {
     axis: 'x' | 'y';
     pos: number;
 }[]): Segment[];
+export interface Scale {
+    x: number;
+    y: number;
+}
+/**
+ * Scale factors out of a computed `transform` string. Pure.
+ *
+ * Taken from the matrix rather than from rect-over-offsetWidth: offsetWidth is
+ * rounded to whole pixels, so that ratio invents a scale of 1.0011 on an
+ * unscaled 237.26px element. The matrix is exact and says 1 when it means 1.
+ */
+export declare function scaleFromTransform(t: string): Scale;
+/** Every scale between an element and the document, multiplied together. */
+export declare function scaleOf(el: Element): Scale;

@@ -32,19 +32,21 @@ const CSS = `
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
-  letter-spacing: 0.02em; line-height: 1;
+  line-height: 1;
   -webkit-font-smoothing: antialiased;
   color-scheme: light dark;
   color: ${themed(SEMANTIC.fg)};
   background: ${nest(0)};
   box-shadow: ${surfaceShadow(3, false)};
 }
+/* Scoped to .flag: this stylesheet shares a shadow root with the box model,
+   which has a .name of its own — an unscoped rule uppercased its header too. */
+.flag .name { text-transform: uppercase; letter-spacing: -0.01em; }
 .flag:hover { background: ${nest(1)}; }
 @media (prefers-color-scheme: dark) {
   .flag { box-shadow: ${surfaceShadow(3, true)}; }
 }
-.count { color: ${themed(SEMANTIC.muted)}; }
-.hint { color: ${themed(SEMANTIC.muted)}; font-weight: ${WEIGHT.regular}; }
+.flag .count { color: ${themed(SEMANTIC.muted)}; }
 
 .help {
   position: fixed; top: 46px; right: 16px; width: 292px;
@@ -83,13 +85,13 @@ export function createIndicator(root: ShadowRoot): Indicator {
   const flag = document.createElement('div');
   flag.className = 'flag';
   const label = document.createElement('span');
+  label.className = 'name';
+  // Stored in natural case and capitalised in CSS, so the copy never has to be
+  // rewritten if the treatment changes.
   label.textContent = 'align';
   const count = document.createElement('span');
   count.className = 'count';
-  const hint = document.createElement('span');
-  hint.className = 'hint';
-  hint.textContent = 'keys';
-  flag.append(label, count, hint);
+  flag.append(label, count);
 
   const help = document.createElement('div');
   help.className = 'help';

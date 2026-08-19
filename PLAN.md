@@ -1,195 +1,257 @@
-# Align — Implementation Plan
+# Align — measurement tool
 
-## Context
+Supersedes the audit-tool plan (previous version in git history).
 
-`ALIGN-PRD.md` specifies a ~600-line, dependency-free TypeScript dev tool that audits a live page for alignment near-misses (e.g. five cards at `left: 24px`, one at `25.5px`), subpixel positions, and inconsistent spacing, and shows results on a canvas overlay + shadow-DOM panel. The repo currently contains only the spec. This plan turns the spec into an ordered build, strictly following its six phases with a gate between each (§12: "do not proceed on a failing phase").
+## The change
 
-Decisions already made with the user:
-- **Demo page in repo** (Vite) with seeded misalignments + clean control sections → reproducible Phase 1 acceptance, and the Vite target for Phase 6.
-- **Next.js scratch app** also in repo for Phase 6 (HMR / SSR / production-strip checks).
-- **Repo shape:** package-ready but `private: true` — source in `align/`, build to `dist/`, `exports`/`types` wired, so shipping later is a one-line flip.
-- **npm + git**, one commit per phase.
+The tool stops judging. It measures, draws thin lines, and gets out of the way.
+Deciding whether 25.5px is wrong is the user's job.
 
-## Target layout
+**Out:** violations, clustering, near-miss detection, spacing lint, subpixel
+flags, the results panel, tolerance slider, filter tabs.
+
+**In:** hover to inspect, click to pin, dotted edge guides, distance lines
+between two elements, a cursor tooltip, and a box model panel bottom-left.
+
+---
+
+## 1. Interaction
+
+| Action | Result |
+|---|---|
+| `Cmd/Ctrl + Shift + A` | toggle |
+| hover | 1px outline on the element under the cursor, dotted guides from its four edges, `160 × 24` tooltip at the cursor |
+| click | pin it — outline persists, box model panel opens bottom-left |
+| hover with a pin set | distance lines between pinned and hovered, labelled in px |
+| `Escape` | clear the pin; again to close |
+
+**Clicks are swallowed while the tool is on.** Click means "pin", so it can't
+also reach the app — same as DevTools inspect mode. Toggle off to use the page.
+
+---
+
+## 2. Visual design
+
+### 2.1 Colour — OKLCH, `light-dark()`, Fluid Functionalism tokens
+
+Every colour is written once as `light-dark(light, dark)` and flipped by
+`color-scheme: light dark` on the panel root (Fluid rule 7). Values are the
+Fluid tokens converted to OKLCH.
+
+| Token | Light | Dark | Source |
+|---|---|---|---|
+| `--surface` | `oklch(1 0 0)` | `oklch(0.264 0 0)` | Fluid surface-3 / `--card` |
+| `--fg` | `oklch(0.205 0 0)` | `oklch(0.97 0 0)` | `--foreground` |
+| `--muted` | `oklch(0.556 0 0)` | `oklch(0.715 0 0)` | `--muted-foreground` |
+| `--border` | `color-mix(in oklab, var(--fg) 12%, transparent)` | same formula | `--border` |
+| `--accent` | `oklch(0.693 0.161 265.2)` | same | `--focus-ring` (#6B97FF) |
+| `--measure` | `oklch(0.637 0.208 25.3)` | `oklch(0.711 0.166 22.2)` | `--destructive` |
+
+Box model bands are a derived family — **one lightness, one chroma, four hues**,
+so no band reads heavier than another (better-colors: equal C% for consistent
+vividness):
+
+| Band | Colour |
+|---|---|
+| margin | `oklch(0.72 0.13 70)` |
+| border | `oklch(0.72 0.13 250)` |
+| padding | `oklch(0.72 0.13 150)` |
+| content | `oklch(0.72 0 0)` |
+
+Canvas can't evaluate `light-dark()`, so `overlay.ts` resolves the pair once via
+`matchMedia('(prefers-color-scheme: dark)')` and listens for changes.
+
+### 2.2 Line work
+
+Nothing thicker than 1px. Keeps the existing `translate(0.5, 0.5)` grid offset so
+strokes land on a pixel instead of straddling two.
+
+| Element | Style |
+|---|---|
+| Hovered outline | 1px solid `--accent` @ 70% |
+| Pinned outline | 1px solid `--accent` |
+| Edge guides | 1px **dotted** `--measure` @ 70%, `[2, 2]` dash, spanning the viewport from each of the hovered element's four edges |
+| Distance lines | 1px solid `--measure`, 5px perpendicular end caps, label at midpoint |
+
+### 2.3 Typography
+
+| Property | Value | Why |
+|---|---|---|
+| Family | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` | numeric readout; system stack, no font to load |
+| **`font-variant-numeric: tabular-nums`** | on every number | numbers change on each mousemove; proportional digits jitter the tooltip. The single highest-value detail here |
+| Scale | 12px header · 11px numbers · 10px band labels | |
+| Tracking | `0.01em` on the 10px labels | small text needs positive tracking |
+| Line-height | `1` on readouts, `1.4` on the header | |
+| `font-synthesis: none` | | no faked bold from a missing weight |
+| `-webkit-font-smoothing: antialiased` | on the panel root | |
+| `user-select: none` | whole overlay | it's chrome, not content |
+
+Sizes sit below the 12px floor in better-typography. Deliberate: this is a
+developer HUD over someone else's page, the same class of surface as DevTools'
+own 11px chrome, and it must occlude as little as possible. Contrast still
+clears AA — `--fg` on `--surface` is far past 4.5:1 in both themes.
+
+### 2.4 Surfaces
+
+Panel is Fluid **surface-3** with the matching level-3 shadow (light: stacked
+drops; dark: inset highlight + ring + drops). Shadows, not borders.
+
+**Concentric radius** — outer = inner + padding. Panel `12px` with `10px`
+padding gives inner rectangles `2px`, which is also just right for a box model
+diagram: these are boxes, not cards.
+
+---
+
+## 3. Motion
+
+`find-animation-opportunities` gate applied to every candidate. Default is no.
+
+| Candidate | Frequency | Verdict |
+|---|---|---|
+| Hover outline / guides / tooltip | hundreds per session | **Reject.** Instant. Motion here is friction on every single use |
+| Hotkey toggle | keyboard-initiated | **Reject.** Never animate a keyboard action — Raycast precedent |
+| Distance lines appearing | hundreds per session | **Reject.** Instant |
+| Panel values changing on re-pin | frequent, information-critical | **Reject.** Data-dense UI defaults to static |
+| **Box model panel enter/exit** | occasional — a few times per session | **Accept.** One animation |
+
+So the tool has **exactly one animation**. That is the correct outcome, not an
+oversight.
+
+**Panel entrance.** Fluid tier `spring.moderate` — a panel that must land
+exactly. No motion library here, so the CSS equivalent:
+
+```css
+/* enter: 160ms, critically damped, strong ease-out */
+transition: transform 160ms cubic-bezier(0.2, 0, 0, 1),
+            opacity   160ms cubic-bezier(0.2, 0, 0, 1);
+transform: translateY(4px) scale(0.98);   /* → none */
+opacity: 0;                                /* → 1 */
+```
+
+Exit is one tier quicker at **120ms**, no bounce — slow in, faster out (Fluid
+rule 2). Transform and opacity only, so it stays on the compositor. Never
+`transition: all`. Starts at `scale(0.98)`, never `scale(0)`.
+
+**Reduced motion.** Fluid rule 5 — fewer and gentler, not none: keep the opacity
+fade (it aids comprehension), drop the transform.
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .panel { transition: opacity 120ms linear; transform: none; }
+}
+```
+
+This is where Fluid and the animations.dev course disagree — the course says
+`animation: none` outright. Following Fluid, since the ask was to keep the
+design consistent with it.
+
+---
+
+## 4. Box model panel
+
+Bottom-left, 16px inset, 232px wide.
 
 ```
-workflow-proj/
-  ALIGN-PRD.md                  (keep; also copy to SPEC.md per spec §0)
-  package.json                  type:module, private:true, exports→dist, scripts
-  tsconfig.json                 strict, ESNext, DOM + DOM.Iterable libs, noEmit (tsc used for typecheck + d.ts)
-  vitest.config.ts              include: align/**/*.test.ts, environment: node
-  align/
-    types.ts  config.ts  scan.ts  cluster.ts  measure.ts  overlay.ts  panel.ts  index.ts
-    cluster.test.ts
-  dist/                         align.js (esbuild) + align.d.ts (tsc), gitignored
-  examples/
-    vite-demo/                  index.html + main.ts + styles.css, seeded bugs, imports ../../align
-    next-app/                   minimal App Router app, components/AlignDev.tsx, imports align via relative path
-  .gitignore                    node_modules, dist, examples/**/.next, examples/**/dist
+┌─ div.card ─────────── 160 × 24 ─┐
+│           margin 24             │
+│  ┌───── border 1 ───────────┐   │
+│  │  ┌── padding 16 ──────┐  │   │
+│  │  │    128 × 20        │  │   │
+│  │  └────────────────────┘  │   │
+│  └──────────────────────────┘   │
+└─────────────────────────────────┘
 ```
 
-Root `package.json` scripts:
-- `build`: `esbuild align/index.ts --bundle --format=esm --minify --outfile=dist/align.js` + `tsc -p tsconfig.build.json` (declarations only)
-- `test`: `vitest run`
-- `typecheck`: `tsc --noEmit`
-- `size`: print `dist/align.js` byte size (tiny node one-liner), asserts < 20KB
-- `demo`: `vite examples/vite-demo` (vite is a devDependency of the root; demo has no own package.json to keep it simple)
-
-Dev deps only: `typescript`, `esbuild`, `vitest`, `vite`. Next app has its own `package.json` (`next`, `react`, `react-dom`) since Next needs its own project root.
-
-Hard architectural rules to enforce in every phase (spec §4): `cluster.ts` is pure (no DOM, no `Box.el` access — it receives `Box[]` but only reads numeric fields); only `scan.ts` walks the DOM; only `overlay.ts`/`panel.ts` write to the DOM; only `index.ts` touches `window` globals / `import.meta.hot`.
+- Values from `getComputedStyle`, all `tabular-nums`.
+- Zeros render as `–` in `--muted` so the numbers that matter stand out.
+- Header: element label left, `W × H` right.
+- Bands tinted at 14% of their hue; label sits on the band it describes.
 
 ---
 
-## Phase 0 — Scaffold (no spec phase; 15 min)
+## 5. Architecture
 
-1. `git init`, `.gitignore`, `npm init -y` → edit `package.json` (name `align`, `private: true`, `type: module`, `exports: {".": {"types": "./dist/align.d.ts", "import": "./dist/align.js"}}`, `files: ["dist"]`).
-2. `npm i -D typescript esbuild vitest vite`.
-3. `tsconfig.json` (strict, `target: ES2022`, `module: ESNext`, `moduleResolution: Bundler`, `lib: [ES2022, DOM, DOM.Iterable]`, `types: ["vite/client"]` so `import.meta.env`/`import.meta.hot` typecheck). `tsconfig.build.json` extends it with `declaration`, `emitDeclarationOnly`, `outDir: dist`, `include: ["align/index.ts"]`... (rootDir align so output is `dist/index.d.ts`; point `types` there instead — simpler than renaming).
-4. Copy `ALIGN-PRD.md` → `SPEC.md`.
-5. Commit `chore: scaffold`.
+```
+align/
+  index.ts      init, hotkey, hover/pin state, lifecycle    ~110 lines
+  overlay.ts    canvas: outlines, guides, distances, tooltip ~150 lines
+  boxmodel.ts   the bottom-left panel                        ~110 lines
+  measure.ts    pure geometry + computed-style reads          ~80 lines
+  theme.ts      OKLCH tokens, light/dark resolution           ~40 lines
+  types.ts      Box, Segment, Bands                           ~25 lines
+  config.ts     ignore selector, hotkey                       ~20 lines
+```
 
-Verify: `npm run typecheck` passes on an empty `align/index.ts`.
+**Deleted:** `cluster.ts`, `cluster.test.ts`, `panel.ts`, **`scan.ts`**.
 
----
+`scan.ts` goes because nothing needs a DOM walk any more: guides come from the
+hovered element's own rect, distances from exactly two elements. Measuring on
+demand through `elementFromPoint` also removes the cache, the `MutationObserver`,
+the stale state and the rescan affordance. Nothing is stored, so nothing can go
+stale — an animating page can no longer show a wrong number.
 
-## Phase 1 — Prove the idea (types, config, scan, cluster; no UI)
+Rules that survive: only `overlay.ts` / `boxmodel.ts` write to the DOM; only
+`index.ts` touches window globals and `import.meta.hot`; geometry in `measure.ts`
+stays pure and unit-tested.
 
-**Files:** `align/types.ts`, `align/config.ts`, `align/scan.ts`, `align/cluster.ts`, minimal `align/index.ts`, `examples/vite-demo/*`.
+Expected bundle: **~8KB**, down from 16.7KB.
 
-### types.ts (§5.1)
-`Box`, `Axis`, `Violation` exactly as spec. Add `Config` import type re-export.
+### On Base UI
 
-### config.ts (§10)
-`Config` interface + `DEFAULTS` (`tol 3, epsilon 0.5, minSize 4, minCluster 3, scale [4,8,12,16,24,32,48,64], ignore '', skipFixed false, hotkey 'mod+shift+a'`) + `mergeConfig(partial): Config`. `SKIP_SELECTOR` constant (§5.5) lives here too (it's config-shaped, and `scan.ts` needs it; keeps `scan.ts` focused on traversal). Export `skipSelector(cfg)` = `SKIP_SELECTOR` joined with `cfg.ignore` if non-empty.
+Not usable here, and I'd rather say so than pretend. Base UI is
+`@base-ui/react` — React components. This tool is zero-dependency vanilla TS
+injected into arbitrary host pages inside a **closed** shadow root; adding React
+plus Base UI means a peer React in every host app and a bundle five-plus times
+the size, for two static panels with no popover, focus-trap, or keyboard-nav
+behaviour to manage.
 
-### scan.ts (§5.2)
-- `walk(root, out)` recursive across shadow roots, skipping `SKIP_SELECTOR` matches (note: `el.matches` with a selector containing an unknown custom tag like `nextjs-portal` is fine — valid selector syntax).
-- `scan(cfg): Box[]` — two-pass batching (§11): pass 1 collects candidate elements and calls `getBoundingClientRect` for all; pass 2 applies `checkVisibility`, size, viewport, and (if `skipFixed`) `getComputedStyle` filters. Exclusion order as §5.2 (cheapest first). Overlay host check = `el.closest('#__align_host')` or being inside its shadow (host has `data-align-ignore` so SKIP covers it anyway).
-- `checkVisibility` fallback: if method missing (older browsers), treat as visible.
-- Module-level `cache: WeakMap<Element, Box>` + exported `invalidate()` that replaces the WeakMap (used by `index.ts` later).
-- `label(el)` per §5.2 (tag + `#id` + first class, 40-char cap).
-
-### cluster.ts (§5.3, §5.4) — pure
-- `cluster(values, tol)` verbatim from spec.
-- `auditAlignment(boxes, cfg)` — six axes; steps 1–6; majority via rounding to epsilon precision then mode; tie-break → most boxes, then prefer integer (`Math.abs(v - Math.round(v))` smaller). Sort by `spread` desc. `message`: `` `${axis} · ${n} elements · ${counts}` `` where counts is `"5 at 24px, 1 at 25.5px"` (descending count). Number formatting helper `fmt(n)` = 2 decimals, trailing zeros stripped — put in `cluster.ts` (pure) and reuse from measure/panel later.
-- `auditSubpixel(boxes, cfg, dpr)` — `dpr` passed as a **number argument** so the module stays pure (`index.ts` passes `devicePixelRatio`). Flag when `frac = (value*dpr) % 1` satisfies `epsilon < frac < 1 - epsilon`. One violation per box listing offending edges.
-- `auditSpacing(boxes, cfg)` — gap consistency grouped by parent. **Purity constraint:** grouping needs `el.parentElement`; to keep `cluster.ts` DOM-free, `scan.ts` will add an optional `parent?: Element` ... no — simpler: `Box` gets a `parentKey: number` (index of parent box, or -1) assigned in `scan.ts`; `cluster.ts` groups by that number. Scale-adherence needs `getComputedStyle` → that read happens in `scan.ts` pass 2 and is stored on `Box` as `spacing?: number[]` (parsed px values of gap/rowGap/columnGap/padding*/margin*). `auditSpacing` then stays pure. Cap scale violations at 20.
-- `audit(boxes, cfg, dpr): Violation[]` = alignment first, then spacing, then subpixel (spec §5.4: alignment always first).
-
-→ Small deliberate deviation from the spec's `Box` shape (adds `parentKey`, `spacing`) in service of the spec's stronger rule "cluster.ts must be pure". Flag in commit message.
-
-### index.ts (Phase 1 version)
-`initAlign(cfg?)` with SSR + re-entry guards, merges config, exposes `window.__alignAudit = () => { const v = audit(scan(cfg), cfg, devicePixelRatio); console.table(v.map(summary)); return v; }`. No hotkey yet (spec says no UI; a global function is enough).
-
-### examples/vite-demo
-`index.html` + `styles.css` + `main.ts` (`if (import.meta.env.DEV) import('../../align/index').then(m => m.initAlign())`). Page content:
-- **Seeded defects (must be found):** card grid with 5 cards at `left: 24px`, 1 at `25.5px`; a nav row with gaps 16/16/18; a heading at `top: 100.5px` (via `margin-top: 0.5px` trick); a button group where one right edge drifts 1px per item (24→25→26→27).
-- **Clean controls (must NOT be flagged):** a correctly aligned 3-col grid; a sticky header; a hidden (`display:none`) section; sub-4px divider lines; an off-screen section.
-- Comment in HTML listing the expected violations.
-
-### Acceptance (gate)
-Open demo, run `__alignAudit()` in console: all seeded defects appear; clean sections produce < 10 false positives (target: 0–2). If noise is high, tune `minSize`/`minCluster`/`SKIP_SELECTOR` **before moving on** (spec §12 hard stop). Also verify scan time on a synthetic 2000-element page (add a `?stress=2000` query flag to the demo that appends N divs) — `performance.now()` around `scan()` < 100ms.
-
-Commit `feat(phase1): scan + cluster + audit, demo page`.
+What I do take is its **structural model**, applied to plain DOM: named anatomy
+parts, state expressed as data attributes (`[data-pinned]`, `[data-empty]`)
+styled by attribute selectors rather than class toggling, and geometry passed as
+CSS custom properties. If you want the real Base UI components, the panel would
+have to become a React island — say so and I'll do it that way.
 
 ---
 
-## Phase 2 — Unit tests (cluster.ts only)
+## 6. Build order
 
-**File:** `align/cluster.test.ts`, `vitest.config.ts`.
+Each step ends with something you can open and use.
 
-Cases (spec §12 list + a few for the other pure functions):
-- `cluster`: empty → `[]`; single value → `[[v]]`; exact 5×24 → one cluster; `[24,24,24,24,24,25.5]` tol 3 → one cluster; chain `24,25,26,27` tol 3 → one cluster; `[24,24,24,200,200,200]` → two clusters.
-- `auditAlignment` (build `Box` fixtures with a helper `box({left,...})`, `el: {} as Element`): exact match → no violation; 5@24+1@25.5 → one violation, `majority 24`, `boxes.length 1`, `spread 1.5`; chain drift → flagged; two separate tight groups → none; `minCluster` respected; sorted by spread desc.
-- `auditSubpixel`: 100.5 at dpr 1 → flagged; at dpr 2 → not flagged; 100.25 at dpr 2 → flagged.
-- `auditSpacing`: gaps 16/16/18 → violation; scale lint cap 20.
-- Purity guard: a test that `cluster.ts` source contains no `document`/`window` (read file via `fs` in the test) — cheap enforcement of §4.
+**Step 1 — Strip and re-point.**
+Delete the four files. Cut `Box` to geometry plus label, `Config` to
+`{ ignore, hotkey }`. Rebuild `index.ts` around hover state; add `theme.ts`.
+*Ships:* hover draws a 1px outline and the tooltip.
+*Check:* hovering anything on the demo outlines it and reads its true size;
+tooltip numbers don't jitter as the cursor moves.
 
-Acceptance: `npm test` green; `cluster.ts` has zero imports other than `./types`/`./config` types.
+**Step 2 — Guides, pinning, distances.**
+Dotted edge guides on hover; click to pin; distance lines with end caps and px
+labels between pinned and hovered.
+*Check:* the demo's 13.5px fixture reads exactly 13.5; guides are crisp 1px;
+Escape clears the pin before it closes the tool.
 
-Commit `test(phase2): cluster unit tests`.
+**Step 3 — Box model panel.**
+`boxmodel.ts` into the same shadow root, with the one animation.
+*Check:* every number matches DevTools' computed panel including fractions;
+panel enters in 160ms and leaves in 120ms; reduced-motion drops the transform
+but keeps the fade; light and dark both legible.
 
----
-
-## Phase 3 — Overlay
-
-**Files:** `align/overlay.ts`, `align/index.ts` (hotkeys, mount/unmount, state).
-
-### overlay.ts (§7.1, §7.2)
-- `mount(): { host, root, canvas, ctx, destroy }` — host per §7.1 verbatim (`documentElement`, `all: initial`, `pointer-events:none`, `data-align-ignore`, closed shadow).
-- `resize()` — DPR-scaled canvas backing store.
-- `draw(state)` where `state = { violations, highlighted?: Violation|null, measure?: MeasureState|null }` — wrapped so callers call `schedule()` which coalesces into one `requestAnimationFrame`.
-- Draw order: highlights → guides → dimension lines → labels. `ctx.translate(0.5,0.5)` for 1px lines. Guide = dashed full-viewport line at `majority` on the axis (vertical for left/right/centerX, horizontal for top/bottom/centerY), solid markers at offending values; offending boxes = 1px outline + 10% fill; labels 11px monospace pill, flipped inward near edges (40px).
-- Color palette as constants (align = red-ish, spacing = amber, subpixel = blue) — tiny, no theming.
-
-### index.ts additions
-- State: `active`, `violations`, `cfg`, `stale`. Single keydown listener in capture phase registered at init (the *only* thing init does). Hotkey parse: `'mod+shift+a'` → check `e.key.toLowerCase()==='a' && e.shiftKey && (e.metaKey||e.ctrlKey)`; `Escape` closes.
-- `activate()`: mount overlay, scan+audit, draw, start MutationObserver + debounced resize/scroll (150ms) that set `stale` (§8.2, no rescan). `deactivate()`: disconnect, remove host, clear state.
-- Keep `window.__alignAudit` as a debug export.
-
-### Acceptance (gate)
-In demo: toggle on → dashed guides visible and crisp (zoom DevTools screenshot to confirm pixel-grid alignment); page clicks still work through the overlay; page `font-family`/`line-height` do not affect overlay labels (demo sets an aggressive global font); toggle off → `document.querySelector('#__align_host') === null`, `getEventListeners(document)` shows one keydown.
-
-Commit `feat(phase3): canvas overlay + hotkey lifecycle`.
+**Step 4 — Tests, docs, verification.**
+Move unit tests onto `measure.ts` geometry (overlapping, diagonal, touching,
+fractional). Rewrite README. Re-run what still applies from the old Phase 6:
+30 saves leave one host and one listener, `next build` ships nothing, both
+example apps work.
 
 ---
 
-## Phase 4 — Panel
+## 7. Open points
 
-**File:** `align/panel.ts`; wiring in `index.ts`.
-
-- `createPanel(root, handlers): PanelApi` — appended inside the same shadow root, `pointer-events:auto`, fixed bottom-right 340px, max-height 60vh, scroll. All CSS in one `<style>` inside the shadow root.
-- Header: count, tolerance `<input type=range min=1 max=8 step=0.5>` (live → `handlers.onTol(v)` re-audits from cached boxes, no rescan), "rescan" button shown only when `stale`, close button.
-- Tabs: All / Align / Spacing / Subpixel (filter by `kind`).
-- Rows: `message` + axis + values. `mouseenter` → `handlers.onHover(v)` (overlay dims others, highlights this); `mouseleave` → `onHover(null)`; click → `console.log(v.boxes.map(b=>b.el))` + `scrollIntoView` first offender (`{block:'center'}`) — this triggers scroll → stale flag, which is correct behaviour.
-- `panel.update(violations, {stale})` re-renders list (plain `innerHTML`-free DOM building, or a template string — ~120 lines either way; use DOM building to avoid escaping issues with labels).
-
-Acceptance (gate): dragging slider updates list < 50ms (measure with `performance.now()` in the handler, log in dev); hover highlights; click logs elements in DevTools.
-
-Commit `feat(phase4): results panel`.
-
----
-
-## Phase 5 — Measure mode
-
-**File:** `align/measure.ts`; overlay gains dimension-line + box-model-band drawing; `index.ts` adds `mousemove`/`click`/`keyup` listeners **only while active**.
-
-- `measure.ts` exports pure-ish helpers: `nearestScanned(el, boxes)` (walk `parentElement`/host chain up to a Box), `gap(a: Box, b: Box): { dx?: Segment, dy?: Segment }` (shortest edge-to-edge per axis; 0 if overlapping on that axis; both if diagonal), `boxModel(el)` (reads `getComputedStyle` padding/border/margin → bands). DOM reads here are acceptable per spec (`measure.ts` is listed as doing hover computation), but keep `gap()` pure so it can be tested later if wanted.
-- Interaction (§6): `mousemove` with `altKey` → `elementFromPoint`, highlight + bands; Alt+click → pin anchor A; second hover → dimension lines with `fmt()` labels (2 decimals, trailing zeros stripped); Escape / Alt keyup → clear anchor. All through `overlay.schedule()`.
-
-Acceptance (gate): in demo, measured gap between two known elements matches DevTools computed layout exactly incl. fractions (seed a 13.5px gap to check).
-
-Commit `feat(phase5): measure mode`.
-
----
-
-## Phase 6 — Integration hardening
-
-**Files:** `align/index.ts` (HMR dispose), `examples/next-app/*`, root scripts.
-
-1. HMR: `if (import.meta.hot) import.meta.hot.dispose(() => { deactivate(); removeEventListener('keydown', onKey, true); delete window.__align; })`. Guard with `typeof import.meta.hot !== 'undefined'` style check so esbuild bundle for non-Vite consumers doesn't break (esbuild leaves `import.meta.hot` as-is; it's `undefined` at runtime, fine).
-2. `examples/next-app`: `create-next-app`-equivalent minimal App Router (hand-written, no CLI prompts): `app/layout.tsx` with `{process.env.NODE_ENV !== 'production' && <AlignDev />}`, `components/AlignDev.tsx` per spec §9 importing `../../../align/index` (tsconfig path alias `@align/*` → `../../align/*`; Next transpiles TS outside root via `transpilePackages` not needed for relative imports — verify; fallback is a symlink or copying).
-3. Production-strip: `npm run build` in next-app → `grep -r "__align" .next/static` must return nothing. Also check Vite: `vite build examples/vite-demo` → grep `dist/assets` for `__align`.
-4. HMR stacking test: with tool open, save a file 30 times (script: loop `touch`/append-whitespace to `main.ts` with 300ms sleep) → `document.querySelectorAll('#__align_host').length === 1`, `getEventListeners(document).keydown.length === 1`.
-5. Size budget: `npm run size` < 20KB; perf: re-check 2000-element scan < 100ms, audit < 20ms, redraw < 8ms (log `performance.now()` deltas behind a `cfg.debug`?—no, not in spec; just measure ad-hoc in devtools and record numbers in a `NOTES.md` or commit message).
-6. Framework ignore selectors verified live: Next dev overlay present on page while scanning → not reported.
-
-Acceptance (gate): spec §12 Phase 6 (a)(b)(c) all pass.
-
-Commit `feat(phase6): HMR/SSR hardening, Next + Vite verification`.
-
----
-
-## Verification summary (end-to-end)
-
-- `npm run typecheck && npm test && npm run build && npm run size` all green.
-- `npm run demo` → `Ctrl+Shift+A` → seeded defects listed, clean sections silent; fix one seeded CSS value → rescan → that row disappears (spec §14 definition of done).
-- `cd examples/next-app && npm run dev` → same; `npm run build && grep -r __align .next/static` → empty.
-- 30-save HMR test → one host, one listener.
-
-## Risks / open points
-
-- `Element.checkVisibility` is Chromium 105+/Safari 17.4+/Firefox 106+; fallback to "visible" keeps it from crashing elsewhere.
-- `Box` shape gains `parentKey` + `spacing` to keep `cluster.ts` pure — a small, explained deviation from §5.1.
-- Next importing TS from outside its project root: if it refuses, use `transpilePackages`/`experimental.externalDir` or a symlink; decided at Phase 6, not before.
+- The demo keeps its 25.5px card and 13.5px gap — no longer "defects", now
+  fixtures with known exact values to measure against.
+- Scroll and resize recompute from fresh rects for the two live elements. Cheap
+  enough to run directly, no debounce.
+- `data-align-ignore` still works: if the hit element carries it, walk up to the
+  nearest ancestor that doesn't.
+- **Guide legibility over arbitrary pages.** A dotted red line at 70% can get
+  lost on a red hero. Starting simple, as asked; if it bites, the fix is a 1px
+  dark halo under each guide, which is a few lines in one function.

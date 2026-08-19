@@ -1,48 +1,27 @@
-import { fmt } from './cluster';
-import type { Bands } from './measure';
-import type { Axis, Box, Violation } from './types';
+import { fmt } from './measure';
+import { alpha, ink, prefersDark, TYPE, type Ink } from './theme';
+import type { Box, Segment } from './types';
 
 /**
- * Canvas rendering (§7.1, §7.2). One of the two modules allowed to write to the
- * DOM. Everything is drawn inside a single requestAnimationFrame — never
- * synchronously from an event handler.
+ * Canvas rendering. One of the two modules allowed to write to the DOM.
+ * Everything draws inside a single requestAnimationFrame — never synchronously
+ * from an event handler.
  */
 
-export interface Segment {
-  x1: number; y1: number; x2: number; y2: number; label: string;
-}
-
-/** Filled in by measure mode (§6); null until then. */
-export interface MeasureView {
-  hover: Box | null;
-  anchor: Box | null;
-  bands: Bands | null;
-  lines: Segment[];
-}
-
 export interface OverlayState {
-  violations: Violation[];
-  highlighted: Violation | null;
-  measure: MeasureView | null;
+  hover: Box | null;
+  pinned: Box | null;
+  lines: Segment[];
+  cursor: { x: number; y: number } | null;
 }
 
-const COLOR = {
-  align: '#ff4d6d',
-  spacing: '#ffb020',
-  subpixel: '#4da6ff',
-  measure: '#38e08b',
-  ink: '#e8edf6',
-  pill: 'rgba(10, 13, 18, 0.92)',
-} as const;
-
-const VERTICAL: Axis[] = ['left', 'right', 'centerX'];
-const FONT = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-const EDGE_MARGIN = 40;
+const CAP = 5;          // end-cap length on a distance line
+const PAD = 4;          // chip padding
+const EDGE = 12;        // keep chips this far from the viewport edge
 
 export interface Overlay {
   root: ShadowRoot;
   update(patch: Partial<OverlayState>): void;
-  /** Re-fit the canvas to the viewport, then redraw. */
   resize(): void;
   destroy(): void;
 }
@@ -53,9 +32,8 @@ export function mountOverlay(): Overlay {
   host.setAttribute('data-align-ignore', '');
   // `all: initial` because shadow DOM blocks selector matching but NOT
   // inheritance — without it the host page's font and line-height leak in.
-  // `pointer-events: none` because the overlay must not swallow app clicks; the
-  // panel re-enables it on itself. documentElement rather than body because
-  // React reconciles body children and would fight us during hydration.
+  // documentElement rather than body because React reconciles body children and
+  // would fight us during hydration.
   host.style.cssText = 'all: initial; position: fixed; inset: 0; ' +
     'z-index: 2147483647; pointer-events: none;';
   document.documentElement.appendChild(host);
@@ -66,9 +44,13 @@ export function mountOverlay(): Overlay {
   root.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
 
-  const state: OverlayState = { violations: [], highlighted: null, measure: null };
+  const state: OverlayState = { hover: null, pinned: null, lines: [], cursor: null };
+  let c: Ink = ink(prefersDark());
   let frame = 0;
-  let labels: (() => void)[] = [];
+
+  const scheme = matchMedia('(prefers-color-scheme: dark)');
+  const onScheme = () => { c = ink(scheme.matches); schedule(); };
+  scheme.addEventListener('change', onScheme);
 
   function fit() {
     const dpr = devicePixelRatio;
@@ -77,137 +59,104 @@ export function mountOverlay(): Overlay {
     canvas.style.width = innerWidth + 'px';
     canvas.style.height = innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Half-pixel offset puts 1px strokes on the pixel grid instead of straddling
-    // it. A blurry alignment tool is absurd.
+    // Half-pixel offset puts 1px strokes on the pixel grid rather than
+    // straddling it. A blurry measuring tool is absurd.
     ctx.translate(0.5, 0.5);
-  }
-
-  function pill(text: string, x: number, y: number, color: string) {
-    ctx.font = FONT;
-    const w = ctx.measureText(text).width + 8;
-    const h = 16;
-    // Flip inward when the label would otherwise run off the viewport.
-    const px = x + w > innerWidth - EDGE_MARGIN ? x - w - 8 : x + 4;
-    const py = y < EDGE_MARGIN ? y + 6 : y - h - 4;
-    ctx.fillStyle = COLOR.pill;
-    ctx.fillRect(px, py, w, h);
-    ctx.fillStyle = color;
-    ctx.fillRect(px, py, 2, h);
-    ctx.fillStyle = COLOR.ink;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, px + 6, py + h / 2);
-  }
-
-  function guide(axis: Axis, at: number, dashed: boolean, color: string) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.setLineDash(dashed ? [4, 4] : []);
-    ctx.beginPath();
-    if (VERTICAL.includes(axis)) {
-      ctx.moveTo(Math.round(at), 0);
-      ctx.lineTo(Math.round(at), innerHeight);
-    } else {
-      ctx.moveTo(0, Math.round(at));
-      ctx.lineTo(innerWidth, Math.round(at));
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 
   function outline(box: Box, color: string) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
+    ctx.setLineDash([]);
     ctx.strokeRect(Math.round(box.left), Math.round(box.top),
       Math.round(box.width), Math.round(box.height));
-    ctx.fillStyle = color;
-    ctx.globalAlpha *= 0.1;
-    ctx.fillRect(box.left, box.top, box.width, box.height);
-    ctx.globalAlpha /= 0.1;
   }
 
-  function drawViolation(v: Violation, dim: boolean) {
-    ctx.globalAlpha = dim ? 0.18 : 1;
-    const color = COLOR[v.kind];
+  /** Dotted lines running the full viewport from each edge of the box. */
+  function guides(box: Box) {
+    ctx.strokeStyle = alpha(c.measure, 0.7);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    for (const x of [box.left, box.right]) {
+      ctx.moveTo(Math.round(x), 0);
+      ctx.lineTo(Math.round(x), innerHeight);
+    }
+    for (const y of [box.top, box.bottom]) {
+      ctx.moveTo(0, Math.round(y));
+      ctx.lineTo(innerWidth, Math.round(y));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-    if (v.kind === 'align' && v.axis) {
-      guide(v.axis, v.majority, true, color);
-      for (const value of v.values) {
-        if (Math.abs(value - v.majority) < 1e-6) continue;
-        guide(v.axis, value, false, color);
+  /** A distance line with perpendicular end caps, the way a ruler reads. */
+  function distance(seg: Segment) {
+    ctx.strokeStyle = c.measure;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(seg.x1), Math.round(seg.y1));
+    ctx.lineTo(Math.round(seg.x2), Math.round(seg.y2));
+    if (seg.axis === 'x') {
+      for (const x of [seg.x1, seg.x2]) {
+        ctx.moveTo(Math.round(x), Math.round(seg.y1) - CAP);
+        ctx.lineTo(Math.round(x), Math.round(seg.y1) + CAP);
+      }
+    } else {
+      for (const y of [seg.y1, seg.y2]) {
+        ctx.moveTo(Math.round(seg.x1) - CAP, Math.round(y));
+        ctx.lineTo(Math.round(seg.x1) + CAP, Math.round(y));
       }
     }
-    for (const box of v.boxes) outline(box, color);
-
-    if (!dim) {
-      const anchor = v.boxes[0];
-      if (anchor) {
-        const text = v.kind === 'align' && v.axis
-          ? `${v.axis} ${fmt(anchor[v.axis])} → ${fmt(v.majority)}`
-          : v.message;
-        labels.push(() => pill(text, anchor.right, anchor.top, color));
-      }
-    }
-    ctx.globalAlpha = 1;
+    ctx.stroke();
   }
 
-  /** Content, padding, border and margin, drawn as nested translucent bands. */
-  function drawBands(box: Box, b: Bands) {
-    const [mt, mr, mb, ml] = b.margin;
-    const [bt, br, bb, bl] = b.border;
-    const [pt, pr, pb, pl] = b.padding;
-
-    const band = (x: number, y: number, w: number, h: number, color: string) => {
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, w, h);
-    };
-    // Margin sits outside the border box, which is what a rect measures.
-    band(box.left - ml, box.top - mt, box.width + ml + mr, box.height + mt + mb,
-      'rgba(255, 176, 32, 0.14)');
-    band(box.left, box.top, box.width, box.height, 'rgba(56, 224, 139, 0.14)');
-    band(box.left + bl, box.top + bt, box.width - bl - br, box.height - bt - bb,
-      'rgba(77, 166, 255, 0.14)');
-    band(box.left + bl + pl, box.top + bt + pt,
-      box.width - bl - br - pl - pr, box.height - bt - bb - pt - pb,
-      'rgba(232, 237, 246, 0.10)');
-  }
-
-  function drawMeasure(m: MeasureView) {
-    ctx.globalAlpha = 1;
-    if (m.hover) {
-      if (m.bands) drawBands(m.hover, m.bands);
-      outline(m.hover, COLOR.measure);
-      const box = m.hover;
-      labels.push(() => pill(`${box.label} · ${fmt(box.width)} × ${fmt(box.height)}`,
-        box.left, box.top, COLOR.measure));
-    }
-    if (m.anchor) outline(m.anchor, COLOR.measure);
-    for (const seg of m.lines) {
-      ctx.strokeStyle = COLOR.measure;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(seg.x1, seg.y1);
-      ctx.lineTo(seg.x2, seg.y2);
-      ctx.stroke();
-      const mx = (seg.x1 + seg.x2) / 2;
-      const my = (seg.y1 + seg.y2) / 2;
-      labels.push(() => pill(seg.label, mx, my, COLOR.measure));
-    }
+  /** `center` places the chip's midpoint at (x, y) instead of its top-left. */
+  function chip(text: string, x: number, y: number, bg: string, center = false) {
+    ctx.font = `${TYPE.tooltip}px ${TYPE.mono}`;
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(text).width + PAD * 2;
+    const h = TYPE.tooltip + PAD * 2;
+    const left = center ? x - w / 2 : x;
+    const top = center ? y - h / 2 : y;
+    const cx = Math.min(Math.max(left, EDGE), innerWidth - w - EDGE);
+    const cy = Math.min(Math.max(top, EDGE), innerHeight - h - EDGE);
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, w, h, 4);
+    ctx.fill();
+    ctx.fillStyle = c.surface;
+    ctx.fillText(text, cx + PAD, cy + h / 2);
   }
 
   function draw() {
     frame = 0;
-    labels = [];
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    for (const v of state.violations) {
-      drawViolation(v, state.highlighted !== null && state.highlighted !== v);
+    if (state.pinned) outline(state.pinned, c.accent);
+    if (state.hover) {
+      guides(state.hover);
+      outline(state.hover, state.pinned ? alpha(c.accent, 0.7) : c.accent);
     }
-    if (state.measure) drawMeasure(state.measure);
-    for (const label of labels) label();   // labels last, always on top
+    for (const seg of state.lines) distance(seg);
+
+    // Labels last, always on top. A distance label sits clear of its own line:
+    // above a horizontal one, beside a vertical one.
+    for (const seg of state.lines) {
+      const mx = (seg.x1 + seg.x2) / 2;
+      const my = (seg.y1 + seg.y2) / 2;
+      if (seg.axis === 'x') chip(seg.label, mx, my - 16, c.measure, true);
+      else chip(seg.label, mx + 26, my, c.measure, true);
+    }
+    if (state.hover && state.cursor) {
+      const { width, height } = state.hover;
+      chip(`${fmt(width)} × ${fmt(height)}`,
+        state.cursor.x + 14, state.cursor.y + 14, c.accent);
+    }
   }
 
   function schedule() {
@@ -223,6 +172,7 @@ export function mountOverlay(): Overlay {
     resize() { fit(); schedule(); },
     destroy() {
       if (frame) cancelAnimationFrame(frame);
+      scheme.removeEventListener('change', onScheme);
       host.remove();
     },
   };

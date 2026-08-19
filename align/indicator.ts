@@ -20,6 +20,7 @@ export const KEYS: [string, string][] = [
   ['Click', 'lock an element'],
   ['Right-click', 'add to, or drop from, the locked set'],
   ['Drag the panel header', 'move the box model'],
+  ['B', 'hide or bring back the box model'],
   ['Esc', 'clear the locks, then close'],
 ];
 

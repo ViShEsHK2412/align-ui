@@ -2,11 +2,14 @@ export interface Config {
   /** Extra CSS selector to skip when hit-testing. */
   ignore: string;
   hotkey: string;
+  /** Hides or brings back the box model panel, while the tool is open. */
+  panelKey: string;
 }
 
 export const DEFAULTS: Config = {
   ignore: '',
   hotkey: 'mod+shift+a',
+  panelKey: 'b',
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {

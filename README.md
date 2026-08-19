@@ -16,7 +16,8 @@ click                   lock it, and open the box model panel
 right-click             add to the locked set (or drop one already in it)
 hover with locks set    distance from the newest lock to what you point at
 drag the panel header   move the box model anywhere on screen
-Escape                  clear the locks; again to close
+B, or the × in it       hide the box model, and bring it back
+Escape                  close the key list, then the locks, then the tool
 ```
 
 **Locking more than one** is how you check a row at a glance: click the first
@@ -111,8 +112,14 @@ Two options, both optional.
 initAlign({
   ignore: '.third-party-widget, [data-radix-portal]',   // extra selector to skip
   hotkey: 'mod+shift+a',
+  panelKey: 'b',                                        // hides/shows the box model
 });
 ```
+
+Closing the box model with its × keeps the locks and the measuring — only the
+panel goes away, which is what you want when it is sitting on top of the thing
+you are trying to look at. It stays away until you ask for it back, rather than
+reappearing on the next lock.
 
 Mark anything the tool should never measure with `data-align-ignore` — hovering
 it walks up to the nearest ancestor that isn't ignored.

@@ -14,8 +14,12 @@ import type { Box, Quad } from './types';
  */
 
 export interface BoxModel {
+  /** A lock changed: re-render, and open unless the user closed the panel. */
   show(box: Box): void;
+  /** Nothing is locked any more. */
   hide(): void;
+  /** The user asked for it back, or asked it to go away. */
+  toggle(): void;
   destroy(): void;
 }
 
@@ -98,6 +102,15 @@ header .size {
   font-size: ${TYPE.body}px; font-weight: ${WEIGHT.medium};
   color: var(--muted);
 }
+/* Padded well past its glyph so it is comfortably clickable, and outside the
+   header's drag gesture. */
+.close {
+  flex: none; margin: -6px -4px -6px 0; padding: 6px 8px;
+  border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: ${TYPE.body}px; line-height: 1;
+  color: var(--muted);
+}
+.close:hover { color: var(--fg); background: ${nest(1)}; }
 
 /* Each region is one step up Fluid's surface ladder, so depth is carried by
    the surface itself and the numbers can stay full-contrast foreground. */
@@ -136,6 +149,9 @@ header .size {
 /** Where the user left it. Survives closing and reopening, not a reload. */
 let dockX = MARGIN;
 let dockY = -1;          // -1 means "not placed yet" → default to the bottom
+
+/** Set by the close button, cleared by the key. Outlives one panel instance. */
+let dismissed = false;
 
 export function createBoxModel(root: ShadowRoot): BoxModel {
   const style = document.createElement('style');
@@ -188,6 +204,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   }
 
   addEventListener('resize', place);
+  let current: Box | null = null;
 
   // ── Rendering ─────────────────────────────────────────────────────────────
   function edge(n: number): HTMLElement {
@@ -234,7 +251,20 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       const size = document.createElement('span');
       size.className = 'size';
       size.textContent = `${fmt(box.width)} × ${fmt(box.height)}`;
-      header.append(name, size);
+      const close = document.createElement('button');
+      close.className = 'close';
+      close.textContent = '×';
+      close.title = 'close (B brings it back)';
+      // The header is the drag handle, so the button has to claim its own
+      // pointerdown or a click on it would start a drag instead.
+      close.addEventListener('pointerdown', (e) => e.stopPropagation());
+      close.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismissed = true;
+        dock.removeAttribute('data-open');
+      });
+
+      header.append(name, size, close);
       header.addEventListener('pointerdown', onPointerDown);
       header.addEventListener('pointermove', onPointerMove);
       header.addEventListener('pointerup', onPointerUp);
@@ -251,11 +281,19 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
           region('border', 2, b.border,
             region('padding', 3, b.padding, content))),
       );
+      current = box;
       place();
+      if (dismissed) return;
       // A frame first, so the browser paints the closed state before it moves.
       requestAnimationFrame(() => dock.setAttribute('data-open', ''));
     },
-    hide() { dock.removeAttribute('data-open'); },
+    hide() { current = null; dock.removeAttribute('data-open'); },
+    toggle() {
+      if (!current) return;              // nothing locked, nothing to show
+      dismissed = !dismissed;
+      if (dismissed) dock.removeAttribute('data-open');
+      else { place(); dock.setAttribute('data-open', ''); }
+    },
     destroy() {
       removeEventListener('resize', place);
       dock.remove();

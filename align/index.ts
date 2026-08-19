@@ -201,6 +201,11 @@ function onKey(e: KeyboardEvent) {
   if (matchesHotkey(e)) {
     e.preventDefault();
     overlay ? deactivate() : activate();
+  } else if (overlay && e.key.toLowerCase() === cfg.panelKey) {
+    // A plain letter is safe here: while the tool is on it swallows clicks, so
+    // nothing on the page can hold focus and receive the keystroke instead.
+    e.preventDefault();
+    boxmodel?.toggle();
   } else if (e.key === 'Escape' && overlay) {
     // Escape dismisses the topmost thing first: help, then the locks, then the
     // tool itself.

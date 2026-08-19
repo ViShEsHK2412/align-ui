@@ -186,6 +186,23 @@ export function initAlign(partial: Partial<Config> = {}): void {
   // app-level shortcut handler cannot swallow the hotkey.
   addEventListener('keydown', onKey, { capture: true });
 
+  // Without this, every file save stacks another canvas and another listener
+  // set. The page degrades gradually over an editing session, which is a
+  // miserable bug to diagnose after the fact (§8.3).
+  // Vite and friends expose `import.meta.hot` in dev, but nothing declares it in
+  // a plain TS project — and this module has to type-check inside the host app's
+  // build (Next runs tsc over it), so declare the sliver we use rather than
+  // depending on vite/client being present.
+  const hot = (import.meta as ImportMeta & { hot?: { dispose(cb: () => void): void } }).hot;
+  if (hot) {
+    hot.dispose(() => {
+      deactivate();
+      removeEventListener('keydown', onKey, { capture: true } as EventListenerOptions);
+      delete window.__align;
+      delete window.__alignAudit;
+    });
+  }
+
   window.__alignAudit = () => {
     const t0 = performance.now();
     invalidate();

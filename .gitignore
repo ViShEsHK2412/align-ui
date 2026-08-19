@@ -3,3 +3,6 @@ dist/
 examples/**/node_modules/
 examples/**/.next/
 examples/**/dist/
+examples/next-app/AGENTS.md
+examples/next-app/CLAUDE.md
+examples/next-app/next-env.d.ts

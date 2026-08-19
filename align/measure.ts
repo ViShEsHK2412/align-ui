@@ -86,3 +86,33 @@ export function gapSegments(a: Box, b: Box): Segment[] {
   }
   return out;
 }
+
+/**
+ * Order a set of boxes along whichever axis they actually vary on, so a row
+ * reads left-to-right and a column top-to-bottom without being told which.
+ * Pure.
+ */
+export function chain(boxes: Box[]): Box[] {
+  if (boxes.length < 2) return [...boxes];
+  const spread = (get: (b: Box) => number) => {
+    const vs = boxes.map(get);
+    return Math.max(...vs) - Math.min(...vs);
+  };
+  const horizontal = spread((b) => b.left + b.width / 2) >=
+                     spread((b) => b.top + b.height / 2);
+  return [...boxes].sort((a, b) => horizontal ? a.left - b.left : a.top - b.top);
+}
+
+/**
+ * The gaps between each adjacent pair in a locked set — five tags in a row give
+ * the four gutters between them, which is the whole point of locking more than
+ * one. Pure.
+ */
+export function chainSegments(boxes: Box[]): Segment[] {
+  const ordered = chain(boxes);
+  const out: Segment[] = [];
+  for (let i = 1; i < ordered.length; i++) {
+    out.push(...gapSegments(ordered[i - 1]!, ordered[i]!));
+  }
+  return out;
+}

@@ -6,30 +6,42 @@ distance between them — fractions included.
 
 It measures. It doesn't judge: whether 25.5px is wrong is your call.
 
-No runtime dependencies, ~13KB minified, physically absent from production
+No runtime dependencies, ~16KB minified, physically absent from production
 bundles.
 
 ```
 Cmd/Ctrl + Shift + A    toggle
 hover                   outline + dotted edge guides + size tooltip
-click                   pin it, and open the box model panel
-hover with a pin set    distance lines between the two, in px
+click                   lock it, and open the box model panel
+Shift + click           add to the locked set (or drop one already in it)
+hover with locks set    distance from the newest lock to what you point at
 drag the panel header   move the box model anywhere on screen
-Escape                  clear the pin; again to close
+Escape                  clear the locks; again to close
 ```
 
-While the tool is on, a click means "pin this", so it doesn't reach the page —
+**Locking more than one** is how you check a row at a glance: click the first
+tag, then Shift-click the rest, and every gutter between them is measured at
+once. The set is ordered along whichever axis it actually varies on, so a row
+reads left-to-right and a column top-to-bottom without being told which.
+Shift-clicking something already locked drops it, so a mis-click costs nothing.
+
+A small badge sits top-right whenever the tool is running, with a count of what
+is locked, so it can never be on without you knowing. It's inert — no pointer
+events, nothing to click by accident.
+
+While the tool is on, a click means "lock this", so it doesn't reach the page —
 the same bargain DevTools' inspect mode makes. Toggle off to use the app.
 
 ## What you see
 
 - **Dotted guides** run the full viewport from each edge of whatever you're
   hovering, so you can line things up by eye.
-- **Distance lines** are drawn with end caps and a px label, only between the
-  pinned element and the hovered one.
+- **Distance lines** are drawn with end caps and a px label — between each
+  adjacent pair in the locked set, and from the newest lock to whatever you're
+  pointing at.
 - **The tooltip** follows the cursor with `160 × 24` and nothing else.
 - **The box model panel** starts bottom-left and shows margin, border, padding
-  and content for the pinned element, each region a step up the surface ladder
+  and content for the most recently locked element, each region a step up the surface ladder
   so depth is carried by the surface rather than by colour. Zeros are muted so
   the numbers that matter stand out. Drag it by the header to anywhere on
   screen — it lifts while held, stays where you put it, and is clamped so it
@@ -160,9 +172,10 @@ DevTools. `?hmrprobe` tracks listener registrations across saves.
 
 ```
 align/
-  index.ts      init, hotkey, hover/pin state, lifecycle
+  index.ts      init, hotkey, hover/lock state, lifecycle
   overlay.ts    canvas: outlines, guides, distances, tooltip
   boxmodel.ts   the draggable box model panel
+  indicator.ts  the top-right "running" badge
   measure.ts    geometry, hit-testing, computed styles
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
@@ -174,7 +187,7 @@ element's own rect, distances from exactly two elements, all measured on demand
 through `elementFromPoint`. Since nothing is stored, nothing can go stale — an
 animating page can't show you a wrong number.
 
-Only `overlay.ts` and `boxmodel.ts` write to the DOM; only `index.ts` touches
+Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only `index.ts` touches
 window globals and `import.meta.hot`; the geometry in `measure.ts` is pure and
 unit-tested.
 

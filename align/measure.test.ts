@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt, gapSegments } from './measure';
+import { chain, chainSegments, fmt, gapSegments } from './measure';
 import type { Box } from './types';
 
 function box(left: number, top: number, width = 100, height = 40): Box {
@@ -62,5 +62,41 @@ describe('fmt', () => {
     expect(fmt(13.5)).toBe('13.5');
     expect(fmt(25.10)).toBe('25.1');
     expect(fmt(333.141)).toBe('333.14');
+  });
+});
+
+describe('chain', () => {
+  it('orders a row left to right whichever way it was locked', () => {
+    const a = box(0, 0, 80, 28), b = box(96, 0, 80, 28), c = box(192, 0, 80, 28);
+    expect(chain([c, a, b]).map((x) => x.left)).toEqual([0, 96, 192]);
+  });
+
+  it('orders a column top to bottom', () => {
+    const a = box(0, 0), b = box(0, 60), c = box(0, 120);
+    expect(chain([c, a, b]).map((x) => x.top)).toEqual([0, 60, 120]);
+  });
+
+  it('leaves a set of one alone', () => {
+    expect(chain([box(5, 5)]).map((x) => x.left)).toEqual([5]);
+    expect(chain([])).toEqual([]);
+  });
+});
+
+describe('chainSegments', () => {
+  it('measures every gutter in a locked row at once', () => {
+    // Four tags with gutters of 16, 16 and 18 — the case this exists for.
+    const tags = [box(0, 0, 80, 28), box(96, 0, 80, 28),
+                  box(192, 0, 80, 28), box(290, 0, 80, 28)];
+    expect(chainSegments(tags).map((s) => s.label)).toEqual(['16', '16', '18']);
+  });
+
+  it('measures adjacent pairs only, not every combination', () => {
+    const tags = [box(0, 0, 10, 10), box(20, 0, 10, 10), box(40, 0, 10, 10)];
+    expect(chainSegments(tags)).toHaveLength(2);
+  });
+
+  it('has nothing to say about fewer than two boxes', () => {
+    expect(chainSegments([box(0, 0)])).toEqual([]);
+    expect(chainSegments([])).toEqual([]);
   });
 });

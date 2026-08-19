@@ -1,6 +1,7 @@
 import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
-import { boxOf, gapSegments, hitTest } from './measure';
+import { createIndicator, type Indicator } from './indicator';
+import { boxOf, chainSegments, gapSegments, hitTest } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
 import type { Box } from './types';
@@ -20,8 +21,9 @@ declare global {
 let cfg: Config;
 let overlay: Overlay | null = null;
 let boxmodel: BoxModel | null = null;
+let indicator: Indicator | null = null;
 let hover: Box | null = null;
-let pinned: Box | null = null;
+let pinned: Box[] = [];
 
 function matchesHotkey(e: KeyboardEvent): boolean {
   const parts = cfg.hotkey.toLowerCase().split('+');
@@ -34,12 +36,20 @@ function matchesHotkey(e: KeyboardEvent): boolean {
 }
 
 function render(cursor?: { x: number; y: number }) {
+  const last = pinned[pinned.length - 1];
+  const locked = hover && pinned.some((b) => b.el === hover!.el);
   overlay?.update({
     hover,
     pinned,
-    lines: pinned && hover && hover.el !== pinned.el ? gapSegments(pinned, hover) : [],
+    lines: [
+      // Gaps within the locked set, then from the newest lock to what you're
+      // pointing at — measuring to something already locked would be noise.
+      ...chainSegments(pinned),
+      ...(last && hover && !locked ? gapSegments(last, hover) : []),
+    ],
     ...(cursor ? { cursor } : {}),
   });
+  indicator?.update(pinned.length);
 }
 
 function onMouseMove(e: MouseEvent) {
@@ -50,19 +60,30 @@ function onMouseMove(e: MouseEvent) {
 function onMouseDown(e: MouseEvent) {
   const hit = hitTest(e.clientX, e.clientY, cfg);
   if (!hit) return;
-  // While the tool is on, a click means "pin this" — it must not also reach the
-  // page, the same bargain DevTools' inspect mode makes.
+  // While the tool is on, a click means "lock this" — it must not also reach
+  // the page, the same bargain DevTools' inspect mode makes.
   e.preventDefault();
   e.stopPropagation();
-  pinned = hit;
+
+  if (e.shiftKey) {
+    // Hold shift to build a set: click each element in turn and the gaps
+    // between all of them are measured at once. Clicking a locked one again
+    // drops it, so a mis-click costs nothing.
+    const at = pinned.findIndex((b) => b.el === hit.el);
+    pinned = at >= 0 ? pinned.filter((_, i) => i !== at) : [...pinned, hit];
+  } else {
+    pinned = [hit];
+  }
+
   hover = hit;
-  boxmodel?.show(hit);
+  const last = pinned[pinned.length - 1];
+  if (last) boxmodel?.show(last); else boxmodel?.hide();
   render({ x: e.clientX, y: e.clientY });
 }
 
 /** Rects move under the cursor on scroll and resize; re-measure the live two. */
 function onViewportChange() {
-  if (pinned) pinned = boxOf(pinned.el);
+  pinned = pinned.map((b) => boxOf(b.el));
   if (hover) hover = boxOf(hover.el);
   overlay?.resize();
   render();
@@ -74,6 +95,8 @@ function activate() {
   loadFont();
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
+  indicator = createIndicator(overlay.root);
+  indicator.update(0);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('resize', onViewportChange);
@@ -85,13 +108,15 @@ function deactivate() {
   removeEventListener('mousedown', onMouseDown, { capture: true });
   removeEventListener('resize', onViewportChange);
   removeEventListener('scroll', onViewportChange, true);
+  indicator?.destroy();
+  indicator = null;
   boxmodel?.destroy();
   boxmodel = null;
   overlay?.destroy();
   overlay = null;
   unloadFont();
   hover = null;
-  pinned = null;
+  pinned = [];
 }
 
 function onKey(e: KeyboardEvent) {
@@ -100,7 +125,7 @@ function onKey(e: KeyboardEvent) {
     overlay ? deactivate() : activate();
   } else if (e.key === 'Escape' && overlay) {
     // Escape backs out one step: drop the pin first, close second.
-    if (pinned) { pinned = null; boxmodel?.hide(); render(); }
+    if (pinned.length) { pinned = []; boxmodel?.hide(); render(); }
     else deactivate();
   }
 }

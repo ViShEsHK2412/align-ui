@@ -53,7 +53,7 @@ const CSS = `
   --border: color-mix(in oklab, var(--fg) 12%, transparent);
 }
 .panel {
-  padding: 10px; border-radius: 12px;
+  padding: 10px; border-radius: 0;
   font-size: ${TYPE.body}px; line-height: 1.4;
   color: var(--fg);
   background: ${nest(0)};
@@ -102,7 +102,7 @@ header .size {
 /* Each region is one step up Fluid's surface ladder, so depth is carried by
    the surface itself and the numbers can stay full-contrast foreground. */
 .region {
-  position: relative; border-radius: 6px;
+  position: relative; border-radius: 0;
   border: 1px solid var(--border);
   padding: 21px 6px 6px;
 }
@@ -126,7 +126,7 @@ header .size {
 .row > .fill { flex: 1 1 auto; min-width: 0; }
 
 .content {
-  border-radius: 4px; border: 1px solid var(--border); padding: 10px 6px;
+  border-radius: 0; border: 1px solid var(--border); padding: 10px 6px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--fg);

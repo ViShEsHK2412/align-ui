@@ -10,7 +10,8 @@ import type { Box, Segment } from './types';
 
 export interface OverlayState {
   hover: Box | null;
-  pinned: Box | null;
+  /** Every locked element, in the order they were locked. */
+  pinned: Box[];
   lines: Segment[];
   cursor: { x: number; y: number } | null;
 }
@@ -44,7 +45,7 @@ export function mountOverlay(): Overlay {
   root.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
 
-  const state: OverlayState = { hover: null, pinned: null, lines: [], cursor: null };
+  const state: OverlayState = { hover: null, pinned: [], lines: [], cursor: null };
   let c: Ink = ink(prefersDark());
   let frame = 0;
 
@@ -141,10 +142,10 @@ export function mountOverlay(): Overlay {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    if (state.pinned) outline(state.pinned, c.accent);
+    for (const box of state.pinned) outline(box, c.accent);
     if (state.hover) {
       guides(state.hover);
-      outline(state.hover, state.pinned ? alpha(c.accent, 0.7) : c.accent);
+      outline(state.hover, state.pinned.length ? alpha(c.accent, 0.7) : c.accent);
     }
     for (const seg of state.lines) distance(seg);
 

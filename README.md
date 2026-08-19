@@ -17,16 +17,48 @@ It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 
 ## Install
 
-Copy the `align/` folder into your project, then wire it up behind a dev guard.
+```bash
+npm i -D github:ViShEsHK2412/align-ui
+```
 
-### Vite, CRA, Remix, SvelteKit, Astro
+Then pick the line that matches your setup.
+
+### Vite, Astro, SvelteKit, Remix, Nuxt
+
+One line in the config, and nothing in application code:
 
 ```ts
-// main.ts
-if (import.meta.env.DEV) import('./align').then((m) => m.initAlign());
+// vite.config.ts
+import align from 'align-ui/vite';
+
+export default defineConfig({
+  plugins: [align()],
+});
+```
+
+The plugin is `apply: 'serve'`, so it does not exist during a production build —
+there is no dev guard to remember and no way for the tool to reach a bundle by
+accident. Options go straight in: `align({ hotkey: 'mod+shift+a' })`.
+
+### Anything else
+
+```ts
+// entry file
+if (import.meta.env.DEV) import('align-ui/auto');
+```
+
+Or take the handle yourself if you want to pass options:
+
+```ts
+if (import.meta.env.DEV) {
+  import('align-ui').then((m) => m.initAlign({ ignore: '.my-widget' }));
+}
 ```
 
 ### Next.js (App Router)
+
+Next has no equivalent of Vite's HTML hook, so it takes a small client
+component. No import of ours in the layout, so nothing reaches the bundle:
 
 ```tsx
 // components/AlignDev.tsx
@@ -40,7 +72,7 @@ export default function AlignDev() {
     if (process.env.NODE_ENV === 'production') return;   // must be here
     if (didInit) return;
     didInit = true;
-    import('@/align').then((m) => m.initAlign());
+    import('align-ui/auto');
   }, []);
   return null;
 }
@@ -53,13 +85,7 @@ export default function AlignDev() {
 
 > The env check has to wrap the dynamic `import()` itself, not just the element.
 > Guarding only `<AlignDev />` leaves the component statically imported and the
-> import reachable, so the whole tool ships to production. The Vite recipe works
-> as written because `import.meta.env.DEV` guards the import directly.
-
-If `align/` sits outside your Next project root, set
-`experimental: { externalDir: true }` in `next.config.mjs`.
-
----
+> import reachable, so the whole tool ships to production.
 
 ## Keys
 

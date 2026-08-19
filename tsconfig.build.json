@@ -7,5 +7,9 @@
     "outDir": "dist",
     "rootDir": "align"
   },
-  "include": ["align/index.ts"]
+  "include": [
+    "align/index.ts",
+    "align/auto.ts",
+    "align/vite.ts"
+  ]
 }

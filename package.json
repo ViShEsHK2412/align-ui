@@ -8,18 +8,27 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/align.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "esbuild align/index.ts --bundle --format=esm --minify --outfile=dist/align.js && tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "size": "node -e \"const fs=require('fs'),zlib=require('zlib');const s=fs.statSync('dist/align.js').size,z=zlib.gzipSync(fs.readFileSync('dist/align.js')).length;console.log('dist/align.js',s,'bytes ('+z+' gzipped)');if(s>32768)process.exit(1)\"",
     "demo": "vite examples/vite-demo",
-    "demo:build": "vite build examples/vite-demo"
+    "demo:build": "vite build examples/vite-demo",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -27,5 +36,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ViShEsHK2412/align-ui.git"
   }
 }

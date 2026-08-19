@@ -1,10 +1,13 @@
 import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator } from './indicator';
-import { boxOf, chainSegments, gapSegments, hitTest } from './measure';
+import {
+  boxOf, chainSegments, gapSegments, guideSegments, guideUnder, hitTest,
+  snapEdges, snapTo,
+} from './measure';
 import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
-import type { Box } from './types';
+import type { Box, Guide } from './types';
 
 /**
  * Public API, state machine, hotkeys, lifecycle. The only module that touches
@@ -27,6 +30,44 @@ let pinned: Box[] = [];
 let watching = 0;
 /** Sticky across open and close, like the panel's position. */
 let rulers = false;
+/** Guides live for the session: across toggling, gone on reload. */
+let guides: Guide[] = [];
+let nextGuideId = 1;
+let dragging: Guide | null = null;
+let hoverGuide: Guide | null = null;
+
+/** The ruler gutter, mirrored from overlay.ts. */
+const RULER = 22;
+
+function inRuler(x: number, y: number): 'x' | 'y' | null {
+  if (!rulers) return null;
+  // Drag down from the top rule for a horizontal line, right from the left one
+  // for a vertical: the axis is implied by where the drag began.
+  if (y < RULER && x >= RULER) return 'y';
+  if (x < RULER && y >= RULER) return 'x';
+  return null;
+}
+
+/** Place a guide, pulling it onto a nearby edge unless Alt says otherwise. */
+function placeGuide(g: Guide, x: number, y: number, free: boolean) {
+  const under = hitTest(x, y, cfg);
+  const viewport = g.axis === 'x' ? x : y;
+  const snapped = snapTo(viewport, snapEdges(under, g.axis), free);
+  g.at = snapped + (g.axis === 'x' ? scrollX : scrollY);
+}
+
+function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
+  const g: Guide = { id: nextGuideId++, axis, at: 0 };
+  placeGuide(g, x, y, free);
+  guides = [...guides, g];
+  return g;
+}
+
+function removeGuide(g: Guide) {
+  guides = guides.filter((o) => o.id !== g.id);
+  if (hoverGuide?.id === g.id) hoverGuide = null;
+  if (dragging?.id === g.id) dragging = null;
+}
 
 function matchesHotkey(e: KeyboardEvent): boolean {
   const parts = cfg.hotkey.toLowerCase().split('+');
@@ -41,29 +82,76 @@ function matchesHotkey(e: KeyboardEvent): boolean {
 function render(cursor?: { x: number; y: number }) {
   const last = pinned[pinned.length - 1];
   const locked = hover && pinned.some((b) => b.el === hover!.el);
+  const at = guides.map((g) => ({
+    axis: g.axis,
+    pos: g.axis === 'x' ? g.at - scrollX : g.at - scrollY,
+  }));
   overlay?.update({
     hover,
     pinned,
     rulers,
+    guides,
+    liveGuide: dragging ?? hoverGuide,
     lines: [
       // Gaps within the locked set, then from the newest lock to what you're
       // pointing at — measuring to something already locked would be noise.
       ...chainSegments(pinned),
       ...(last && hover && !locked ? gapSegments(last, hover) : []),
+      // And from whatever you are pointing at to the nearest guide each way.
+      ...(hover && guides.length ? guideSegments(hover, at) : []),
     ],
     ...(cursor ? { cursor } : {}),
   });
   indicator?.update(pinned.length);
 }
 
+/** The keyboard needs to know where the pointer is to drop a guide there. */
+let cursorAt: { x: number; y: number } | null = null;
+
 function onMouseMove(e: MouseEvent) {
+  cursorAt = { x: e.clientX, y: e.clientY };
+  if (dragging) {
+    placeGuide(dragging, e.clientX, e.clientY, e.altKey);
+    guides = [...guides];
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
+  hoverGuide = guideUnder(guides, e.clientX, e.clientY);
   hover = hitTest(e.clientX, e.clientY, cfg);
+  render({ x: e.clientX, y: e.clientY });
+}
+
+function onMouseUp(e: MouseEvent) {
+  if (!dragging) return;
+  // Dropped back in a rule: that is how you throw a guide away.
+  if (inRuler(e.clientX, e.clientY) || e.clientX < RULER || e.clientY < RULER) {
+    removeGuide(dragging);
+  }
+  dragging = null;
   render({ x: e.clientX, y: e.clientY });
 }
 
 /** Lock exactly this one, dropping whatever was locked before. */
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
+
+  // Precedence, so the gestures never fight: a rule starts a new guide, a
+  // guide under the cursor gets picked up, anything else locks an element.
+  const fromRuler = inRuler(e.clientX, e.clientY);
+  if (fromRuler) {
+    swallow(e);
+    dragging = addGuide(fromRuler, e.clientX, e.clientY, e.altKey);
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
+  const grabbed = guideUnder(guides, e.clientX, e.clientY);
+  if (grabbed) {
+    swallow(e);
+    dragging = grabbed;
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
+
   const hit = hitTest(e.clientX, e.clientY, cfg);
   if (!hit) return;                       // our own UI — let it have the event
   swallow(e);
@@ -173,6 +261,7 @@ function activate() {
   indicator.update(0);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
+  addEventListener('mouseup', onMouseUp, { capture: true });
   addEventListener('click', onClick, { capture: true });
   addEventListener('auxclick', onAuxClick, { capture: true });
   addEventListener('contextmenu', onContextMenu, { capture: true });
@@ -183,6 +272,7 @@ function activate() {
 function deactivate() {
   removeEventListener('mousemove', onMouseMove);
   removeEventListener('mousedown', onMouseDown, { capture: true });
+  removeEventListener('mouseup', onMouseUp, { capture: true });
   removeEventListener('click', onClick, { capture: true });
   removeEventListener('auxclick', onAuxClick, { capture: true });
   removeEventListener('contextmenu', onContextMenu, { capture: true });
@@ -198,12 +288,23 @@ function deactivate() {
   unloadFont();
   hover = null;
   pinned = [];
+  dragging = null;
+  hoverGuide = null;
 }
 
 function onKey(e: KeyboardEvent) {
   if (matchesHotkey(e)) {
     e.preventDefault();
     overlay ? deactivate() : activate();
+  } else if (overlay && e.key.toLowerCase() === cfg.guideKey && cursorAt) {
+    e.preventDefault();
+    addGuide(e.shiftKey ? 'y' : 'x', cursorAt.x, cursorAt.y, e.altKey);
+    render();
+  } else if (overlay && (e.key === 'Delete' || e.key === 'Backspace')) {
+    e.preventDefault();
+    if (e.shiftKey) guides = [];
+    else if (hoverGuide) removeGuide(hoverGuide);
+    render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();
     rulers = !rulers;

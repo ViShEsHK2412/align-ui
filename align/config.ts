@@ -6,6 +6,8 @@ export interface Config {
   panelKey: string;
   /** Shows or hides the rulers, while the tool is open. */
   rulerKey: string;
+  /** Drops a guide at the cursor; with shift, on the other axis. */
+  guideKey: string;
 }
 
 export const DEFAULTS: Config = {
@@ -13,6 +15,7 @@ export const DEFAULTS: Config = {
   hotkey: 'mod+shift+a',
   panelKey: 'b',
   rulerKey: 'r',
+  guideKey: 'g',
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {

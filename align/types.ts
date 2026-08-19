@@ -26,3 +26,15 @@ export interface Segment {
   /** Which way the end caps point. */
   axis: 'x' | 'y';
 }
+
+/**
+ * A line the user placed, in PAGE coordinates — so it stays on the same part of
+ * the document as you scroll, rather than floating in the viewport.
+ *
+ * `x` is a vertical line at page-x; `y` is a horizontal line at page-y.
+ */
+export interface Guide {
+  id: number;
+  axis: 'x' | 'y';
+  at: number;
+}

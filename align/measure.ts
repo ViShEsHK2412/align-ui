@@ -1,5 +1,5 @@
 import { skipSelector, type Config } from './config';
-import type { Bands, Box, Quad, Segment } from './types';
+import type { Bands, Box, Guide, Quad, Segment } from './types';
 
 /**
  * Measurement. Everything that reads geometry lives here; the arithmetic is
@@ -132,6 +132,85 @@ export function chainSegments(boxes: Box[]): Segment[] {
   const out: Segment[] = [];
   for (let i = 1; i < ordered.length; i++) {
     out.push(...gapSegments(ordered[i - 1]!, ordered[i]!));
+  }
+  return out;
+}
+
+// ── Guides ──────────────────────────────────────────────────────────────────
+
+/** How near the cursor has to be to pick a guide up, in px. */
+export const GRAB = 5;
+/** How near an edge a guide has to be to snap onto it, in px. */
+export const SNAP = 4;
+
+/** Viewport position of a guide — page coordinates minus the scroll. */
+export function guideAt(g: Guide): number {
+  return g.axis === 'x' ? g.at - scrollX : g.at - scrollY;
+}
+
+/** The guide under the cursor, if any. Nearest wins when two overlap. */
+export function guideUnder(guides: Guide[], x: number, y: number): Guide | null {
+  let best: Guide | null = null;
+  let bestGap = GRAB;
+  for (const g of guides) {
+    const gap = Math.abs(guideAt(g) - (g.axis === 'x' ? x : y));
+    if (gap <= bestGap) { best = g; bestGap = gap; }
+  }
+  return best;
+}
+
+/**
+ * Pull a guide onto a nearby edge. A guide meant to sit on a card's edge has to
+ * sit *on* it — a pixel off is a guide that quietly lies to you. Pure.
+ */
+export function snapTo(value: number, edges: number[], free: boolean): number {
+  if (free) return value;
+  let best = value;
+  let bestGap = SNAP;
+  for (const e of edges) {
+    const gap = Math.abs(e - value);
+    if (gap < bestGap) { best = e; bestGap = gap; }
+  }
+  return best;
+}
+
+/** The edges a guide on this axis could snap to, from the box under the cursor. */
+export function snapEdges(box: Box | null, axis: 'x' | 'y'): number[] {
+  if (!box) return [];
+  return axis === 'x' ? [box.left, box.right] : [box.top, box.bottom];
+}
+
+/**
+ * The gap between a box and the nearest guide on each axis, as drawable
+ * segments. A guide passing through the box reports nothing — there is no gap.
+ * Pure: guide positions come in already converted to viewport space.
+ */
+export function guideSegments(box: Box, at: { axis: 'x' | 'y'; pos: number }[]): Segment[] {
+  const out: Segment[] = [];
+  for (const axis of ['x', 'y'] as const) {
+    const near = at
+      .filter((g) => g.axis === axis)
+      .map((g) => ({
+        pos: g.pos,
+        gap: axis === 'x'
+          ? (g.pos < box.left ? box.left - g.pos : g.pos > box.right ? g.pos - box.right : -1)
+          : (g.pos < box.top ? box.top - g.pos : g.pos > box.bottom ? g.pos - box.bottom : -1),
+      }))
+      .filter((g) => g.gap >= 0)
+      .sort((a, b) => a.gap - b.gap)[0];
+    if (!near) continue;
+
+    if (axis === 'x') {
+      const y = box.top + box.height / 2;
+      const from = near.pos < box.left ? near.pos : box.right;
+      const to = near.pos < box.left ? box.left : near.pos;
+      out.push({ x1: from, y1: y, x2: to, y2: y, label: fmt(near.gap), axis: 'x' });
+    } else {
+      const x = box.left + box.width / 2;
+      const from = near.pos < box.top ? near.pos : box.bottom;
+      const to = near.pos < box.top ? box.top : near.pos;
+      out.push({ x1: x, y1: from, x2: x, y2: to, label: fmt(near.gap), axis: 'y' });
+    }
   }
   return out;
 }

@@ -1,6 +1,6 @@
-import { fmt } from './measure';
+import { fmt, guideAt } from './measure';
 import { alpha, ink, prefersDark, TYPE, WEIGHT, whenFontReady, type Ink } from './theme';
-import type { Box, Segment } from './types';
+import type { Box, Guide, Segment } from './types';
 
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
@@ -15,6 +15,9 @@ export interface OverlayState {
   lines: Segment[];
   cursor: { x: number; y: number } | null;
   rulers: boolean;
+  guides: Guide[];
+  /** The one under the cursor or being dragged, drawn at full strength. */
+  liveGuide: Guide | null;
 }
 
 const CAP = 5;          // end-cap length on a distance line
@@ -53,6 +56,7 @@ export function mountOverlay(): Overlay {
 
   const state: OverlayState = {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false,
+    guides: [], liveGuide: null,
   };
   let c: Ink = ink(prefersDark());
   let frame = 0;
@@ -234,6 +238,14 @@ export function mountOverlay(): Overlay {
       ctx.stroke();
     }
 
+    // Where each guide sits, so they are findable on the rule.
+    ctx.fillStyle = c.guide;
+    for (const g of state.guides) {
+      const at = Math.round(guideAt(g));
+      if (g.axis === 'x') ctx.fillRect(at - 1, -0.5, 2, RULER);
+      else ctx.fillRect(-0.5, at - 1, RULER, 2);
+    }
+
     // The corner, so the two rules read as one frame.
     ctx.fillStyle = c.rulerBg;
     ctx.fillRect(-0.5, -0.5, RULER, RULER);
@@ -253,6 +265,18 @@ export function mountOverlay(): Overlay {
       guides(state.hover);
       outline(state.hover, state.pinned.length ? alpha(c.accent, 0.7) : c.accent);
     }
+    for (const g of state.guides) {
+      const live = state.liveGuide?.id === g.id;
+      ctx.strokeStyle = live ? c.guide : alpha(c.guide, 0.65);
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      const at = Math.round(guideAt(g));
+      if (g.axis === 'x') { ctx.moveTo(at, 0); ctx.lineTo(at, innerHeight); }
+      else { ctx.moveTo(0, at); ctx.lineTo(innerWidth, at); }
+      ctx.stroke();
+    }
+
     for (const seg of state.lines) distance(seg);
 
     // Labels last, always on top. A distance label sits clear of its own line:
@@ -267,6 +291,13 @@ export function mountOverlay(): Overlay {
       const { width, height } = state.hover;
       chip(`${fmt(width)} × ${fmt(height)}`,
         state.cursor.x + 14, state.cursor.y + 14, c.accent);
+    }
+    if (state.liveGuide) {
+      const g = state.liveGuide;
+      const at = Math.round(guideAt(g));
+      chip(`${g.axis} ${fmt(g.at)}`,
+        g.axis === 'x' ? at + 6 : 30,
+        g.axis === 'x' ? 30 : at + 6, c.guide);
     }
     if (state.rulers) rulers();
   }

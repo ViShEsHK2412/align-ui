@@ -22,6 +22,10 @@ export const KEYS: [string, string][] = [
   ['Drag the panel header', 'move the box model'],
   ['B', 'hide or bring back the box model'],
   ['R', 'rulers down the top and left edges'],
+  ['Drag from a rule', 'pull out a guide; drag it back to remove'],
+  ['G / Shift+G', 'guide at the cursor, vertical / horizontal'],
+  ['Alt while placing', 'ignore snapping'],
+  ['Del', 'remove the guide under the cursor; Shift+Del for all'],
   ['Esc', 'clear the locks, then close'],
 ];
 

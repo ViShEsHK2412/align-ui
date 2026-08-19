@@ -9,7 +9,7 @@ It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 ![align-ui measuring the gutters between five chips](docs/screenshot.png)
 
 - No runtime dependencies
-- ~21 KB minified, 7.7 KB gzipped
+- ~24 KB minified, 8.7 KB gzipped
 - Physically absent from production builds
 - Vite, Next.js, CRA, Remix, Astro, SvelteKit
 
@@ -72,6 +72,10 @@ If `align/` sits outside your Next project root, set
 | drag the panel header | move the box model |
 | `B`, or the `×` | hide the box model, and bring it back |
 | `R` | rulers along the top and left edges |
+| drag from a rule | pull out a guide; drag it back to remove |
+| `G` / `Shift + G` | guide at the cursor, vertical / horizontal |
+| `Alt` while placing | ignore snapping |
+| `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
 
 Clicking the **Align** badge, top-right, shows this list in the page.
@@ -82,6 +86,21 @@ meaning something as you scroll. Ticks step 10 / 50 / 100 px and the cursor is
 marked on both rules. Locked elements are shaded on them, so a selection stays
 findable once it scrolls off — the hovered element is not, since a band
 repainting on every mouse move is noise rather than information.
+
+**Guides** are lines you place yourself, in page coordinates like the rulers.
+Pull one out of a rule — down from the top for a horizontal, right from the left
+for a vertical — so the axis is implied by where the drag started. Drag one back
+into a rule to throw it away.
+
+They snap onto the edges of whatever is under the cursor within 4px, because a
+guide meant to sit on a card's edge has to sit *on* it rather than a pixel off
+and quietly lying; hold `Alt` to place one freely. And they measure: hover an
+element and the nearest guide on each axis draws the gap and labels it, so
+"is this aligned to my guide" gets a number. A guide passing *through* the
+element draws nothing, since there is no gap to report.
+
+Guides last for the session — kept across toggling the tool off and on, gone on
+reload. Nothing is written to the host page's storage.
 
 **Locking more than one** is how you check a row at a glance: click the first
 element, right-click the rest, and every gutter between them is measured at
@@ -105,6 +124,7 @@ initAlign({
   hotkey: 'mod+shift+a',
   panelKey: 'b',
   rulerKey: 'r',
+  guideKey: 'g',
 });
 ```
 
@@ -134,7 +154,7 @@ align/
   measure.ts    geometry, hit-testing, computed styles
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
-  config.ts     ignore selector, hotkey, panel and ruler keys
+  config.ts     ignore selector, hotkey, panel / ruler / guide keys
 ```
 
 Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only

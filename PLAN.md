@@ -255,3 +255,72 @@ example apps work.
 - **Guide legibility over arbitrary pages.** A dotted red line at 70% can get
   lost on a red hero. Starting simple, as asked; if it bites, the fix is a 1px
   dark halo under each guide, which is a few lines in one function.
+
+---
+
+# Guides (custom lines)
+
+Lines you place yourself, to check things line up against.
+
+## Model
+
+```ts
+interface Guide { id: number; axis: 'x' | 'y'; at: number }
+```
+
+`at` is a **page** coordinate, like the rulers — a guide stays on the same part
+of the document as you scroll, rather than floating in the viewport.
+
+They live for the session: kept across toggling the tool off and on, gone on
+reload. Nothing is written to the host page's storage, which keeps the "nothing
+is stored, so nothing can go stale" property intact.
+
+## Placing
+
+**Drag out of a ruler.** Pull down from the top ruler for a horizontal line,
+right from the left ruler for a vertical one — the axis is implied by where the
+drag started, so there is nothing to remember. Release back inside the ruler to
+cancel.
+
+**Or press a key**, for when the rulers are off:
+
+| | |
+|---|---|
+| `G` | vertical line at the cursor |
+| `Shift + G` | horizontal line at the cursor |
+
+## Snapping
+
+While placing or moving, a guide snaps to the edges of whatever is under the
+cursor when it comes within 4px — so a guide meant to sit on a card's edge sits
+*on* it, rather than a pixel off and quietly lying. Hold `Alt` to place freely.
+
+## Moving and removing
+
+- Hover within 5px of a guide to pick it up; it brightens.
+- Drag to move it. Drag it into a ruler to delete it.
+- `Delete` or `Backspace` removes the guide under the cursor.
+- `Shift + Delete` clears them all.
+
+## Measuring
+
+A guide is not just a line to eyeball. When you hover an element, the nearest
+guide on each axis draws the gap between them and labels it — at most two extra
+lines, so it answers "is this aligned to my guide" with a number without
+crowding the screen. A guide passing *through* the element draws nothing, since
+there is no gap to report.
+
+## Drawing
+
+1px, in a hue of its own — measurements are red and the selection is blue, so
+guides are teal and can't be confused with either. Dimmed slightly at rest,
+full strength when the cursor is on one. Each guide also marks its position on
+the rulers.
+
+## Precedence
+
+`mousedown` resolves in this order, so the gestures never fight:
+
+1. inside a ruler gutter → start a new guide
+2. within grab range of a guide → move that guide
+3. otherwise → the existing lock behaviour

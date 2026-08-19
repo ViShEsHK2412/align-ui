@@ -1,72 +1,28 @@
-# Align
+# align-ui
 
-A dev-only measuring tool that runs inside your own project. Hover anything to
-see its size, click to pin it, then hover something else to get the exact
-distance between them — fractions included.
+A dev-only measuring tool that runs inside your own project. Hover any element
+to see its size, click to lock it, then hover another to get the exact distance
+between them — fractions included.
 
-It measures. It doesn't judge: whether 25.5px is wrong is your call.
+It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 
-No runtime dependencies, ~16KB minified, physically absent from production
-bundles.
+![align-ui measuring the gutters between five chips](docs/screenshot.png)
 
-```
-Cmd/Ctrl + Shift + A    toggle
-hover                   outline + dotted edge guides + size tooltip
-click                   lock it, and open the box model panel
-right-click             add to the locked set (or drop one already in it)
-hover with locks set    distance from the newest lock to what you point at
-drag the panel header   move the box model anywhere on screen
-B, or the × in it       hide the box model, and bring it back
-Escape                  close the key list, then the locks, then the tool
-```
+- No runtime dependencies
+- ~19 KB minified
+- Physically absent from production builds
+- Vite, Next.js, CRA, Remix, Astro, SvelteKit
 
-**Locking more than one** is how you check a row at a glance: click the first
-tag, then right-click the rest, and every gutter between them is measured at
-once. The set is ordered along whichever axis it actually varies on, so a row
-reads left-to-right and a column top-to-bottom without being told which.
-Right-clicking something already locked drops it, so a mis-click costs nothing.
-
-*Why the second button:* every modifier+click pairing is already spoken for by
-the browser — Shift opens a new window, Ctrl/Cmd a new tab, Alt downloads — so
-the right button is the one gesture left to take. The context menu is
-suppressed while the tool is on to make room for it.
-
-A badge sits top-right whenever the tool is running, with a count of what is
-locked, so it can never be on without you knowing. Click it for the full list
-of keys.
-
-While the tool is on it swallows clicks — plain, modified, and middle — so
-nothing navigates out from under you. That takes preventing the `click` event,
-not just `mousedown`: a link activates on click, so stopping mousedown alone
-still lets the page navigate. Toggle off to use the app.
-
-## What you see
-
-- **Dotted guides** run the full viewport from each edge of whatever you're
-  hovering, so you can line things up by eye.
-- **Distance lines** are drawn with end caps and a px label — between each
-  adjacent pair in the locked set, and from the newest lock to whatever you're
-  pointing at.
-- **The tooltip** follows the cursor with `160 × 24` and nothing else.
-- **The box model panel** starts bottom-left and shows margin, border, padding
-  and content for the most recently locked element, each region a step up the surface ladder
-  so depth is carried by the surface rather than by colour. Zeros are muted so
-  the numbers that matter stand out. Drag it by the header to anywhere on
-  screen — it lifts while held, stays where you put it, and is clamped so it
-  can never be lost off an edge.
-
-Everything is 1px. Numbers are tabular, so they don't jitter as the cursor
-moves.
+---
 
 ## Install
 
-Copy the `align/` folder into your project, or build it (`npm run build`) and
-import `dist/align.js`. Then wire it up behind a dev guard.
+Copy the `align/` folder into your project, then wire it up behind a dev guard.
 
-### Vite / CRA / Remix / SvelteKit / Astro
+### Vite, CRA, Remix, SvelteKit, Astro
 
 ```ts
-// main.ts — entry file
+// main.ts
 if (import.meta.env.DEV) import('./align').then((m) => m.initAlign());
 ```
 
@@ -81,7 +37,7 @@ let didInit = false;
 
 export default function AlignDev() {
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;   // <- must be here
+    if (process.env.NODE_ENV === 'production') return;   // must be here
     if (didInit) return;
     didInit = true;
     import('@/align').then((m) => m.initAlign());
@@ -95,151 +51,134 @@ export default function AlignDev() {
 {process.env.NODE_ENV !== 'production' ? <AlignDev /> : null}
 ```
 
-**The env check has to wrap the dynamic `import()` itself, not just the
-element.** Guarding only `<AlignDev />` in the layout leaves the component
-statically imported and the `import()` reachable, so the whole tool ships to
-production — verified by grepping `.next/static`. The Vite recipe works as
-written because `import.meta.env.DEV` guards the import directly.
+> The env check has to wrap the dynamic `import()` itself, not just the element.
+> Guarding only `<AlignDev />` leaves the component statically imported and the
+> import reachable, so the whole tool ships to production. The Vite recipe works
+> as written because `import.meta.env.DEV` guards the import directly.
 
-If `align/` lives outside your Next project root, set
+If `align/` sits outside your Next project root, set
 `experimental: { externalDir: true }` in `next.config.mjs`.
+
+---
+
+## Keys
+
+| | |
+|---|---|
+| `Ctrl/Cmd + Shift + A` | turn the tool on or off |
+| hover | outline, dotted edge guides, size tooltip |
+| click | lock an element, and open the box model |
+| right-click | add to the locked set, or drop one from it |
+| drag the panel header | move the box model |
+| `B`, or the `×` | hide the box model, and bring it back |
+| `Esc` | close the key list, then the locks, then the tool |
+
+Clicking the **Align** badge, top-right, shows this list in the page.
+
+**Locking more than one** is how you check a row at a glance: click the first
+element, right-click the rest, and every gutter between them is measured at
+once. The set orders itself along whichever axis it varies on, so a row reads
+left-to-right and a column top-to-bottom.
+
+Right-click rather than a modifier because every modifier+click is already
+taken by the browser — Shift opens a new window, Ctrl/Cmd a new tab, Alt
+downloads. While the tool is on it swallows clicks so nothing navigates out
+from under you; toggle off to use the app.
+
+---
 
 ## Configuration
 
-Two options, both optional.
+Everything has a default. Nothing is required.
 
 ```ts
 initAlign({
   ignore: '.third-party-widget, [data-radix-portal]',   // extra selector to skip
   hotkey: 'mod+shift+a',
-  panelKey: 'b',                                        // hides/shows the box model
+  panelKey: 'b',
 });
 ```
-
-Closing the box model with its × keeps the locks and the measuring — only the
-panel goes away, which is what you want when it is sitting on top of the thing
-you are trying to look at. It stays away until you ask for it back, rather than
-reappearing on the next lock.
 
 Mark anything the tool should never measure with `data-align-ignore` — hovering
 it walks up to the nearest ancestor that isn't ignored.
 
-## Design
+---
 
-**Type** is Inter throughout, on a three-step scale named by use: 13px for the
-panel title, 12px for every number and the cursor tooltip, 11px for the band
-names — the only thing below the 12px floor, and it never carries a value.
-Numbers are `tabular-nums`, which matters more here than anywhere else: they
-change on every mousemove, and proportional digits make the readout jitter.
-`font-synthesis: none`, so a missing weight fails visibly instead of being
-faked.
+## How it works
 
-Inter is loaded from Google Fonts at document level, because `@font-face`
-inside a shadow root is ignored — a stylesheet in our own shadow CSS would
-never apply. It's fetched on first activation, not at import, and removed on
-teardown. If the host page blocks it, the system stack takes over and
-everything still reads correctly; it just isn't Inter.
+The tool asks the browser one question — *what is at this coordinate?* — via
+`elementFromPoint`, descending through open shadow roots so pages built from
+web components measure their real inner nodes.
 
-**Colour** is [Fluid Functionalism](https://fluidfunctionalism.com)'s tokens
-converted to OKLCH, written once as `light-dark()` pairs and flipped by
-`color-scheme`, so the panel follows your OS theme.
-
-The box model uses that system's **surface ladder**: the panel is surface-3, a
-card floating over the page, and each nested region climbs one more step, so
-margin, border, padding and content read as depth rather than as four tinted
-fills. Dark mode is the ladder verbatim — an additive white-opacity climb over
-`#171717`. Light mode can't be, because Fluid's light ladder is flat `#FFFFFF`
-from surface-3 up and lets *shadow* carry elevation, which does nothing for
-regions nested inside one card; light instead steps down through the neutral
-tokens the system already defines (surface-1, `--muted`, `--accent`), inverting
-the direction at the same perceptual step size. Colour survives only in each
-region's label, at a lightness chosen for contrast — L 0.72 on white reads
-about 2.4:1, under the 4.5:1 floor for text.
-
-Two CSS notes worth knowing if you touch this: `light-dark()` accepts **colours
-only**, so a themed `box-shadow` has to be two declarations with a
-`prefers-color-scheme` block — written as one it is silently invalid and you
-get no shadow at all. And `color-scheme` has to sit on the panel rather than
-`:host`, because the host's inline `all: initial` outranks a `:host` rule and
-would pin `light-dark()` to its light branch on a dark page.
-
-**The tool has exactly one animation** — the box model panel's entrance, 160ms
-in and 120ms out (slow in, faster out). Everything else is instant on purpose:
-hovering happens hundreds of times a session, and motion there is friction on
-every single use. Under `prefers-reduced-motion` the panel keeps its fade and
-drops the travel.
-
-## Development
-
-```bash
-npm run demo         # the Vite demo page, with fixtures of known size
-npm test             # unit tests on the geometry
-npm run typecheck
-npm run build && npm run size
-```
-
-`examples/vite-demo` has two pages. `/` holds simple fixtures of known size — a
-13.5px gap, a 40px header with 16px side padding — for checking a reading
-against DevTools. `/complex.html` is the hard cases, twelve sections each
-stating the numbers it should produce:
-
-| | |
-|---|---|
-| asymmetric box model | every side a different margin, border and padding |
-| `box-sizing` | two boxes declaring the same width, only one of them 200px |
-| flex gap | five chips — the multi-lock case |
-| grid | column and row gaps differing |
-| negative margin | overlapping, so there is no gap to draw |
-| transforms | a rect follows `scale`/`rotate`; computed padding does not |
-| web components | an open shadow root, and a closed one that can't be pierced |
-| scrolling container | rects must follow the content, not go stale |
-| fractional geometry | thirds of 700px, landing on `233.33` |
-| deep nesting, stacking | ten wrappers, then overlapping z-indexed tiles |
-| SVG and tables | neither is an ordinary block box |
-| sticky, fixed, iframe | hit-testing stops at the iframe boundary |
-
-`?hmrprobe` tracks listener registrations across saves.
-
-## Architecture
+Nothing is cached and nothing is stored, so nothing can go stale. Measurements
+are re-read every frame while the tool is open, which keeps the overlay correct
+through CSS transitions, image loads and framework re-renders, and drops
+anything that leaves the document. Nothing redraws unless something moved; the
+cost is about 0.01 ms per frame.
 
 ```
 align/
   index.ts      init, hotkey, hover/lock state, lifecycle
   overlay.ts    canvas: outlines, guides, distances, tooltip
   boxmodel.ts   the draggable box model panel
-  indicator.ts  the top-right badge and its key list
+  indicator.ts  the badge and its key list
   measure.ts    geometry, hit-testing, computed styles
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
-  config.ts     ignore selector, hotkey
+  config.ts     ignore selector, hotkey, panel key
 ```
 
-Nothing walks the DOM and nothing is cached: guides come from the hovered
-element's own rect, distances from the locked set, all measured on demand
-through `elementFromPoint` — descending through open shadow roots, so a page
-built from web components measures its real inner nodes rather than one opaque
-host per component. Since nothing is stored, nothing can go stale — an
-animating page can't show you a wrong number.
+Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only
+`index.ts` touches window globals and `import.meta.hot`; the geometry in
+`measure.ts` is pure and unit-tested.
 
-Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only `index.ts` touches
-window globals and `import.meta.hot`; the geometry in `measure.ts` is pure and
-unit-tested.
+**Design.** Type is Inter on a three-step scale, with tabular figures so the
+numbers don't jitter as the cursor moves. Colour is
+[Fluid Functionalism](https://fluidfunctionalism.com)'s tokens in OKLCH,
+written once as `light-dark()` pairs, so the panel follows your OS theme; the
+box model uses that system's surface ladder, one step per nested region. There
+is exactly one animation — the panel's entrance, 160 ms in and 120 ms out.
+Everything else is instant, because hovering happens hundreds of times a
+session and motion there is friction on every use.
+
+---
 
 ## Known limits
 
-Three things it cannot see, all inherent to hit-testing rather than oversights:
+Three things it cannot see. All follow from hit-testing rather than oversight.
 
-- **`pointer-events: none` elements.** `elementFromPoint` looks straight through
-  them and reports whatever is behind, so a decorative overlay measures as its
-  parent. Removing the exclusion would mean walking the whole DOM again, which
-  is the cost this design exists to avoid.
-- **Inside an `<iframe>`.** A separate document — hit-testing stops at the
-  boundary and reports the `iframe` element itself.
-- **Closed shadow roots.** Nothing can pierce them, by design. Open roots are
-  descended into normally; our own overlay is closed for the same reason.
+| | |
+|---|---|
+| `pointer-events: none` | the browser looks straight through these, so a decorative overlay measures as its parent |
+| inside an `<iframe>` | a separate document — hit-testing stops at the boundary and reports the `iframe` |
+| closed shadow roots | nothing can pierce them, by design. Open roots work normally |
 
-## Non-goals
+---
 
-Alignment auditing, spacing lint, subpixel warnings, design-file diffing,
-jumping to source, writing CSS back, a11y and contrast checks. This tool tells
-you the numbers; you decide what they mean.
+## Development
+
+```bash
+npm install
+npm run demo        # http://localhost:5173
+npm test            # unit tests on the geometry
+npm run typecheck
+npm run build       # dist/align.js
+npm run size        # fails over 20 KB
+```
+
+Two example pages under `examples/vite-demo`:
+
+- **`/`** — simple fixtures of known size, for checking a reading against DevTools
+- **`/complex.html`** — twelve hard cases, each stating the numbers it should
+  produce: asymmetric box models, `box-sizing`, flex and grid gaps, negative
+  margins, transforms, shadow DOM, scrolling containers, fractional thirds,
+  deep nesting, SVG and tables, sticky/fixed/iframe
+
+`examples/next-app` is a minimal App Router app used to verify the SSR guard,
+HMR cleanup, and that nothing reaches the production bundle.
+
+---
+
+## License
+
+Private. All rights reserved.

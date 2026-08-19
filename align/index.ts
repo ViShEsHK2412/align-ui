@@ -24,6 +24,7 @@ let boxmodel: BoxModel | null = null;
 let indicator: Indicator | null = null;
 let hover: Box | null = null;
 let pinned: Box[] = [];
+let watching = 0;
 
 function matchesHotkey(e: KeyboardEvent): boolean {
   const parts = cfg.hotkey.toLowerCase().split('+');
@@ -113,12 +114,50 @@ function swallow(e: Event) {
   e.stopPropagation();
 }
 
-/** Rects move under the cursor on scroll and resize; re-measure the live two. */
-function onViewportChange() {
-  pinned = pinned.map((b) => boxOf(b.el));
-  if (hover) hover = boxOf(hover.el);
-  overlay?.resize();
+function sameRect(a: Box, b: Box): boolean {
+  return a.left === b.left && a.top === b.top &&
+         a.width === b.width && a.height === b.height;
+}
+
+/**
+ * Re-measure what is on screen every frame, while the tool is open.
+ *
+ * Scroll and resize events don't cover it: an element can move because a
+ * transition ran, an image loaded, or a framework re-rendered, none of which
+ * fire anything we can listen for. Without this the outline stays where the
+ * element used to be, which on a measuring tool is the worst possible failure.
+ *
+ * It also drops anything that has left the document. A locked element removed
+ * by a route change otherwise collapses to a 0x0 box at the origin and the
+ * tool goes on measuring distances to that phantom.
+ *
+ * Cost is one getBoundingClientRect per live box per frame, and only while
+ * open. Nothing is redrawn unless something actually moved.
+ */
+function watch() {
+  watching = requestAnimationFrame(watch);
+
+  const live = pinned.filter((b) => b.el.isConnected);
+  const next = live.map((b) => boxOf(b.el));
+  const nextHover = hover && hover.el.isConnected ? boxOf(hover.el) : null;
+
+  const moved =
+    next.length !== pinned.length ||
+    next.some((b, i) => !sameRect(b, pinned[i]!)) ||
+    (hover === null) !== (nextHover === null) ||
+    (hover !== null && nextHover !== null && !sameRect(hover, nextHover));
+  if (!moved) return;
+
+  pinned = next;
+  hover = nextHover;
+  const last = pinned[pinned.length - 1];
+  if (last) boxmodel?.show(last); else boxmodel?.hide();
   render();
+}
+
+/** The canvas has to be refitted on resize; the boxes are handled by watch(). */
+function onViewportChange() {
+  overlay?.resize();
 }
 
 function activate() {
@@ -135,7 +174,7 @@ function activate() {
   addEventListener('auxclick', onAuxClick, { capture: true });
   addEventListener('contextmenu', onContextMenu, { capture: true });
   addEventListener('resize', onViewportChange);
-  addEventListener('scroll', onViewportChange, true);
+  watching = requestAnimationFrame(watch);
 }
 
 function deactivate() {
@@ -145,7 +184,8 @@ function deactivate() {
   removeEventListener('auxclick', onAuxClick, { capture: true });
   removeEventListener('contextmenu', onContextMenu, { capture: true });
   removeEventListener('resize', onViewportChange);
-  removeEventListener('scroll', onViewportChange, true);
+  cancelAnimationFrame(watching);
+  watching = 0;
   indicator?.destroy();
   indicator = null;
   boxmodel?.destroy();
@@ -162,7 +202,9 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     overlay ? deactivate() : activate();
   } else if (e.key === 'Escape' && overlay) {
-    // Escape backs out one step: drop the pin first, close second.
+    // Escape dismisses the topmost thing first: help, then the locks, then the
+    // tool itself.
+    if (indicator?.closeHelp()) return;
     if (pinned.length) { pinned = []; boxmodel?.hide(); render(); }
     else deactivate();
   }

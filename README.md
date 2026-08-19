@@ -218,6 +218,19 @@ Only `overlay.ts`, `boxmodel.ts` and `indicator.ts` write to the DOM; only `inde
 window globals and `import.meta.hot`; the geometry in `measure.ts` is pure and
 unit-tested.
 
+## Known limits
+
+Three things it cannot see, all inherent to hit-testing rather than oversights:
+
+- **`pointer-events: none` elements.** `elementFromPoint` looks straight through
+  them and reports whatever is behind, so a decorative overlay measures as its
+  parent. Removing the exclusion would mean walking the whole DOM again, which
+  is the cost this design exists to avoid.
+- **Inside an `<iframe>`.** A separate document — hit-testing stops at the
+  boundary and reports the `iframe` element itself.
+- **Closed shadow roots.** Nothing can pierce them, by design. Open roots are
+  descended into normally; our own overlay is closed for the same reason.
+
 ## Non-goals
 
 Alignment auditing, spacing lint, subpixel warnings, design-file diffing,

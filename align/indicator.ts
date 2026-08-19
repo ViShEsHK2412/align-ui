@@ -8,7 +8,8 @@ import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 
 export interface Indicator {
   update(locked: number): void;
-  closeHelp(): void;
+  /** True if it was open — lets Escape dismiss the topmost layer first. */
+  closeHelp(): boolean;
   destroy(): void;
 }
 
@@ -116,7 +117,11 @@ export function createIndicator(root: ShadowRoot): Indicator {
     update(locked) {
       count.textContent = locked > 0 ? `${locked} locked` : '';
     },
-    closeHelp() { help.removeAttribute('data-open'); },
+    closeHelp() {
+      const wasOpen = help.hasAttribute('data-open');
+      help.removeAttribute('data-open');
+      return wasOpen;
+    },
     destroy() { flag.remove(); help.remove(); style.remove(); },
   };
 }

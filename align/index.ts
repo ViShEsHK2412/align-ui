@@ -1,7 +1,13 @@
 import { audit } from './cluster';
 import { mergeConfig, type Config } from './config';
+import { mountOverlay, type Overlay } from './overlay';
 import { invalidate, scan } from './scan';
-import type { Violation } from './types';
+import type { Box, Violation } from './types';
+
+/**
+ * Public API, state machine, hotkeys, lifecycle (§8). The only module that
+ * touches window globals or import.meta.hot.
+ */
 
 export type { Box, Violation, Axis } from './types';
 export type { Config } from './config';
@@ -14,27 +20,84 @@ declare global {
 }
 
 let cfg: Config;
+let overlay: Overlay | null = null;
+let observer: MutationObserver | null = null;
+let boxes: Box[] = [];
+let violations: Violation[] = [];
+let stale = false;
+let debounce = 0;
 
-function run(): Violation[] {
+function matchesHotkey(e: KeyboardEvent): boolean {
+  const parts = cfg.hotkey.toLowerCase().split('+');
+  const key = parts[parts.length - 1]!;
+  if (e.key.toLowerCase() !== key) return false;
+  if (parts.includes('shift') !== e.shiftKey) return false;
+  if (parts.includes('alt') !== e.altKey) return false;
+  const mod = parts.includes('mod') || parts.includes('ctrl') || parts.includes('cmd');
+  return mod === (e.metaKey || e.ctrlKey);
+}
+
+/** Re-run the audit over the boxes already measured — no DOM reads. */
+function reaudit() {
+  violations = audit(boxes, cfg, devicePixelRatio);
+  overlay?.update({ violations, highlighted: null });
+}
+
+function rescan() {
   invalidate();
-  const t0 = performance.now();
-  const boxes = scan(cfg);
-  const t1 = performance.now();
-  const violations = audit(boxes, cfg, devicePixelRatio);
-  const t2 = performance.now();
+  boxes = scan(cfg);
+  stale = false;
+  reaudit();
+}
 
-  console.log(
-    `[align] ${boxes.length} boxes, ${violations.length} violations · ` +
-    `scan ${(t1 - t0).toFixed(1)}ms, audit ${(t2 - t1).toFixed(1)}ms`,
-  );
-  console.table(violations.map((v) => ({
-    kind: v.kind,
-    axis: v.axis ?? '',
-    spread: Math.round(v.spread * 100) / 100,
-    offenders: v.boxes.length,
-    message: v.message,
-  })));
-  return violations;
+function markStale() {
+  stale = true;
+}
+
+function onResizeOrScroll() {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
+    markStale();
+    overlay?.resize();
+  }, 150) as unknown as number;
+}
+
+function activate() {
+  if (overlay) return;
+  overlay = mountOverlay();
+  rescan();
+
+  // Drop the cache and flag staleness, but DO NOT rescan: an animating page
+  // would rescan hundreds of times a second (§8.2).
+  observer = new MutationObserver(() => { invalidate(); markStale(); });
+  observer.observe(document.body, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ['class', 'style'],
+  });
+  addEventListener('resize', onResizeOrScroll);
+  addEventListener('scroll', onResizeOrScroll, true);
+}
+
+function deactivate() {
+  observer?.disconnect();
+  observer = null;
+  removeEventListener('resize', onResizeOrScroll);
+  removeEventListener('scroll', onResizeOrScroll, true);
+  clearTimeout(debounce);
+  overlay?.destroy();
+  overlay = null;
+  boxes = [];
+  violations = [];
+  stale = false;
+}
+
+function onKey(e: KeyboardEvent) {
+  if (matchesHotkey(e)) {
+    e.preventDefault();
+    overlay ? deactivate() : activate();
+  } else if (e.key === 'Escape' && overlay) {
+    deactivate();
+  }
 }
 
 export function initAlign(partial: Partial<Config> = {}): void {
@@ -43,6 +106,22 @@ export function initAlign(partial: Partial<Config> = {}): void {
   window.__align = true;
 
   cfg = mergeConfig(partial);
-  window.__alignAudit = run;
-  console.log('[align] ready — run __alignAudit() in the console');
+
+  // Dormancy is a requirement, not an optimisation (§8.1): until the first
+  // toggle this listener is the tool's entire footprint. Capture phase so an
+  // app-level shortcut handler cannot swallow the hotkey.
+  addEventListener('keydown', onKey, { capture: true });
+
+  window.__alignAudit = () => {
+    const t0 = performance.now();
+    invalidate();
+    const measured = scan(cfg);
+    const t1 = performance.now();
+    const found = audit(measured, cfg, devicePixelRatio);
+    console.log(
+      `[align] ${measured.length} boxes, ${found.length} violations · ` +
+      `scan ${(t1 - t0).toFixed(1)}ms, audit ${(performance.now() - t1).toFixed(1)}ms`,
+    );
+    return found;
+  };
 }

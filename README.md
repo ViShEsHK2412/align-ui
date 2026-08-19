@@ -22,7 +22,9 @@ It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 npm i -D github:ViShEsHK2412/align-ui
 ```
 
-Then pick the line that matches your setup.
+Nothing is built on install. `dist/` is committed to the repo deliberately, so
+the package works even where npm blocks lifecycle scripts — which recent npm
+does by default. Then pick the line that matches your setup.
 
 ### Vite, Astro, SvelteKit, Remix, Nuxt
 
@@ -232,11 +234,21 @@ npm run demo        # http://localhost:5173
 npm test            # unit tests on the geometry
 npm run typecheck
 npm run build       # dist/{align,auto,vite}.js + types
+npm run verify:dist # fails if the committed dist/ is stale
 npm run size        # fails over 32 KB
 ```
 
-`npm run build` runs on install too, via `prepare`, which is what lets the
-package be installed straight from git without any build output in the repo.
+`dist/` is committed. That is deliberate: installing from git used to build via
+a `prepare` script, and modern npm blocks install scripts by default, so the
+package silently arrived unbuilt. Shipping the build removes the dependency on
+a script running at all.
+
+The cost is that the committed output can drift from the source, so there is a
+check for exactly that — run it before committing:
+
+```bash
+npm run verify:dist   # rebuilds and fails if dist/ is out of date
+```
 
 To check a change to the packaging itself, install it somewhere real rather
 than trusting it:

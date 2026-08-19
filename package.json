@@ -23,12 +23,12 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "verify:dist": "npm run build && git diff --exit-code --stat dist",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "size": "node -e \"const fs=require('fs'),zlib=require('zlib');const s=fs.statSync('dist/align.js').size,z=zlib.gzipSync(fs.readFileSync('dist/align.js')).length;console.log('dist/align.js',s,'bytes ('+z+' gzipped)');if(s>32768)process.exit(1)\"",
     "demo": "vite examples/vite-demo",
-    "demo:build": "vite build examples/vite-demo",
-    "prepare": "npm run build"
+    "demo:build": "vite build examples/vite-demo"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

@@ -1,5 +1,7 @@
 node_modules/
-dist/
+
+# The package's own dist/ IS committed — see below. Only the examples' build
+# output is ignored.
 examples/**/node_modules/
 examples/**/.next/
 examples/**/dist/

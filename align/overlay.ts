@@ -1,4 +1,5 @@
 import { fmt } from './cluster';
+import type { Bands } from './measure';
 import type { Axis, Box, Violation } from './types';
 
 /**
@@ -15,7 +16,7 @@ export interface Segment {
 export interface MeasureView {
   hover: Box | null;
   anchor: Box | null;
-  bands: { padding: number[]; border: number[]; margin: number[] } | null;
+  bands: Bands | null;
   lines: Segment[];
 }
 
@@ -149,9 +150,36 @@ export function mountOverlay(): Overlay {
     ctx.globalAlpha = 1;
   }
 
+  /** Content, padding, border and margin, drawn as nested translucent bands. */
+  function drawBands(box: Box, b: Bands) {
+    const [mt, mr, mb, ml] = b.margin as [number, number, number, number];
+    const [bt, br, bb, bl] = b.border as [number, number, number, number];
+    const [pt, pr, pb, pl] = b.padding as [number, number, number, number];
+
+    const band = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    };
+    // Margin sits outside the border box, which is what a rect measures.
+    band(box.left - ml, box.top - mt, box.width + ml + mr, box.height + mt + mb,
+      'rgba(255, 176, 32, 0.14)');
+    band(box.left, box.top, box.width, box.height, 'rgba(56, 224, 139, 0.14)');
+    band(box.left + bl, box.top + bt, box.width - bl - br, box.height - bt - bb,
+      'rgba(77, 166, 255, 0.14)');
+    band(box.left + bl + pl, box.top + bt + pt,
+      box.width - bl - br - pl - pr, box.height - bt - bb - pt - pb,
+      'rgba(232, 237, 246, 0.10)');
+  }
+
   function drawMeasure(m: MeasureView) {
     ctx.globalAlpha = 1;
-    if (m.hover) outline(m.hover, COLOR.measure);
+    if (m.hover) {
+      if (m.bands) drawBands(m.hover, m.bands);
+      outline(m.hover, COLOR.measure);
+      const box = m.hover;
+      labels.push(() => pill(`${box.label} · ${fmt(box.width)} × ${fmt(box.height)}`,
+        box.left, box.top, COLOR.measure));
+    }
     if (m.anchor) outline(m.anchor, COLOR.measure);
     for (const seg of m.lines) {
       ctx.strokeStyle = COLOR.measure;

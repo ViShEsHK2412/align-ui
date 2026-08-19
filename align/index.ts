@@ -1,6 +1,7 @@
 import { audit } from './cluster';
 import { mergeConfig, type Config } from './config';
-import { mountOverlay, type Overlay } from './overlay';
+import { bandsOf, gapSegments, nearestScanned } from './measure';
+import { mountOverlay, type MeasureView, type Overlay } from './overlay';
 import { createPanel, type Panel } from './panel';
 import { invalidate, scan } from './scan';
 import type { Box, Violation } from './types';
@@ -28,6 +29,9 @@ let boxes: Box[] = [];
 let violations: Violation[] = [];
 let stale = false;
 let debounce = 0;
+let byEl = new Map<Element, Box>();
+let anchor: Box | null = null;
+let measureShown = false;
 
 function matchesHotkey(e: KeyboardEvent): boolean {
   const parts = cfg.hotkey.toLowerCase().split('+');
@@ -49,8 +53,49 @@ function reaudit() {
 function rescan() {
   invalidate();
   boxes = scan(cfg);
+  byEl = new Map(boxes.map((b) => [b.el, b]));
   stale = false;
   reaudit();
+}
+
+// ── Measure mode (§6) — active only while Alt is held ───────────────────────
+
+function clearMeasure() {
+  anchor = null;
+  measureShown = false;
+  overlay?.update({ measure: null });
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (!e.altKey) {
+    if (anchor || measureShown) clearMeasure();
+    return;
+  }
+  // One hit test per move; never a rescan (§11).
+  const hover = nearestScanned(document.elementFromPoint(e.clientX, e.clientY), byEl);
+  const view: MeasureView = {
+    hover,
+    anchor,
+    bands: hover ? bandsOf(hover.el) : null,
+    lines: anchor && hover && hover !== anchor ? gapSegments(anchor, hover) : [],
+  };
+  measureShown = true;
+  overlay?.update({ measure: view });
+}
+
+function onMouseDown(e: MouseEvent) {
+  if (!e.altKey) return;
+  const hit = nearestScanned(document.elementFromPoint(e.clientX, e.clientY), byEl);
+  if (!hit) return;
+  // Alt+click is a browser gesture on some platforms; this one is ours.
+  e.preventDefault();
+  e.stopPropagation();
+  anchor = hit;
+  overlay?.update({ measure: { hover: hit, anchor, bands: bandsOf(hit.el), lines: [] } });
+}
+
+function onKeyUp(e: KeyboardEvent) {
+  if (e.key === 'Alt') clearMeasure();
 }
 
 function markStale() {
@@ -92,6 +137,9 @@ function activate() {
   });
   addEventListener('resize', onResizeOrScroll);
   addEventListener('scroll', onResizeOrScroll, true);
+  addEventListener('mousemove', onMouseMove);
+  addEventListener('mousedown', onMouseDown, { capture: true });
+  addEventListener('keyup', onKeyUp);
 }
 
 function deactivate() {
@@ -99,13 +147,19 @@ function deactivate() {
   observer = null;
   removeEventListener('resize', onResizeOrScroll);
   removeEventListener('scroll', onResizeOrScroll, true);
+  removeEventListener('mousemove', onMouseMove);
+  removeEventListener('mousedown', onMouseDown, { capture: true } as EventListenerOptions);
+  removeEventListener('keyup', onKeyUp);
   clearTimeout(debounce);
   panel?.destroy();
   panel = null;
   overlay?.destroy();
   overlay = null;
   boxes = [];
+  byEl = new Map();
   violations = [];
+  anchor = null;
+  measureShown = false;
   stale = false;
 }
 
@@ -114,7 +168,9 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     overlay ? deactivate() : activate();
   } else if (e.key === 'Escape' && overlay) {
-    deactivate();
+    // Escape backs out one step: drop the measurement first, close second.
+    if (anchor || measureShown) clearMeasure();
+    else deactivate();
   }
 }
 

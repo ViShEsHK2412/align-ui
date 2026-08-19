@@ -4,12 +4,15 @@ export interface Config {
   hotkey: string;
   /** Hides or brings back the box model panel, while the tool is open. */
   panelKey: string;
+  /** Shows or hides the rulers, while the tool is open. */
+  rulerKey: string;
 }
 
 export const DEFAULTS: Config = {
   ignore: '',
   hotkey: 'mod+shift+a',
   panelKey: 'b',
+  rulerKey: 'r',
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {

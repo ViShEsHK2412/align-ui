@@ -16,6 +16,10 @@ export const INK = {
   measure: pair('oklch(0.637 0.208 25.3)', 'oklch(0.711 0.166 22.2)'),    // --destructive
   surface: pair('oklch(1 0 0)', 'oklch(0.264 0 0)'),                      // surface-3
   fg: pair('oklch(0.205 0 0)', 'oklch(0.97 0 0)'),
+  muted: pair('oklch(0.556 0 0)', 'oklch(0.715 0 0)'),                    // --muted-foreground
+  /** The ruler gutters: a surface, slightly translucent over the page. */
+  rulerBg: pair('oklch(1 0 0 / 0.92)', 'oklch(0.235 0 0 / 0.92)'),        // surface-3 / surface-2
+  rulerLine: pair('oklch(0.205 0 0 / 0.28)', 'oklch(0.97 0 0 / 0.28)'),
 } as const;
 
 /**

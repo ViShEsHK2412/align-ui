@@ -25,6 +25,8 @@ let indicator: Indicator | null = null;
 let hover: Box | null = null;
 let pinned: Box[] = [];
 let watching = 0;
+/** Sticky across open and close, like the panel's position. */
+let rulers = false;
 
 function matchesHotkey(e: KeyboardEvent): boolean {
   const parts = cfg.hotkey.toLowerCase().split('+');
@@ -42,6 +44,7 @@ function render(cursor?: { x: number; y: number }) {
   overlay?.update({
     hover,
     pinned,
+    rulers,
     lines: [
       // Gaps within the locked set, then from the newest lock to what you're
       // pointing at — measuring to something already locked would be noise.
@@ -114,6 +117,12 @@ function swallow(e: Event) {
   e.stopPropagation();
 }
 
+function toggleRulers() {
+  rulers = !rulers;
+  indicator?.setRulers(rulers);
+  render();
+}
+
 function sameRect(a: Box, b: Box): boolean {
   return a.left === b.left && a.top === b.top &&
          a.width === b.width && a.height === b.height;
@@ -166,8 +175,9 @@ function activate() {
   loadFont();
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
-  indicator = createIndicator(overlay.root);
+  indicator = createIndicator(overlay.root, { onToggleRulers: toggleRulers });
   indicator.update(0);
+  indicator.setRulers(rulers);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('click', onClick, { capture: true });
@@ -201,6 +211,9 @@ function onKey(e: KeyboardEvent) {
   if (matchesHotkey(e)) {
     e.preventDefault();
     overlay ? deactivate() : activate();
+  } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
+    e.preventDefault();
+    toggleRulers();
   } else if (overlay && e.key.toLowerCase() === cfg.panelKey) {
     // A plain letter is safe here: while the tool is on it swallows clicks, so
     // nothing on the page can hold focus and receive the keystroke instead.

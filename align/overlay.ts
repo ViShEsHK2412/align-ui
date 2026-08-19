@@ -14,11 +14,17 @@ export interface OverlayState {
   pinned: Box[];
   lines: Segment[];
   cursor: { x: number; y: number } | null;
+  rulers: boolean;
 }
 
 const CAP = 5;          // end-cap length on a distance line
 const PAD = 4;          // chip padding
 const EDGE = 12;        // keep chips this far from the viewport edge
+
+const RULER = 22;       // gutter thickness
+const MINOR = 10;       // unlabelled tick, px of page
+const MID = 50;         // half-height tick
+const MAJOR = 100;      // labelled tick
 
 export interface Overlay {
   root: ShadowRoot;
@@ -45,7 +51,9 @@ export function mountOverlay(): Overlay {
   root.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
 
-  const state: OverlayState = { hover: null, pinned: [], lines: [], cursor: null };
+  const state: OverlayState = {
+    hover: null, pinned: [], lines: [], cursor: null, rulers: false,
+  };
   let c: Ink = ink(prefersDark());
   let frame = 0;
 
@@ -135,6 +143,103 @@ export function mountOverlay(): Overlay {
     ctx.fillText(text, cx + PAD, cy + h / 2);
   }
 
+  /**
+   * Figma-style rulers along the top and left edges, in page coordinates —
+   * they count from the top-left of the document, not the viewport, so the
+   * numbers keep meaning something as you scroll.
+   */
+  function rulers() {
+    const ox = scrollX, oy = scrollY;      // page origin, in viewport space
+
+    // Gutters. The half-pixel offset that keeps strokes crisp would leave a
+    // seam on a fill, so these are drawn back a half pixel.
+    ctx.fillStyle = c.rulerBg;
+    ctx.fillRect(-0.5, -0.5, innerWidth + 1, RULER);
+    ctx.fillRect(-0.5, -0.5, RULER, innerHeight + 1);
+
+    ctx.strokeStyle = c.rulerLine;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.font = `${WEIGHT.regular} 9px ${TYPE.stack}`;
+    ctx.fillStyle = c.muted;
+
+    // Shade what is locked or hovered, so a selection is findable on the rule.
+    const marks = [...state.pinned, ...(state.hover ? [state.hover] : [])];
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = c.accent;
+    for (const b of marks) {
+      ctx.fillRect(b.left, -0.5, b.width, RULER);
+      ctx.fillRect(-0.5, b.top, RULER, b.height);
+    }
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.moveTo(-0.5, RULER - 0.5);
+    ctx.lineTo(innerWidth, RULER - 0.5);
+    ctx.moveTo(RULER - 0.5, -0.5);
+    ctx.lineTo(RULER - 0.5, innerHeight);
+    ctx.stroke();
+
+    const tick = (v: number) =>
+      v % MAJOR === 0 ? RULER : v % MID === 0 ? 7 : 4;
+
+    // ── top ──────────────────────────────────────────────────────────────
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.beginPath();
+    const firstX = Math.floor(ox / MINOR) * MINOR;
+    for (let v = firstX; v < ox + innerWidth; v += MINOR) {
+      const x = Math.round(v - ox);
+      if (x < RULER) continue;
+      const len = tick(v);
+      ctx.moveTo(x, RULER - len);
+      ctx.lineTo(x, RULER);
+      if (len === RULER) {
+        ctx.fillStyle = c.muted;
+        ctx.fillText(String(v), x + 3, 3);
+      }
+    }
+    ctx.stroke();
+
+    // ── left, labels turned to read up the page ──────────────────────────
+    ctx.beginPath();
+    const firstY = Math.floor(oy / MINOR) * MINOR;
+    for (let v = firstY; v < oy + innerHeight; v += MINOR) {
+      const y = Math.round(v - oy);
+      if (y < RULER) continue;
+      const len = tick(v);
+      ctx.moveTo(RULER - len, y);
+      ctx.lineTo(RULER, y);
+      if (len === RULER) {
+        ctx.save();
+        ctx.translate(3, y - 3);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = c.muted;
+        ctx.fillText(String(v), 0, 0);
+        ctx.restore();
+      }
+    }
+    ctx.stroke();
+
+    // Where the cursor is, on both rules.
+    if (state.cursor) {
+      ctx.strokeStyle = c.accent;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(state.cursor.x), -0.5);
+      ctx.lineTo(Math.round(state.cursor.x), RULER);
+      ctx.moveTo(-0.5, Math.round(state.cursor.y));
+      ctx.lineTo(RULER, Math.round(state.cursor.y));
+      ctx.stroke();
+    }
+
+    // The corner, so the two rules read as one frame.
+    ctx.fillStyle = c.rulerBg;
+    ctx.fillRect(-0.5, -0.5, RULER, RULER);
+    ctx.strokeStyle = c.rulerLine;
+    ctx.strokeRect(-0.5, -0.5, RULER, RULER);
+  }
+
   function draw() {
     frame = 0;
     ctx.save();
@@ -162,6 +267,7 @@ export function mountOverlay(): Overlay {
       chip(`${fmt(width)} × ${fmt(height)}`,
         state.cursor.x + 14, state.cursor.y + 14, c.accent);
     }
+    if (state.rulers) rulers();
   }
 
   function schedule() {

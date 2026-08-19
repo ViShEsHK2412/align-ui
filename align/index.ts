@@ -296,9 +296,11 @@ function onKey(e: KeyboardEvent) {
   if (matchesHotkey(e)) {
     e.preventDefault();
     overlay ? deactivate() : activate();
-  } else if (overlay && e.key.toLowerCase() === cfg.guideKey && cursorAt) {
+  } else if (overlay && cursorAt && (e.key.toLowerCase() === cfg.guideKeys.vertical
+                                  || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
     e.preventDefault();
-    addGuide(e.shiftKey ? 'y' : 'x', cursorAt.x, cursorAt.y, e.altKey);
+    const axis = e.key.toLowerCase() === cfg.guideKeys.vertical ? 'x' : 'y';
+    addGuide(axis, cursorAt.x, cursorAt.y, e.altKey);
     render();
   } else if (overlay && (e.key === 'Delete' || e.key === 'Backspace')) {
     e.preventDefault();

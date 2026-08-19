@@ -286,8 +286,12 @@ cancel.
 
 | | |
 |---|---|
-| `G` | vertical line at the cursor |
-| `Shift + G` | horizontal line at the cursor |
+| `V` | vertical line at the cursor |
+| `H` | horizontal line at the cursor |
+
+Two keys rather than one key plus shift: told to "press G", anyone types a
+capital G, so the modifier that was meant to pick the axis gets held by reflex
+and every guide comes out horizontal.
 
 ## Snapping
 

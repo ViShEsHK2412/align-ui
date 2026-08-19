@@ -73,7 +73,7 @@ If `align/` sits outside your Next project root, set
 | `B`, or the `×` | hide the box model, and bring it back |
 | `R` | rulers along the top and left edges |
 | drag from a rule | pull out a guide; drag it back to remove |
-| `G` / `Shift + G` | guide at the cursor, vertical / horizontal |
+| `V` / `H` | vertical / horizontal guide at the cursor |
 | `Alt` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
@@ -89,8 +89,9 @@ repainting on every mouse move is noise rather than information.
 
 **Guides** are lines you place yourself, in page coordinates like the rulers.
 Pull one out of a rule — down from the top for a horizontal, right from the left
-for a vertical — so the axis is implied by where the drag started. Drag one back
-into a rule to throw it away.
+for a vertical — so the axis is implied by where the drag started. Or press `V`
+or `H` to drop one at the cursor, which works whether or not the rulers are
+showing. Drag a guide back into a rule to throw it away.
 
 They snap onto the edges of whatever is under the cursor within 4px, because a
 guide meant to sit on a card's edge has to sit *on* it rather than a pixel off
@@ -124,7 +125,7 @@ initAlign({
   hotkey: 'mod+shift+a',
   panelKey: 'b',
   rulerKey: 'r',
-  guideKey: 'g',
+  guideKeys: { vertical: 'v', horizontal: 'h' },
 });
 ```
 

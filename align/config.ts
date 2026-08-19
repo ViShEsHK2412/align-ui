@@ -6,8 +6,12 @@ export interface Config {
   panelKey: string;
   /** Shows or hides the rulers, while the tool is open. */
   rulerKey: string;
-  /** Drops a guide at the cursor; with shift, on the other axis. */
-  guideKey: string;
+  /**
+   * Drops a guide at the cursor. Two keys rather than one key plus shift:
+   * anyone told to "press G" types a capital G, and a modifier you hold by
+   * reflex cannot carry meaning.
+   */
+  guideKeys: { vertical: string; horizontal: string };
 }
 
 export const DEFAULTS: Config = {
@@ -15,7 +19,7 @@ export const DEFAULTS: Config = {
   hotkey: 'mod+shift+a',
   panelKey: 'b',
   rulerKey: 'r',
-  guideKey: 'g',
+  guideKeys: { vertical: 'v', horizontal: 'h' },
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {

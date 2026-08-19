@@ -29,10 +29,11 @@ the same bargain DevTools' inspect mode makes. Toggle off to use the app.
   pinned element and the hovered one.
 - **The tooltip** follows the cursor with `160 × 24` and nothing else.
 - **The box model panel** starts bottom-left and shows margin, border, padding
-  and content for the pinned element. Each band names itself in its own hue, so
-  a label can't be mistaken for the region above it. Zeros render as `–` so the
-  numbers that matter stand out. Drag it by the header to anywhere on screen —
-  it stays where you put it, clamped so it can never be lost off an edge.
+  and content for the pinned element, each region a step up the surface ladder
+  so depth is carried by the surface rather than by colour. Zeros are muted so
+  the numbers that matter stand out. Drag it by the header to anywhere on
+  screen — it lifts while held, stays where you put it, and is clamped so it
+  can never be lost off an edge.
 
 Everything is 1px. Numbers are tabular, so they don't jitter as the cursor
 moves.
@@ -115,11 +116,26 @@ everything still reads correctly; it just isn't Inter.
 
 **Colour** is [Fluid Functionalism](https://fluidfunctionalism.com)'s tokens
 converted to OKLCH, written once as `light-dark()` pairs and flipped by
-`color-scheme`, so the panel follows your OS theme. The box model fills share
-one lightness and one chroma across four hues, so no band reads heavier than
-another. The band *labels* use the same hues at a different lightness — L 0.72
-on white reads about 2.4:1, well under the 4.5:1 floor for text, and contrast
-is fixed on the L channel alone so the hue still ties label to band.
+`color-scheme`, so the panel follows your OS theme.
+
+The box model uses that system's **surface ladder**: the panel is surface-3, a
+card floating over the page, and each nested region climbs one more step, so
+margin, border, padding and content read as depth rather than as four tinted
+fills. Dark mode is the ladder verbatim — an additive white-opacity climb over
+`#171717`. Light mode can't be, because Fluid's light ladder is flat `#FFFFFF`
+from surface-3 up and lets *shadow* carry elevation, which does nothing for
+regions nested inside one card; light instead steps down through the neutral
+tokens the system already defines (surface-1, `--muted`, `--accent`), inverting
+the direction at the same perceptual step size. Colour survives only in each
+region's label, at a lightness chosen for contrast — L 0.72 on white reads
+about 2.4:1, under the 4.5:1 floor for text.
+
+Two CSS notes worth knowing if you touch this: `light-dark()` accepts **colours
+only**, so a themed `box-shadow` has to be two declarations with a
+`prefers-color-scheme` block — written as one it is silently invalid and you
+get no shadow at all. And `color-scheme` has to sit on the panel rather than
+`:host`, because the host's inline `all: initial` outranks a `:host` rule and
+would pin `light-dark()` to its light branch on a dark page.
 
 **The tool has exactly one animation** — the box model panel's entrance, 160ms
 in and 120ms out (slow in, faster out). Everything else is instant on purpose:

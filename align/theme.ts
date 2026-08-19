@@ -19,26 +19,82 @@ export const INK = {
 } as const;
 
 /**
- * One lightness, one chroma, four hues — so no band reads heavier than another.
- */
-export const BAND = {
-  margin: 'oklch(0.72 0.13 70)',
-  border: 'oklch(0.72 0.13 250)',
-  padding: 'oklch(0.72 0.13 150)',
-  content: 'oklch(0.72 0 0)',
-} as const;
-
-/**
- * The same hues as text. A fill can sit at L 0.72 in both themes, but a label
- * cannot: on white that lightness reads around 2.4:1, well under the 4.5:1
- * floor. Contrast is fixed on the L channel alone, so the hue and chroma are
- * untouched and the label still obviously belongs to its band.
+ * The one place colour survives in the box model: each region's label, so the
+ * label can't be mistaken for the region above it. Same hue in both themes,
+ * with lightness set for contrast against the surface it sits on — L 0.72 on
+ * white reads about 2.4:1, under the 4.5:1 floor for text.
  */
 export const BAND_INK = {
   margin: 'light-dark(oklch(0.44 0.13 70), oklch(0.8 0.13 70))',
   border: 'light-dark(oklch(0.44 0.16 250), oklch(0.8 0.13 250))',
   padding: 'light-dark(oklch(0.44 0.13 150), oklch(0.8 0.13 150))',
+  content: 'light-dark(oklch(0.44 0 0), oklch(0.8 0 0))',
 } as const;
+
+/**
+ * Fluid Functionalism's surface system (rule 6), applied to nested regions.
+ *
+ * Dark mode is the ladder verbatim: an additive white-opacity climb over
+ * #171717, so each nested region reads one step nearer the viewer.
+ *
+ * Light mode can't be: Fluid's light ladder is flat #FFFFFF from surface-3 up
+ * and lets *shadow* carry elevation, which works for a popover floating over a
+ * page but gives nested regions inside one card nothing to separate them. So
+ * light steps down through the neutral tokens the system already defines —
+ * surface-1, --muted, --accent — inverting the direction while keeping the
+ * same perceptual step size.
+ *
+ * Index 0 is the panel itself; 1-4 are margin, border, padding and content.
+ */
+export const NEST = [
+  pair('oklch(1 0 0)', 'oklch(0.264 0 0)'),       // --card      / surface-3
+  pair('oklch(0.985 0 0)', 'oklch(0.293 0 0)'),   // surface-1   / surface-4
+  pair('oklch(0.967 0 0)', 'oklch(0.321 0 0)'),   // --muted     / surface-5
+  pair('oklch(0.937 0 0)', 'oklch(0.348 0 0)'),   // step        / surface-6
+  pair('oklch(0.922 0 0)', 'oklch(0.375 0 0)'),   // --accent    / surface-7
+] as const;
+
+/** Written once here, read as CSS below. */
+export const SEMANTIC = {
+  fg: pair('oklch(0.205 0 0)', 'oklch(0.97 0 0)'),          // --foreground
+  muted: pair('oklch(0.556 0 0)', 'oklch(0.715 0 0)'),      // --muted-foreground
+} as const;
+
+/** A colour pair as a CSS `light-dark()` — the one theming point (rule 7). */
+export function themed(p: { light: string; dark: string }): string {
+  return `light-dark(${p.light}, ${p.dark})`;
+}
+
+/** Background for a nesting level, as CSS. */
+export const nest = (level: number): string => themed(NEST[level] ?? NEST[0]!);
+
+/**
+ * Fluid's shadow ladder. `light-dark()` takes colours only, so a themed shadow
+ * has to be two declarations — this returns one, and the caller emits the dark
+ * one inside a prefers-color-scheme block.
+ *
+ * Light: a hairline ring plus additive drops whose offset and blur double as
+ * the spread halves. Dark: an inset highlight and ring over the same drops.
+ */
+const DROPS = [
+  '0 1px 1px -0.5px', '0 3px 3px -1.5px', '0 6px 6px -3px', '0 12px 12px -6px',
+  '0 24px 24px -12px', '0 48px 48px -24px', '0 96px 96px -48px',
+];
+
+export function surfaceShadow(level: number, dark: boolean): string {
+  const n = Math.max(1, Math.min(8, Math.round(level)));
+  const drops = DROPS.slice(0, n - 1);
+  if (!dark) {
+    const sc = 'oklch(0 0 0 / 0.06)';
+    return [`0 0 0 1px ${sc}`, ...drops.map((d) => `${d} ${sc}`)].join(', ');
+  }
+  const highlight = [0, 0, 0.01, 0.02, 0.02, 0.04, 0.04, 0.06][n - 1]!;
+  const ring = [0.02, 0.02, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06][n - 1]!;
+  const drop = 'oklch(0 0 0 / 0.18)';
+  const parts = [`inset 0 0 0 1px oklch(1 0 0 / ${ring})`];
+  if (highlight) parts.unshift(`inset 0 1px 0 0 oklch(1 0 0 / ${highlight})`);
+  return [...parts, ...drops.map((d) => `${d} ${drop}`)].join(', ');
+}
 
 /**
  * Inter, with a system fallback that keeps working if the font is blocked.

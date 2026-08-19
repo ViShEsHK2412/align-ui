@@ -1,5 +1,5 @@
 import { bandsOf, fmt } from './measure';
-import { alpha, BAND, BAND_INK, TYPE, WEIGHT } from './theme';
+import { BAND_INK, nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 import type { Box, Quad } from './types';
 
 /**
@@ -19,9 +19,18 @@ export interface BoxModel {
   destroy(): void;
 }
 
-type BandName = 'margin' | 'border' | 'padding';
+type Region = 'margin' | 'border' | 'padding';
 
 const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
+const CARD = 3;         // the panel floats over the page: Fluid surface-3
+const LIFTED = 5;       // while dragging, it lifts
+
+/** `box-shadow` can't be themed with light-dark(), which takes colours only. */
+const shadow = (sel: string, level: number) => `
+${sel} { box-shadow: ${surfaceShadow(level, false)}; }
+@media (prefers-color-scheme: dark) {
+  ${sel} { box-shadow: ${surfaceShadow(level, true)}; }
+}`;
 
 const CSS = `
 .dock {
@@ -29,26 +38,25 @@ const CSS = `
      which would pin color-scheme to normal and resolve light-dark() to its
      light branch on a dark page. */
   color-scheme: light dark;
-  position: fixed; left: ${MARGIN}px; top: 0; width: 320px;
+  position: fixed; left: ${MARGIN}px; top: 0; width: 340px;
   /* An opacity:0 element still receives pointer events, and a closed panel
-     parked over the page would silently swallow every hit test underneath it. */
+     parked over the page would silently swallow every hit test underneath. */
   pointer-events: none; user-select: none;
   font-family: ${TYPE.stack};
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --fg: ${themed(SEMANTIC.fg)};
+  --muted: ${themed(SEMANTIC.muted)};
+  --border: color-mix(in oklab, var(--fg) 12%, transparent);
 }
 .panel {
   padding: 10px; border-radius: 12px;
   font-size: ${TYPE.body}px; line-height: 1.4;
-  color: light-dark(oklch(0.205 0 0), oklch(0.97 0 0));
-  background: light-dark(oklch(1 0 0), oklch(0.264 0 0));
-  box-shadow:
-    light-dark(0 0 0 1px oklch(0 0 0 / 0.06), inset 0 0 0 1px oklch(1 0 0 / 0.04)),
-    light-dark(0 1px 1px -0.5px oklch(0 0 0 / 0.06), 0 1px 1px -0.5px oklch(0 0 0 / 0.18)),
-    light-dark(0 3px 3px -1.5px oklch(0 0 0 / 0.06), 0 3px 3px -1.5px oklch(0 0 0 / 0.18)),
-    light-dark(0 6px 6px -3px oklch(0 0 0 / 0.06), 0 6px 6px -3px oklch(0 0 0 / 0.18));
+  color: var(--fg);
+  background: ${nest(0)};
 
   /* The one animation in the tool: a panel that must land exactly, so the
      Fluid spring.moderate tier at 160ms, critically damped. */
@@ -56,7 +64,8 @@ const CSS = `
   transform: translateY(4px) scale(0.98);
   transform-origin: bottom left;
   transition: opacity 120ms cubic-bezier(0.2, 0, 0, 1),
-              transform 120ms cubic-bezier(0.2, 0, 0, 1);
+              transform 120ms cubic-bezier(0.2, 0, 0, 1),
+              box-shadow 120ms cubic-bezier(0.2, 0, 0, 1);
 }
 .dock[data-open] .panel {
   pointer-events: auto;
@@ -69,11 +78,13 @@ const CSS = `
   /* Fewer and gentler, not none: the fade aids comprehension, the travel does not. */
   .panel { transform: none; transition: opacity 120ms linear; }
 }
+${shadow('.panel', CARD)}
+${shadow('.dock[data-dragging] .panel', LIFTED)}
 
 header {
   display: flex; align-items: baseline; gap: 8px;
   padding-bottom: 8px; margin-bottom: 8px;
-  border-bottom: 1px solid light-dark(oklch(0.205 0 0 / 0.1), oklch(0.97 0 0 / 0.1));
+  border-bottom: 1px solid var(--border);
   cursor: grab;
 }
 .dock[data-dragging] header { cursor: grabbing; }
@@ -85,33 +96,40 @@ header .name {
 }
 header .size {
   font-size: ${TYPE.body}px; font-weight: ${WEIGHT.medium};
-  color: light-dark(oklch(0.556 0 0), oklch(0.715 0 0));
+  color: var(--muted);
 }
 
-/* Each band names itself in its own hue, so label and region can't be mixed up. */
-.band {
-  position: relative; border-radius: 4px; border: 1px solid;
-  padding: 20px 5px 5px;
+/* Each region is one step up Fluid's surface ladder, so depth is carried by
+   the surface itself and the numbers can stay full-contrast foreground. */
+.region {
+  position: relative; border-radius: 6px;
+  border: 1px solid var(--border);
+  padding: 21px 6px 6px;
 }
-.band > .tag {
-  position: absolute; top: 4px; left: 6px;
-  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
-  letter-spacing: 0.02em; line-height: 1;
+.region[data-level="1"] { background: ${nest(1)}; }
+.region[data-level="2"] { background: ${nest(2)}; }
+.region[data-level="3"] { background: ${nest(3)}; }
+.content { background: ${nest(4)}; }
+
+.tag {
+  position: absolute; top: 5px; left: 7px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.semibold};
+  letter-spacing: 0.02em; line-height: 1; text-transform: lowercase;
 }
 .edge {
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
-  white-space: nowrap;
+  white-space: nowrap; color: var(--fg);
 }
-.row { display: flex; align-items: center; gap: 4px; margin: 5px 0; }
+.edge[data-zero] { color: var(--muted); font-weight: ${WEIGHT.regular}; }
+.row { display: flex; align-items: center; gap: 5px; margin: 6px 0; }
 .row > .edge { flex: 0 0 22px; }
 .row > .fill { flex: 1 1 auto; min-width: 0; }
-.zero { color: light-dark(oklch(0.556 0 0), oklch(0.715 0 0)); opacity: 0.55; }
 
 .content {
-  border-radius: 3px; padding: 9px 6px;
+  border-radius: 4px; border: 1px solid var(--border); padding: 10px 6px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: oklch(0.72 0 0 / 0.16);
+  color: var(--fg);
 }
 `;
 
@@ -143,6 +161,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   }
 
   // ── Drag ──────────────────────────────────────────────────────────────────
+  // Pointer capture keeps tracking when the cursor leaves the header, and the
+  // offset from where it was grabbed is preserved rather than snapping to
+  // centre. Feedback lands on pointer-down, not on release.
   let from: { x: number; y: number; dx: number; dy: number } | null = null;
 
   function onPointerDown(e: PointerEvent) {
@@ -172,17 +193,17 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   function edge(n: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'edge';
-    el.textContent = n === 0 ? '–' : fmt(n);
-    if (n === 0) el.classList.add('zero');
+    el.textContent = n === 0 ? '0' : fmt(n);
+    if (n === 0) el.setAttribute('data-zero', '');
     return el;
   }
 
-  function band(name: BandName, values: Quad, inner: HTMLElement): HTMLElement {
+  function region(name: Region, level: number, values: Quad,
+                  inner: HTMLElement): HTMLElement {
     const [top, right, bottom, left] = values;
     const el = document.createElement('div');
-    el.className = 'band';
-    el.style.background = alpha(BAND[name], 0.12);
-    el.style.borderColor = alpha(BAND[name], 0.4);
+    el.className = 'region';
+    el.setAttribute('data-level', String(level));
 
     const tag = document.createElement('span');
     tag.className = 'tag';
@@ -226,7 +247,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
 
       panel.replaceChildren(
         header,
-        band('margin', b.margin, band('border', b.border, band('padding', b.padding, content))),
+        region('margin', 1, b.margin,
+          region('border', 2, b.border,
+            region('padding', 3, b.padding, content))),
       );
       place();
       // A frame first, so the browser paints the closed state before it moves.

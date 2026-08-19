@@ -74,16 +74,54 @@ export function bandsOf(el: Element): Bands {
   };
 }
 
+/** Does `outer` enclose `inner` on every side? Pure. */
+function contains(outer: Box, inner: Box): boolean {
+  return outer.left <= inner.left && outer.right >= inner.right
+      && outer.top <= inner.top && outer.bottom >= inner.bottom;
+}
+
+/**
+ * The four distances from an inner box's edges out to the box enclosing it.
+ *
+ * Nested boxes have no gap between them, but they do have insets, and that is
+ * the number you actually want: how much room is around this thing inside its
+ * container. Zeros are kept rather than dropped — flush against an edge is
+ * information too. Pure.
+ */
+export function insetSegments(outer: Box, inner: Box): Segment[] {
+  const cx = inner.left + inner.width / 2;
+  const cy = inner.top + inner.height / 2;
+  return [
+    { x1: outer.left, y1: cy, x2: inner.left, y2: cy,
+      label: fmt(inner.left - outer.left), axis: 'x' },
+    { x1: inner.right, y1: cy, x2: outer.right, y2: cy,
+      label: fmt(outer.right - inner.right), axis: 'x' },
+    { x1: cx, y1: outer.top, x2: cx, y2: inner.top,
+      label: fmt(inner.top - outer.top), axis: 'y' },
+    { x1: cx, y1: inner.bottom, x2: cx, y2: outer.bottom,
+      label: fmt(outer.bottom - inner.bottom), axis: 'y' },
+  ];
+}
+
 /**
  * Shortest edge-to-edge distance between two boxes, as drawable segments.
  *
  * Overlapping on an axis means the gap on that axis is zero and no line is
- * drawn for it; boxes diagonal to each other get both, L-shaped. Pure.
+ * drawn for it; boxes diagonal to each other get both, L-shaped. One box
+ * inside another has no gap at all, so it reports insets instead. Pure.
  */
 export function gapSegments(a: Box, b: Box): Segment[] {
   const out: Segment[] = [];
   const overlapX = a.left < b.right && b.left < a.right;
   const overlapY = a.top < b.bottom && b.top < a.bottom;
+
+  if (overlapX && overlapY) {
+    if (contains(a, b)) return insetSegments(a, b);
+    if (contains(b, a)) return insetSegments(b, a);
+    // Overlapping without enclosing: no single number describes that, so it
+    // says nothing rather than something misleading.
+    return [];
+  }
 
   if (!overlapX) {
     const [l, r] = a.right <= b.left ? [a, b] : [b, a];

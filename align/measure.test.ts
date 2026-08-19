@@ -100,3 +100,37 @@ describe('chainSegments', () => {
     expect(chainSegments([])).toEqual([]);
   });
 });
+
+describe('nested boxes', () => {
+  // A 200x100 container with a 100x40 child inset 30 left, 20 top.
+  const outer = box(0, 0, 200, 100);
+  const inner = box(30, 20, 100, 40);
+
+  it('reports insets rather than nothing', () => {
+    const segs = gapSegments(outer, inner);
+    expect(segs.map((s) => s.label)).toEqual(['30', '70', '20', '40']);
+  });
+
+  it('reads the same whichever way round they are locked', () => {
+    expect(gapSegments(inner, outer).map((s) => s.label))
+      .toEqual(gapSegments(outer, inner).map((s) => s.label));
+  });
+
+  it('keeps a zero, because flush against an edge is information', () => {
+    const flush = box(0, 20, 100, 40);           // hard against the left edge
+    expect(gapSegments(outer, flush).map((s) => s.label)).toEqual(['0', '100', '20', '40']);
+  });
+
+  it('draws two horizontal and two vertical lines', () => {
+    expect(gapSegments(outer, inner).map((s) => s.axis)).toEqual(['x', 'x', 'y', 'y']);
+  });
+
+  it('says nothing when they overlap without one enclosing the other', () => {
+    expect(gapSegments(box(0, 0, 100, 100), box(50, 50, 100, 100))).toEqual([]);
+  });
+
+  it('reports all zeros for boxes that coincide exactly', () => {
+    expect(gapSegments(outer, box(0, 0, 200, 100)).map((s) => s.label))
+      .toEqual(['0', '0', '0', '0']);
+  });
+});

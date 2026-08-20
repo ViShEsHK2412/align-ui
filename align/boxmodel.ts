@@ -125,7 +125,10 @@ header .scale {
    example reads. Generous, even insets so each surface has room to breathe. */
 .region {
   position: relative; border-radius: 0;
-  padding: 24px 10px 10px;
+  /* Symmetric. An extra-tall top to clear the label offset each box's centre
+     from its parent's, and nesting compounded it until the side numbers were
+     visibly staggered. The label shares the top number's line instead. */
+  padding: 10px;
 }
 .region[data-level="1"] { background: ${nest(1)}; }
 .region[data-level="2"] { background: ${nest(2)}; }
@@ -136,7 +139,7 @@ ${shadow('.region, .content', NESTED)}
 /* One muted weight for every label: the words already say which band is which,
    so colour would only compete with the numbers. */
 .tag {
-  position: absolute; top: 8px; left: 10px;
+  position: absolute; top: 10px; left: 10px;
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
   letter-spacing: 0.01em; line-height: 1;
   color: var(--muted);

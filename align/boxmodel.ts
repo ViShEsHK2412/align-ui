@@ -1,5 +1,5 @@
 import { bandsOf, fmt, scaleOf } from './measure';
-import { BAND_INK, nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
+import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 import type { Box, Quad } from './types';
 
 /**
@@ -28,6 +28,7 @@ type Region = 'margin' | 'border' | 'padding';
 const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
 const CARD = 3;         // the panel floats over the page: Fluid surface-3
 const LIFTED = 5;       // while dragging, it lifts
+const NESTED = 4;       // every nested region, so the depth reads evenly
 
 /** `box-shadow` can't be themed with light-dark(), which takes colours only. */
 const shadow = (sel: string, level: number) => `
@@ -119,22 +120,26 @@ header .scale {
 }
 .close:hover { color: var(--fg); background: ${nest(1)}; }
 
-/* Each region is one step up Fluid's surface ladder, so depth is carried by
-   the surface itself and the numbers can stay full-contrast foreground. */
+/* Each region is one step up Fluid's surface ladder. Depth is carried by the
+   surface and its shadow — no borders, the same way the system's own nesting
+   example reads. Generous, even insets so each surface has room to breathe. */
 .region {
   position: relative; border-radius: 0;
-  border: 1px solid var(--border);
-  padding: 21px 6px 6px;
+  padding: 24px 10px 10px;
 }
 .region[data-level="1"] { background: ${nest(1)}; }
 .region[data-level="2"] { background: ${nest(2)}; }
 .region[data-level="3"] { background: ${nest(3)}; }
 .content { background: ${nest(4)}; }
+${shadow('.region, .content', NESTED)}
 
+/* One muted weight for every label: the words already say which band is which,
+   so colour would only compete with the numbers. */
 .tag {
-  position: absolute; top: 5px; left: 7px;
-  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.semibold};
-  letter-spacing: 0.02em; line-height: 1; text-transform: lowercase;
+  position: absolute; top: 8px; left: 10px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
+  letter-spacing: 0.01em; line-height: 1;
+  color: var(--muted);
 }
 .edge {
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
@@ -146,7 +151,7 @@ header .scale {
 .row > .fill { flex: 1 1 auto; min-width: 0; }
 
 .content {
-  border-radius: 0; border: 1px solid var(--border); padding: 10px 6px;
+  border-radius: 0; padding: 14px 8px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--fg);
@@ -232,7 +237,6 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
     const tag = document.createElement('span');
     tag.className = 'tag';
     tag.textContent = name;
-    tag.style.color = BAND_INK[name];
 
     const row = document.createElement('div');
     row.className = 'row';

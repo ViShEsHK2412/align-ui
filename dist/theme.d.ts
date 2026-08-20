@@ -23,18 +23,6 @@ export declare const INK: {
     readonly rulerLine: Pair;
 };
 /**
- * The one place colour survives in the box model: each region's label, so the
- * label can't be mistaken for the region above it. Same hue in both themes,
- * with lightness set for contrast against the surface it sits on — L 0.72 on
- * white reads about 2.4:1, under the 4.5:1 floor for text.
- */
-export declare const BAND_INK: {
-    readonly margin: 'light-dark(oklch(0.44 0.13 70), oklch(0.8 0.13 70))';
-    readonly border: 'light-dark(oklch(0.44 0.16 250), oklch(0.8 0.13 250))';
-    readonly padding: 'light-dark(oklch(0.44 0.13 150), oklch(0.8 0.13 150))';
-    readonly content: 'light-dark(oklch(0.44 0 0), oklch(0.8 0 0))';
-};
-/**
  * Fluid Functionalism's surface system (rule 6), applied to nested regions.
  *
  * Dark mode is the ladder verbatim: an additive white-opacity climb over

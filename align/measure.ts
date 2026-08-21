@@ -314,17 +314,42 @@ function overlaps(a: LabelBox, b: LabelBox): boolean {
  * move. That makes the layout stable frame to frame, which matters more here
  * than finding the tightest possible packing. Pure.
  */
-export function spreadLabels(boxes: LabelBox[]): LabelBox[] {
+export function spreadLabels(
+  boxes: LabelBox[],
+  within: { w: number; h: number },
+  edge = 12,
+): LabelBox[] {
+  // The whole box has to land inside, not just its corner — a label clamped by
+  // its left edge alone hangs off the rim, and then the drawing code clamps it
+  // somewhere else and the layout stops describing what you see.
+  const clampX = (x: number, w: number) => Math.min(Math.max(x, edge), within.w - w - edge);
+  const clampY = (y: number, h: number) => Math.min(Math.max(y, edge), within.h - h - edge);
+
   const placed: LabelBox[] = [];
   for (const box of boxes) {
-    const b = { ...box };
+    const b = { ...box, x: clampX(box.x, box.w), y: clampY(box.y, box.h) };
+    // Which way this label escapes. It flips once the preferred direction runs
+    // into the edge of the window: a label near the right rim cannot move any
+    // further right, and pushing it there anyway lands every one of them on
+    // the same clamped pixel — a pile, which is what this is here to prevent.
+    let flipped = false;
+
     // Bounded: a label in an impossible pile settles for overlapping rather
     // than marching off the screen.
     for (let tries = 0; tries < 16; tries++) {
       const blocker = placed.find((p) => overlaps(p, b));
       if (!blocker) break;
-      if (b.axis === 'x') b.y = blocker.y - b.h - LABEL_GAP;
-      else b.x = blocker.x + blocker.w + LABEL_GAP;
+
+      const was = b.axis === 'x' ? b.y : b.x;
+      if (b.axis === 'x') {
+        b.y = clampY(flipped ? blocker.y + blocker.h + LABEL_GAP : blocker.y - b.h - LABEL_GAP, b.h);
+      } else {
+        b.x = clampX(flipped ? blocker.x - b.w - LABEL_GAP : blocker.x + blocker.w + LABEL_GAP, b.w);
+      }
+
+      if ((b.axis === 'x' ? b.y : b.x) !== was) continue;
+      if (flipped) break;              // pinned both ways: settle for the overlap
+      flipped = true;
     }
     placed.push(b);
   }

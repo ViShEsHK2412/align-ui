@@ -266,34 +266,36 @@ describe('guideGapSegments', () => {
 describe('spreadLabels', () => {
   const lab = (x: number, y: number, axis: 'x' | 'y' = 'x'): LabelBox =>
     ({ x, y, w: 40, h: 20, axis });
+  /** Room to move, so these cases are about collisions and nothing else. */
+  const ROOM = { w: 4000, h: 4000 };
 
   it('leaves labels that do not touch exactly where they were', () => {
-    const input = [lab(0, 0), lab(200, 0), lab(0, 200)];
-    expect(spreadLabels(input)).toEqual(input);
+    const input = [lab(100, 100), lab(300, 100), lab(100, 300)];
+    expect(spreadLabels(input, ROOM)).toEqual(input);
   });
 
   it('moves the second of an overlapping pair, never the first', () => {
     // Stability matters more than tight packing: the first label of a pile
     // holding still keeps the layout from churning frame to frame.
-    const [first, second] = spreadLabels([lab(0, 0), lab(10, 5)]);
-    expect(first).toEqual(lab(0, 0));
-    expect(second!.y).toBeLessThan(5);
+    const [first, second] = spreadLabels([lab(100, 100), lab(110, 105)], ROOM);
+    expect(first).toEqual(lab(100, 100));
+    expect(second!.y).toBeLessThan(105);
   });
 
   it('sends the label of a horizontal measurement upward', () => {
-    const [, second] = spreadLabels([lab(0, 100), lab(0, 100)]);
+    const [, second] = spreadLabels([lab(100, 100), lab(100, 100)], ROOM);
     expect(second!.y).toBe(100 - 20 - 3);   // clear above the first
-    expect(second!.x).toBe(0);              // and still over its own line
+    expect(second!.x).toBe(100);            // and still over its own line
   });
 
   it('sends the label of a vertical measurement sideways', () => {
-    const [, second] = spreadLabels([lab(0, 100, 'y'), lab(0, 100, 'y')]);
-    expect(second!.x).toBe(0 + 40 + 3);
+    const [, second] = spreadLabels([lab(100, 100, 'y'), lab(100, 100, 'y')], ROOM);
+    expect(second!.x).toBe(100 + 40 + 3);
     expect(second!.y).toBe(100);
   });
 
   it('separates a whole pile, not just the first collision', () => {
-    const out = spreadLabels([lab(0, 100), lab(0, 100), lab(0, 100), lab(0, 100)]);
+    const out = spreadLabels([lab(100, 200), lab(100, 200), lab(100, 200), lab(100, 200)], ROOM);
     for (let i = 0; i < out.length; i++) {
       for (let j = i + 1; j < out.length; j++) {
         const a = out[i]!, b = out[j]!;
@@ -307,18 +309,55 @@ describe('spreadLabels', () => {
   it('gives up rather than marching a label off the screen', () => {
     // Sixteen tries is the cap; a hundred labels in one spot cannot all fit,
     // and settling for an overlap beats scrolling off into nowhere.
-    const out = spreadLabels(Array.from({ length: 100 }, () => lab(0, 100)));
+    const out = spreadLabels(Array.from({ length: 100 }, () => lab(100, 2000)), ROOM);
     expect(out).toHaveLength(100);
-    expect(Math.min(...out.map((b) => b.y))).toBeGreaterThan(100 - 100 * 23);
+    expect(Math.min(...out.map((b) => b.y))).toBeGreaterThan(2000 - 100 * 23);
   });
 
   it('does not mutate what it was given', () => {
-    const input = [lab(0, 100), lab(0, 100)];
-    spreadLabels(input);
-    expect(input[1]).toEqual(lab(0, 100));
+    const input = [lab(100, 100), lab(100, 100)];
+    spreadLabels(input, ROOM);
+    expect(input[1]).toEqual(lab(100, 100));
   });
 
   it('handles an empty list', () => {
-    expect(spreadLabels([])).toEqual([]);
+    expect(spreadLabels([], ROOM)).toEqual([]);
+  });
+
+  it('escapes the other way when the window is in the way', () => {
+    // Four labels against the right rim. Pushing right does nothing there —
+    // they all clamp to the same pixel and pile up, which is the bug this
+    // guards. They have to go left instead.
+    const tight = { w: 200, h: 400 };
+    const out = spreadLabels(
+      Array.from({ length: 4 }, () => ({ x: 150, y: 100, w: 40, h: 20, axis: 'y' as const })),
+      tight,
+    );
+    const xs = out.map((b) => b.x).sort((a, b) => a - b);
+    expect(new Set(xs).size).toBe(4);           // four distinct places
+    expect(xs[0]).toBeLessThan(150);            // and some of them moved left
+  });
+
+  it('keeps every label inside the window', () => {
+    const tight = { w: 300, h: 200 };
+    const out = spreadLabels(
+      Array.from({ length: 8 }, () => ({ x: 280, y: 20, w: 40, h: 20, axis: 'x' as const })),
+      tight,
+    );
+    for (const b of out) {
+      expect(b.x).toBeGreaterThanOrEqual(12);
+      expect(b.y).toBeGreaterThanOrEqual(12);
+      expect(b.x + b.w).toBeLessThanOrEqual(tight.w - 12);
+      expect(b.y + b.h).toBeLessThanOrEqual(tight.h - 12);
+    }
+  });
+
+  it('pulls a label that starts outside back into the window', () => {
+    const [wayOut] = spreadLabels([lab(-500, -500)], { w: 300, h: 300 });
+    expect(wayOut!.x).toBe(12);
+    expect(wayOut!.y).toBe(12);
+    const [wayIn] = spreadLabels([lab(9999, 9999)], { w: 300, h: 300 });
+    expect(wayIn!.x + wayIn!.w).toBe(300 - 12);   // the whole box, not its corner
+    expect(wayIn!.y + wayIn!.h).toBe(300 - 12);
   });
 });

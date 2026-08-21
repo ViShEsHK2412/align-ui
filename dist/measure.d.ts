@@ -113,7 +113,10 @@ export interface LabelBox {
  * move. That makes the layout stable frame to frame, which matters more here
  * than finding the tightest possible packing. Pure.
  */
-export declare function spreadLabels(boxes: LabelBox[]): LabelBox[];
+export declare function spreadLabels(boxes: LabelBox[], within: {
+    w: number;
+    h: number;
+}, edge?: number): LabelBox[];
 export interface Scale {
     x: number;
     y: number;

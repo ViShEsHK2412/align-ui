@@ -308,7 +308,7 @@ export function mountOverlay(): Overlay {
         ? { x: mx - w / 2, y: my - 16 - h / 2, w, h, axis: seg.axis }
         : { x: mx + 26 - w / 2, y: my - h / 2, w, h, axis: seg.axis };
     });
-    spreadLabels(wanted).forEach((at, i) => {
+    spreadLabels(wanted, { w: innerWidth, h: innerHeight }, EDGE).forEach((at, i) => {
       const seg = state.lines[i]!;
       ctx.globalAlpha = seg.faded ? FADED : 1;
       chipAt(seg.label, at.x, at.y, c.measure);

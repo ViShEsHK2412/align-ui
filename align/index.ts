@@ -2,7 +2,7 @@ import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator } from './indicator';
 import {
-  boxOf, chainSegments, gapSegments, guideSegments, guideUnder, hitTest,
+  boxOf, chainSegments, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
   snapEdges, snapTo,
 } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
@@ -121,6 +121,9 @@ function render(cursor?: { x: number; y: number }) {
       ...measuring.flatMap((g) => pinned.flatMap((b) => guideSegments(b, [viewportGuide(g)]))),
       // And from whatever you are pointing at to the nearest guide each way.
       ...(hover && !onGuide && guides.length ? guideSegments(hover, at) : []),
+      // Two rulers are a measurement on their own, with no element involved.
+      ...guideGapSegments(measuring.map(viewportGuide),
+        { x: innerWidth / 2, y: innerHeight / 2 }),
     ],
     ...(cursor ? { cursor } : {}),
   });

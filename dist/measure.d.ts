@@ -73,6 +73,24 @@ export declare function guideSegments(box: Box, at: {
     axis: 'x' | 'y';
     pos: number;
 }[]): Segment[];
+/**
+ * The gaps between guides on the same axis, as drawable segments.
+ *
+ * Neighbour to neighbour once sorted, never every pair: three guides give two
+ * gaps, which is what you want to read. Guides on different axes cross rather
+ * than sit apart, so they are never paired.
+ *
+ * `at` is where along the guides to draw — they span the whole viewport, so the
+ * line has to be put somewhere, and the middle is as good as anywhere. Pure:
+ * positions come in already converted to viewport space.
+ */
+export declare function guideGapSegments(active: {
+    axis: 'x' | 'y';
+    pos: number;
+}[], at: {
+    x: number;
+    y: number;
+}): Segment[];
 export interface Scale {
     x: number;
     y: number;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { chain, chainSegments, fmt, gapSegments, scaleFromTransform } from './measure';
+import {
+  chain, chainSegments, fmt, gapSegments, guideGapSegments, scaleFromTransform,
+} from './measure';
 import type { Box } from './types';
 
 function box(left: number, top: number, width = 100, height = 40): Box {
@@ -210,5 +212,49 @@ describe('scaleFromTransform', () => {
     const s = scaleFromTransform(
       'matrix3d(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)');
     expect(s).toEqual({ x: 0.5, y: 0.5 });
+  });
+});
+
+describe('guideGapSegments', () => {
+  const mid = { x: 500, y: 300 };
+  const g = (axis: 'x' | 'y', pos: number) => ({ axis, pos });
+
+  it('measures the gap between two guides on the same axis', () => {
+    const [seg] = guideGapSegments([g('y', 100), g('y', 340)], mid);
+    expect(seg?.label).toBe('240');
+    expect(seg?.axis).toBe('y');
+    expect(seg?.y1).toBe(100);
+    expect(seg?.y2).toBe(340);
+    expect(seg?.x1).toBe(500);      // drawn down the middle of the viewport
+  });
+
+  it('measures neighbour to neighbour, not every pair', () => {
+    // Three guides are two gaps. The 0-to-300 span is the sum of the other
+    // two, so reporting it as well would be noise.
+    const out = guideGapSegments([g('x', 0), g('x', 100), g('x', 300)], mid);
+    expect(out.map((s) => s.label)).toEqual(['100', '200']);
+  });
+
+  it('sorts before pairing, so drop order does not matter', () => {
+    const out = guideGapSegments([g('x', 300), g('x', 0), g('x', 100)], mid);
+    expect(out.map((s) => s.label)).toEqual(['100', '200']);
+  });
+
+  it('never pairs across axes, because those guides cross', () => {
+    expect(guideGapSegments([g('x', 100), g('y', 400)], mid)).toEqual([]);
+  });
+
+  it('says nothing about a single guide', () => {
+    expect(guideGapSegments([g('x', 100)], mid)).toEqual([]);
+    expect(guideGapSegments([], mid)).toEqual([]);
+  });
+
+  it('skips two guides sitting in the same place', () => {
+    expect(guideGapSegments([g('y', 100), g('y', 100)], mid)).toEqual([]);
+  });
+
+  it('handles both axes at once', () => {
+    const out = guideGapSegments([g('x', 0), g('x', 60), g('y', 10), g('y', 90)], mid);
+    expect(out.map((s) => `${s.axis}:${s.label}`)).toEqual(['x:60', 'y:80']);
   });
 });

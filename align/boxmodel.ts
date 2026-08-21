@@ -107,8 +107,8 @@ header .size {
    claims a space it is not in. */
 header .scale {
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
-  padding: 2px 5px; margin-left: -2px;
-  color: ${themed(SEMANTIC.fg)}; background: ${nest(3)};
+  margin-left: 4px;
+  color: ${themed(SEMANTIC.fg)};
 }
 /* Padded well past its glyph so it is comfortably clickable, and outside the
    header's drag gesture. */

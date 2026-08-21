@@ -83,6 +83,14 @@ export function mountOverlay(): Overlay {
     ctx.translate(0.5, 0.5);
   }
 
+  /**
+   * Put a fill edge back on the pixel grid. `fit` shifts everything half a
+   * pixel so 1px strokes land on the grid instead of straddling it; a fill
+   * wants the opposite, and without undoing it every chip gets soft edges and
+   * its text sits at a half pixel. A blurry measuring tool is absurd.
+   */
+  const snap = (v: number) => Math.round(v) - 0.5;
+
   function outline(box: Box, color: string) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
@@ -143,11 +151,13 @@ export function mountOverlay(): Overlay {
     ctx.font = `${WEIGHT.medium} ${TYPE.body}px ${TYPE.stack}`;
     ctx.textBaseline = 'middle';
     const { w, h } = chipSize(text);
-    const cx = Math.min(Math.max(left, EDGE), innerWidth - w - EDGE);
-    const cy = Math.min(Math.max(top, EDGE), innerHeight - h - EDGE);
+    const cx = snap(Math.min(Math.max(left, EDGE), innerWidth - w - EDGE));
+    const cy = snap(Math.min(Math.max(top, EDGE), innerHeight - h - EDGE));
     ctx.fillStyle = bg;
     ctx.beginPath();
-    ctx.roundRect(cx, cy, w, h, 4);
+    // Whole pixels wide too, or the right edge lands mid-pixel and only one
+    // side of the chip comes out sharp.
+    ctx.roundRect(cx, cy, Math.ceil(w), h, 4);
     ctx.fill();
     ctx.fillStyle = c.surface;
     ctx.fillText(text, cx + PAD, cy + h / 2);
@@ -185,8 +195,8 @@ export function mountOverlay(): Overlay {
     ctx.globalAlpha = 0.16;
     ctx.fillStyle = c.accent;
     for (const b of state.pinned) {
-      ctx.fillRect(b.left, -0.5, b.width, RULER);
-      ctx.fillRect(-0.5, b.top, RULER, b.height);
+      ctx.fillRect(snap(b.left), -0.5, Math.round(b.width), RULER);
+      ctx.fillRect(-0.5, snap(b.top), RULER, Math.round(b.height));
     }
     ctx.restore();
 

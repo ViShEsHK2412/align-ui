@@ -124,7 +124,7 @@ header .scale {
    surface and its shadow — no borders, the same way the system's own nesting
    example reads. Generous, even insets so each surface has room to breathe. */
 .region {
-  position: relative; border-radius: 0;
+  border-radius: 0;
   /* Symmetric. An extra-tall top to clear the label offset each box's centre
      from its parent's, and nesting compounded it until the side numbers were
      visibly staggered. The label shares the top number's line instead. */
@@ -136,10 +136,18 @@ header .scale {
 .content { background: ${nest(4)}; }
 ${shadow('.region, .content', NESTED)}
 
+/* The label and the top number sit on one line, and a label set 1px off the
+   number it introduces is the kind of thing this tool exists to catch. Equal
+   side columns keep the number centred on the region whatever the label says;
+   a label wider than its column overflows rather than shifting the number. */
+.head {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+}
 /* One muted weight for every label: the words already say which band is which,
    so colour would only compete with the numbers. */
 .tag {
-  position: absolute; top: 10px; left: 10px;
+  justify-self: start; white-space: nowrap;
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
   letter-spacing: 0.01em; line-height: 1;
   color: var(--muted);
@@ -248,7 +256,12 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
     fill.appendChild(inner);
     row.append(edge(left), fill, edge(right));
 
-    el.append(tag, edge(top), row, edge(bottom));
+    // The label and the top number share a line, so they share a baseline too.
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.append(tag, edge(top));
+
+    el.append(head, row, edge(bottom));
     return el;
   }
 

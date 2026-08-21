@@ -166,12 +166,10 @@ export function chain(boxes: Box[]): Box[] {
  * the four gutters between them, which is the whole point of locking more than
  * one. Pure.
  */
-export function chainSegments(boxes: Box[]): Segment[] {
+export function chainPairs(boxes: Box[]): [Box, Box][] {
   const ordered = chain(boxes);
-  const out: Segment[] = [];
-  for (let i = 1; i < ordered.length; i++) {
-    out.push(...gapSegments(ordered[i - 1]!, ordered[i]!));
-  }
+  const out: [Box, Box][] = [];
+  for (let i = 1; i < ordered.length; i++) out.push([ordered[i - 1]!, ordered[i]!]);
   return out;
 }
 

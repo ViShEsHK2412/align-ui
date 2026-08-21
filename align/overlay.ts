@@ -23,6 +23,8 @@ export interface OverlayState {
 const CAP = 5;          // end-cap length on a distance line
 const PAD = 4;          // chip padding
 const EDGE = 12;        // keep chips this far from the viewport edge
+/** How far back a measurement steps when you are asking about another one. */
+const FADED = 0.22;
 
 const RULER = 22;       // gutter thickness
 const MINOR = 10;       // unlabelled tick, px of page
@@ -289,7 +291,11 @@ export function mountOverlay(): Overlay {
       ctx.stroke();
     }
 
-    for (const seg of state.lines) distance(seg);
+    for (const seg of state.lines) {
+      ctx.globalAlpha = seg.faded ? FADED : 1;
+      distance(seg);
+    }
+    ctx.globalAlpha = 1;
 
     // Labels last, always on top. A distance label sits clear of its own line:
     // above a horizontal one, beside a vertical one — then they are nudged off
@@ -303,8 +309,11 @@ export function mountOverlay(): Overlay {
         : { x: mx + 26 - w / 2, y: my - h / 2, w, h, axis: seg.axis };
     });
     spreadLabels(wanted).forEach((at, i) => {
-      chipAt(state.lines[i]!.label, at.x, at.y, c.measure);
+      const seg = state.lines[i]!;
+      ctx.globalAlpha = seg.faded ? FADED : 1;
+      chipAt(seg.label, at.x, at.y, c.measure);
     });
+    ctx.globalAlpha = 1;
     if (state.hover && state.cursor) {
       const { width, height } = state.hover;
       chip(`${fmt(width)} × ${fmt(height)}`,

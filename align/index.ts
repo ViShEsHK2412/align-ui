@@ -2,12 +2,12 @@ import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator } from './indicator';
 import {
-  boxOf, chainSegments, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
+  boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
   snapEdges, snapTo,
 } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
-import type { Box, Guide } from './types';
+import type { Box, Guide, Segment } from './types';
 
 /**
  * Public API, state machine, hotkeys, lifecycle. The only module that touches
@@ -106,27 +106,57 @@ function render(cursor?: { x: number; y: number }) {
   // at it. Each one measures to itself, not to whichever guide happens to be
   // nearest — that is the whole point of choosing one.
   const measuring = guides.filter((g) => g.locked || g.id === onGuide?.id);
+
+  // What the pointer is asking about. Four elements measured at once put four
+  // answers on screen; pointing at one of them, or at a ruler, brings its own
+  // measurements forward and steps the rest back. Anchored on the element or
+  // the guide rather than on the thin line itself, which is unhittable in
+  // exactly the pile-up this is for.
+  const focusEl = !onGuide && locked ? hover!.el : null;
+  const focus = onGuide ?? focusEl;
+  const gp = onGuide ? viewportGuide(onGuide) : null;
+
+  const lines: Segment[] = [];
+  /** Add these, dimmed unless they are what is being asked about. */
+  const add = (segs: Segment[], owns: boolean) => {
+    for (const seg of segs) lines.push(focus && !owns ? { ...seg, faded: true } : seg);
+  };
+  /** Does this ruler-to-ruler gap run to the guide under the cursor? */
+  const touchesFocus = (seg: Segment) => {
+    if (!gp || seg.axis !== gp.axis) return false;
+    const ends = seg.axis === 'x' ? [seg.x1, seg.x2] : [seg.y1, seg.y2];
+    return ends.some((e) => Math.abs(e - gp.pos) < 0.5);
+  };
+
+  // Gaps within the locked set, then from the newest lock to what you're
+  // pointing at — measuring to something already locked would be noise.
+  for (const [a, b] of chainPairs(pinned)) {
+    add(gapSegments(a, b), a.el === focusEl || b.el === focusEl);
+  }
+  if (last && hover && !locked && !onGuide) add(gapSegments(last, hover), true);
+  // From every locked box to each guide that is asking.
+  for (const g of measuring) {
+    for (const b of pinned) {
+      add(guideSegments(b, [viewportGuide(g)]), g.id === onGuide?.id || b.el === focusEl);
+    }
+  }
+  // And from whatever you are pointing at to the nearest guide each way —
+  // unless it is locked, in which case the rulers above already measured it,
+  // and doing it again draws the same number twice in the same place.
+  if (hover && !locked && !onGuide && guides.length) add(guideSegments(hover, at), true);
+  // Two rulers are a measurement on their own, with no element involved.
+  for (const seg of guideGapSegments(measuring.map(viewportGuide),
+    { x: innerWidth / 2, y: innerHeight / 2 })) {
+    add([seg], touchesFocus(seg));
+  }
+
   overlay?.update({
     hover,
     pinned,
     rulers,
     guides,
     liveGuide: dragging ?? hoverGuide,
-    lines: [
-      // Gaps within the locked set, then from the newest lock to what you're
-      // pointing at — measuring to something already locked would be noise.
-      ...chainSegments(pinned),
-      ...(last && hover && !locked && !onGuide ? gapSegments(last, hover) : []),
-      // From every locked box to each guide that is asking.
-      ...measuring.flatMap((g) => pinned.flatMap((b) => guideSegments(b, [viewportGuide(g)]))),
-      // And from whatever you are pointing at to the nearest guide each way —
-      // unless it is locked, in which case the rulers above already measured
-      // it, and doing it again draws the same number twice in the same place.
-      ...(hover && !locked && !onGuide && guides.length ? guideSegments(hover, at) : []),
-      // Two rulers are a measurement on their own, with no element involved.
-      ...guideGapSegments(measuring.map(viewportGuide),
-        { x: innerWidth / 2, y: innerHeight / 2 }),
-    ],
+    lines,
     ...(cursor ? { cursor } : {}),
   });
   indicator?.update(pinned.length);

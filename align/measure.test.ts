@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chain, chainSegments, fmt, gapSegments, guideGapSegments, scaleFromTransform,
+  chain, chainPairs, fmt, gapSegments, guideGapSegments, scaleFromTransform,
   spreadLabels, type LabelBox,
 } from './measure';
 import type { Box } from './types';
@@ -87,22 +87,25 @@ describe('chain', () => {
   });
 });
 
-describe('chainSegments', () => {
+describe('chainPairs', () => {
+  const labels = (boxes: Box[]) =>
+    chainPairs(boxes).flatMap(([a, b]) => gapSegments(a, b)).map((s) => s.label);
+
   it('measures every gutter in a locked row at once', () => {
     // Four tags with gutters of 16, 16 and 18 — the case this exists for.
     const tags = [box(0, 0, 80, 28), box(96, 0, 80, 28),
                   box(192, 0, 80, 28), box(290, 0, 80, 28)];
-    expect(chainSegments(tags).map((s) => s.label)).toEqual(['16', '16', '18']);
+    expect(labels(tags)).toEqual(['16', '16', '18']);
   });
 
   it('measures adjacent pairs only, not every combination', () => {
     const tags = [box(0, 0, 10, 10), box(20, 0, 10, 10), box(40, 0, 10, 10)];
-    expect(chainSegments(tags)).toHaveLength(2);
+    expect(chainPairs(tags)).toHaveLength(2);
   });
 
   it('has nothing to say about fewer than two boxes', () => {
-    expect(chainSegments([box(0, 0)])).toEqual([]);
-    expect(chainSegments([])).toEqual([]);
+    expect(chainPairs([box(0, 0)])).toEqual([]);
+    expect(chainPairs([])).toEqual([]);
   });
 });
 

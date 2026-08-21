@@ -48,7 +48,7 @@ export declare function chain(boxes: Box[]): Box[];
  * the four gutters between them, which is the whole point of locking more than
  * one. Pure.
  */
-export declare function chainSegments(boxes: Box[]): Segment[];
+export declare function chainPairs(boxes: Box[]): [Box, Box][];
 /** How near the cursor has to be to pick a guide up, in px. */
 export declare const GRAB = 5;
 /** How near an edge a guide has to be to snap onto it, in px. */

@@ -25,6 +25,11 @@ export interface Segment {
   label: string;
   /** Which way the end caps point. */
   axis: 'x' | 'y';
+  /**
+   * Dimmed because the pointer is asking about a different measurement. Set
+   * only while something is being pointed at, so the default is undimmed.
+   */
+  faded?: boolean;
 }
 
 /**

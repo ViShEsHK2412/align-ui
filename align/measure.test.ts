@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chain, chainSegments, fmt, gapSegments, guideGapSegments, scaleFromTransform,
+  spreadLabels, type LabelBox,
 } from './measure';
 import type { Box } from './types';
 
@@ -256,5 +257,65 @@ describe('guideGapSegments', () => {
   it('handles both axes at once', () => {
     const out = guideGapSegments([g('x', 0), g('x', 60), g('y', 10), g('y', 90)], mid);
     expect(out.map((s) => `${s.axis}:${s.label}`)).toEqual(['x:60', 'y:80']);
+  });
+});
+
+describe('spreadLabels', () => {
+  const lab = (x: number, y: number, axis: 'x' | 'y' = 'x'): LabelBox =>
+    ({ x, y, w: 40, h: 20, axis });
+
+  it('leaves labels that do not touch exactly where they were', () => {
+    const input = [lab(0, 0), lab(200, 0), lab(0, 200)];
+    expect(spreadLabels(input)).toEqual(input);
+  });
+
+  it('moves the second of an overlapping pair, never the first', () => {
+    // Stability matters more than tight packing: the first label of a pile
+    // holding still keeps the layout from churning frame to frame.
+    const [first, second] = spreadLabels([lab(0, 0), lab(10, 5)]);
+    expect(first).toEqual(lab(0, 0));
+    expect(second!.y).toBeLessThan(5);
+  });
+
+  it('sends the label of a horizontal measurement upward', () => {
+    const [, second] = spreadLabels([lab(0, 100), lab(0, 100)]);
+    expect(second!.y).toBe(100 - 20 - 3);   // clear above the first
+    expect(second!.x).toBe(0);              // and still over its own line
+  });
+
+  it('sends the label of a vertical measurement sideways', () => {
+    const [, second] = spreadLabels([lab(0, 100, 'y'), lab(0, 100, 'y')]);
+    expect(second!.x).toBe(0 + 40 + 3);
+    expect(second!.y).toBe(100);
+  });
+
+  it('separates a whole pile, not just the first collision', () => {
+    const out = spreadLabels([lab(0, 100), lab(0, 100), lab(0, 100), lab(0, 100)]);
+    for (let i = 0; i < out.length; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        const a = out[i]!, b = out[j]!;
+        const clash = a.x < b.x + b.w && b.x < a.x + a.w
+                   && a.y < b.y + b.h && b.y < a.y + a.h;
+        expect(clash).toBe(false);
+      }
+    }
+  });
+
+  it('gives up rather than marching a label off the screen', () => {
+    // Sixteen tries is the cap; a hundred labels in one spot cannot all fit,
+    // and settling for an overlap beats scrolling off into nowhere.
+    const out = spreadLabels(Array.from({ length: 100 }, () => lab(0, 100)));
+    expect(out).toHaveLength(100);
+    expect(Math.min(...out.map((b) => b.y))).toBeGreaterThan(100 - 100 * 23);
+  });
+
+  it('does not mutate what it was given', () => {
+    const input = [lab(0, 100), lab(0, 100)];
+    spreadLabels(input);
+    expect(input[1]).toEqual(lab(0, 100));
+  });
+
+  it('handles an empty list', () => {
+    expect(spreadLabels([])).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { fmt, guideAt } from './measure';
+import { fmt, guideAt, spreadLabels } from './measure';
 import { alpha, ink, prefersDark, TYPE, WEIGHT, whenFontReady, type Ink } from './theme';
 import type { Box, Guide, Segment } from './types';
 
@@ -130,13 +130,17 @@ export function mountOverlay(): Overlay {
   }
 
   /** `center` places the chip's midpoint at (x, y) instead of its top-left. */
-  function chip(text: string, x: number, y: number, bg: string, center = false) {
+  /** How big a chip will be, before deciding where to put it. */
+  function chipSize(text: string) {
+    ctx.font = `${WEIGHT.medium} ${TYPE.body}px ${TYPE.stack}`;
+    return { w: ctx.measureText(text).width + PAD * 2, h: TYPE.body + PAD * 2 + 2 };
+  }
+
+  /** Draw a chip with its top-left corner given, clamped into the viewport. */
+  function chipAt(text: string, left: number, top: number, bg: string) {
     ctx.font = `${WEIGHT.medium} ${TYPE.body}px ${TYPE.stack}`;
     ctx.textBaseline = 'middle';
-    const w = ctx.measureText(text).width + PAD * 2;
-    const h = TYPE.body + PAD * 2 + 2;
-    const left = center ? x - w / 2 : x;
-    const top = center ? y - h / 2 : y;
+    const { w, h } = chipSize(text);
     const cx = Math.min(Math.max(left, EDGE), innerWidth - w - EDGE);
     const cy = Math.min(Math.max(top, EDGE), innerHeight - h - EDGE);
     ctx.fillStyle = bg;
@@ -145,6 +149,11 @@ export function mountOverlay(): Overlay {
     ctx.fill();
     ctx.fillStyle = c.surface;
     ctx.fillText(text, cx + PAD, cy + h / 2);
+  }
+
+  function chip(text: string, x: number, y: number, bg: string, center = false) {
+    const { w, h } = chipSize(text);
+    chipAt(text, center ? x - w / 2 : x, center ? y - h / 2 : y, bg);
   }
 
   /**
@@ -283,13 +292,19 @@ export function mountOverlay(): Overlay {
     for (const seg of state.lines) distance(seg);
 
     // Labels last, always on top. A distance label sits clear of its own line:
-    // above a horizontal one, beside a vertical one.
-    for (const seg of state.lines) {
+    // above a horizontal one, beside a vertical one — then they are nudged off
+    // each other, because a number underneath another number reads as neither.
+    const wanted = state.lines.map((seg) => {
       const mx = (seg.x1 + seg.x2) / 2;
       const my = (seg.y1 + seg.y2) / 2;
-      if (seg.axis === 'x') chip(seg.label, mx, my - 16, c.measure, true);
-      else chip(seg.label, mx + 26, my, c.measure, true);
-    }
+      const { w, h } = chipSize(seg.label);
+      return seg.axis === 'x'
+        ? { x: mx - w / 2, y: my - 16 - h / 2, w, h, axis: seg.axis }
+        : { x: mx + 26 - w / 2, y: my - h / 2, w, h, axis: seg.axis };
+    });
+    spreadLabels(wanted).forEach((at, i) => {
+      chipAt(state.lines[i]!.label, at.x, at.y, c.measure);
+    });
     if (state.hover && state.cursor) {
       const { width, height } = state.hover;
       chip(`${fmt(width)} × ${fmt(height)}`,

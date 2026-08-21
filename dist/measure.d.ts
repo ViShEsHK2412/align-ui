@@ -91,6 +91,29 @@ export declare function guideGapSegments(active: {
     x: number;
     y: number;
 }): Segment[];
+/** A label's box, before anything has been drawn. */
+export interface LabelBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    /** The axis of the line it belongs to, which decides where it can escape to. */
+    axis: 'x' | 'y';
+}
+/**
+ * Nudge labels off each other, keeping each one on its own line.
+ *
+ * Four elements measured at once put their numbers in much the same place, and
+ * a number underneath another number is not a measurement any more. Each label
+ * escapes perpendicular to its own line — a horizontal measurement's label
+ * climbs, a vertical one's steps sideways — so it stays anchored to the line it
+ * describes instead of drifting off toward somebody else's.
+ *
+ * Greedy and in order: the first label of a pile keeps its place and later ones
+ * move. That makes the layout stable frame to frame, which matters more here
+ * than finding the tightest possible packing. Pure.
+ */
+export declare function spreadLabels(boxes: LabelBox[]): LabelBox[];
 export interface Scale {
     x: number;
     y: number;

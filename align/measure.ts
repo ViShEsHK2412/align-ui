@@ -286,6 +286,53 @@ export function guideGapSegments(
   return out;
 }
 
+// ── Labels ──────────────────────────────────────────────────────────────────
+
+/** A label's box, before anything has been drawn. */
+export interface LabelBox {
+  x: number; y: number; w: number; h: number;
+  /** The axis of the line it belongs to, which decides where it can escape to. */
+  axis: 'x' | 'y';
+}
+
+/** Breathing room between two labels that had to be separated, in px. */
+const LABEL_GAP = 3;
+
+function overlaps(a: LabelBox, b: LabelBox): boolean {
+  return a.x < b.x + b.w + LABEL_GAP && b.x < a.x + a.w + LABEL_GAP
+      && a.y < b.y + b.h + LABEL_GAP && b.y < a.y + a.h + LABEL_GAP;
+}
+
+/**
+ * Nudge labels off each other, keeping each one on its own line.
+ *
+ * Four elements measured at once put their numbers in much the same place, and
+ * a number underneath another number is not a measurement any more. Each label
+ * escapes perpendicular to its own line — a horizontal measurement's label
+ * climbs, a vertical one's steps sideways — so it stays anchored to the line it
+ * describes instead of drifting off toward somebody else's.
+ *
+ * Greedy and in order: the first label of a pile keeps its place and later ones
+ * move. That makes the layout stable frame to frame, which matters more here
+ * than finding the tightest possible packing. Pure.
+ */
+export function spreadLabels(boxes: LabelBox[]): LabelBox[] {
+  const placed: LabelBox[] = [];
+  for (const box of boxes) {
+    const b = { ...box };
+    // Bounded: a label in an impossible pile settles for overlapping rather
+    // than marching off the screen.
+    for (let tries = 0; tries < 16; tries++) {
+      const blocker = placed.find((p) => overlaps(p, b));
+      if (!blocker) break;
+      if (b.axis === 'x') b.y = blocker.y - b.h - LABEL_GAP;
+      else b.x = blocker.x + blocker.w + LABEL_GAP;
+    }
+    placed.push(b);
+  }
+  return placed;
+}
+
 // ── Scale ───────────────────────────────────────────────────────────────────
 
 export interface Scale { x: number; y: number }

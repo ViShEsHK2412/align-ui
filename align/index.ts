@@ -119,8 +119,10 @@ function render(cursor?: { x: number; y: number }) {
       ...(last && hover && !locked && !onGuide ? gapSegments(last, hover) : []),
       // From every locked box to each guide that is asking.
       ...measuring.flatMap((g) => pinned.flatMap((b) => guideSegments(b, [viewportGuide(g)]))),
-      // And from whatever you are pointing at to the nearest guide each way.
-      ...(hover && !onGuide && guides.length ? guideSegments(hover, at) : []),
+      // And from whatever you are pointing at to the nearest guide each way —
+      // unless it is locked, in which case the rulers above already measured
+      // it, and doing it again draws the same number twice in the same place.
+      ...(hover && !locked && !onGuide && guides.length ? guideSegments(hover, at) : []),
       // Two rulers are a measurement on their own, with no element involved.
       ...guideGapSegments(measuring.map(viewportGuide),
         { x: innerWidth / 2, y: innerHeight / 2 }),

@@ -32,9 +32,18 @@ export const KEYS: [string, string][] = [
   ['Esc', 'clear the locks, then close'],
 ];
 
+/**
+ * The badge's geometry, written once so the help below it can be placed from
+ * the same numbers instead of a hardcoded offset that drifts when either
+ * changes. Height is the line box plus the padding either side.
+ */
+const INSET = 16;
+const FLAG_H = TYPE.tag + 12;
+const STEP = 8;
+
 const CSS = `
 .flag {
-  position: fixed; top: 16px; right: 16px;
+  position: fixed; top: ${INSET}px; right: ${INSET}px;
   display: flex; align-items: center; gap: 8px;
   padding: 6px 10px; border-radius: 0;
   pointer-events: auto; user-select: none; cursor: pointer;
@@ -62,7 +71,10 @@ const CSS = `
 .flag .count:empty { display: none; }
 
 .help {
-  position: fixed; top: 46px; right: 16px; width: 292px;
+  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 292px;
+  /* Fifteen rows outgrow a short window, and a list you cannot reach the end
+     of is worse than one you have to scroll. */
+  max-height: calc(100vh - ${INSET * 2 + FLAG_H + STEP}px); overflow-y: auto;
   padding: 10px; border-radius: 0;
   pointer-events: auto; user-select: none;
   font-family: ${TYPE.stack};
@@ -79,7 +91,16 @@ const CSS = `
   .help { box-shadow: ${surfaceShadow(4, true)}; }
 }
 .help[data-open] { display: block; }
-.help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 0; }
+/* Baselines, not boxes. A key sits in a bordered chip and its description does
+   not, so aligning the two boxes puts the key's text 4px below the first line
+   of the text it labels — right on one-line rows by luck, wrong on every row
+   that wraps. Aligning on the baseline is right on both. */
+.help dl {
+  display: grid; grid-template-columns: auto 1fr;
+  /* Baseline alignment already buys each wrapped row 4px of separation, so
+     the gap stays where it was rather than pushing the list off the screen. */
+  align-items: baseline; gap: 6px 10px; margin: 0;
+}
 .help dt { justify-self: start; }
 .help kbd {
   display: inline-block; padding: 3px 5px;
@@ -87,7 +108,7 @@ const CSS = `
   border: 1px solid color-mix(in oklab, ${themed(SEMANTIC.fg)} 14%, transparent);
   background: ${nest(2)};
 }
-.help dd { margin: 0; align-self: center; color: ${themed(SEMANTIC.muted)}; }
+.help dd { margin: 0; color: ${themed(SEMANTIC.muted)}; }
 `;
 
 export function createIndicator(root: ShadowRoot): Indicator {

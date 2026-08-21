@@ -229,6 +229,15 @@ function sameRect(a: Box, b: Box): boolean {
  * Cost is one getBoundingClientRect per live box per frame, and only while
  * open. Nothing is redrawn unless something actually moved.
  */
+/**
+ * The last scroll offset drawn at. Guides are anchored to the page, so they
+ * move on screen whenever the page scrolls — but nothing else here notices.
+ * A sticky element under the cursor keeps its rect through a scroll, so the
+ * box comparison below reports no movement and the guides freeze mid-page.
+ */
+let drawnAtX = 0;
+let drawnAtY = 0;
+
 function watch() {
   watching = requestAnimationFrame(watch);
 
@@ -236,13 +245,17 @@ function watch() {
   const next = live.map((b) => boxOf(b.el));
   const nextHover = hover && hover.el.isConnected ? boxOf(hover.el) : null;
 
+  const scrolled = scrollX !== drawnAtX || scrollY !== drawnAtY;
   const moved =
+    scrolled ||
     next.length !== pinned.length ||
     next.some((b, i) => !sameRect(b, pinned[i]!)) ||
     (hover === null) !== (nextHover === null) ||
     (hover !== null && nextHover !== null && !sameRect(hover, nextHover));
   if (!moved) return;
 
+  drawnAtX = scrollX;
+  drawnAtY = scrollY;
   pinned = next;
   hover = nextHover;
   const last = pinned[pinned.length - 1];

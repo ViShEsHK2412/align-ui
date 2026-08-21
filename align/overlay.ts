@@ -265,11 +265,14 @@ export function mountOverlay(): Overlay {
       guides(state.hover);
       outline(state.hover, state.pinned.length ? alpha(c.accent, 0.7) : c.accent);
     }
+    // A locked guide is drawn solid and at full strength, a loose one dashed
+    // and dimmed — so which rulers are still measuring reads at a glance,
+    // without spending a second colour on it.
     for (const g of state.guides) {
       const live = state.liveGuide?.id === g.id;
-      ctx.strokeStyle = live ? c.guide : alpha(c.guide, 0.65);
+      ctx.strokeStyle = g.locked || live ? c.guide : alpha(c.guide, 0.55);
       ctx.lineWidth = 1;
-      ctx.setLineDash([]);
+      ctx.setLineDash(g.locked ? [] : [4, 4]);
       ctx.beginPath();
       const at = Math.round(guideAt(g));
       if (g.axis === 'x') { ctx.moveTo(at, 0); ctx.lineTo(at, innerHeight); }

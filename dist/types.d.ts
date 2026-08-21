@@ -36,4 +36,9 @@ export interface Guide {
     id: number;
     axis: 'x' | 'y';
     at: number;
+    /**
+     * A locked guide keeps measuring to every locked box once the pointer has
+     * moved off it. Loose guides only measure while hovered.
+     */
+    locked: boolean;
 }

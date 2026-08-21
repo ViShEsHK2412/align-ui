@@ -35,6 +35,14 @@ let guides: Guide[] = [];
 let nextGuideId = 1;
 let dragging: Guide | null = null;
 let hoverGuide: Guide | null = null;
+/**
+ * Where a grab on an existing guide began, and whether it has travelled far
+ * enough to count as a drag. Pressing a guide has to serve two gestures: move
+ * it, or lock it. A press that never really moves is a click.
+ */
+let grabFrom: { x: number; y: number } | null = null;
+/** Hand-twitch allowance, in px. Below this a press is a click, not a drag. */
+const CLICK_SLOP = 3;
 
 /** The ruler gutter, mirrored from overlay.ts. */
 const RULER = 22;
@@ -57,7 +65,7 @@ function placeGuide(g: Guide, x: number, y: number, free: boolean) {
 }
 
 function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
-  const g: Guide = { id: nextGuideId++, axis, at: 0 };
+  const g: Guide = { id: nextGuideId++, axis, at: 0, locked: false };
   placeGuide(g, x, y, free);
   guides = [...guides, g];
   return g;
@@ -79,13 +87,25 @@ function matchesHotkey(e: KeyboardEvent): boolean {
   return mod === (e.metaKey || e.ctrlKey);
 }
 
+/** A guide in viewport coordinates, which is what the segment maths wants. */
+function viewportGuide(g: Guide) {
+  return { axis: g.axis, pos: g.axis === 'x' ? g.at - scrollX : g.at - scrollY };
+}
+
 function render(cursor?: { x: number; y: number }) {
   const last = pinned[pinned.length - 1];
   const locked = hover && pinned.some((b) => b.el === hover!.el);
-  const at = guides.map((g) => ({
-    axis: g.axis,
-    pos: g.axis === 'x' ? g.at - scrollX : g.at - scrollY,
-  }));
+  const at = guides.map(viewportGuide);
+
+  // Pointing at a guide means you are asking about that guide, so the element
+  // behind it stops measuring. Without this you would get the guide's answer
+  // and the element's answer stacked on top of each other.
+  const onGuide = !dragging && hoverGuide ? hoverGuide : null;
+
+  // A guide measures to every locked box when it is locked, or while you point
+  // at it. Each one measures to itself, not to whichever guide happens to be
+  // nearest — that is the whole point of choosing one.
+  const measuring = guides.filter((g) => g.locked || g.id === onGuide?.id);
   overlay?.update({
     hover,
     pinned,
@@ -96,9 +116,11 @@ function render(cursor?: { x: number; y: number }) {
       // Gaps within the locked set, then from the newest lock to what you're
       // pointing at — measuring to something already locked would be noise.
       ...chainSegments(pinned),
-      ...(last && hover && !locked ? gapSegments(last, hover) : []),
+      ...(last && hover && !locked && !onGuide ? gapSegments(last, hover) : []),
+      // From every locked box to each guide that is asking.
+      ...measuring.flatMap((g) => pinned.flatMap((b) => guideSegments(b, [viewportGuide(g)]))),
       // And from whatever you are pointing at to the nearest guide each way.
-      ...(hover && guides.length ? guideSegments(hover, at) : []),
+      ...(hover && !onGuide && guides.length ? guideSegments(hover, at) : []),
     ],
     ...(cursor ? { cursor } : {}),
   });
@@ -111,8 +133,13 @@ let cursorAt: { x: number; y: number } | null = null;
 function onMouseMove(e: MouseEvent) {
   cursorAt = { x: e.clientX, y: e.clientY };
   if (dragging) {
-    placeGuide(dragging, e.clientX, e.clientY, e.altKey);
-    guides = [...guides];
+    if (grabFrom && Math.hypot(e.clientX - grabFrom.x, e.clientY - grabFrom.y) > CLICK_SLOP) {
+      grabFrom = null;     // travelled: this is a drag now, and stays one
+    }
+    if (!grabFrom) {
+      placeGuide(dragging, e.clientX, e.clientY, e.altKey);
+      guides = [...guides];
+    }
     render({ x: e.clientX, y: e.clientY });
     return;
   }
@@ -123,10 +150,17 @@ function onMouseMove(e: MouseEvent) {
 
 function onMouseUp(e: MouseEvent) {
   if (!dragging) return;
-  // Dropped back in a rule: that is how you throw a guide away.
-  if (inRuler(e.clientX, e.clientY) || e.clientX < RULER || e.clientY < RULER) {
+  // Pressed and released without going anywhere: a click, which locks the
+  // guide so it keeps measuring after the pointer leaves. Click again to let
+  // it go quiet.
+  if (grabFrom) {
+    dragging.locked = !dragging.locked;
+    guides = [...guides];
+  } else if (inRuler(e.clientX, e.clientY) || e.clientX < RULER || e.clientY < RULER) {
+    // Dropped back in a rule: that is how you throw a guide away.
     removeGuide(dragging);
   }
+  grabFrom = null;
   dragging = null;
   render({ x: e.clientX, y: e.clientY });
 }
@@ -146,6 +180,7 @@ function onMouseDown(e: MouseEvent) {
   const fromRuler = inRuler(e.clientX, e.clientY);
   if (fromRuler) {
     swallow(e);
+    grabFrom = null;
     dragging = addGuide(fromRuler, e.clientX, e.clientY, e.altKey);
     render({ x: e.clientX, y: e.clientY });
     return;
@@ -154,6 +189,7 @@ function onMouseDown(e: MouseEvent) {
   if (grabbed) {
     swallow(e);
     dragging = grabbed;
+    grabFrom = { x: e.clientX, y: e.clientY };
     render({ x: e.clientX, y: e.clientY });
     return;
   }
@@ -310,6 +346,7 @@ function deactivate() {
   hover = null;
   pinned = [];
   dragging = null;
+  grabFrom = null;
   hoverGuide = null;
 }
 

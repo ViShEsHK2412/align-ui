@@ -25,6 +25,8 @@ export const KEYS: [string, string][] = [
   ['Drag from a rule', 'pull out a guide; drag it back to remove'],
   ['V', 'vertical guide at the cursor'],
   ['H', 'horizontal guide at the cursor'],
+  ['Hover a guide', 'distance from it to every locked element'],
+  ['Click a guide', 'keep those distances up; click again to release'],
   ['Alt while placing', 'ignore snapping'],
   ['Del', 'remove the guide under the cursor; Shift+Del for all'],
   ['Esc', 'clear the locks, then close'],

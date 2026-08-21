@@ -362,8 +362,14 @@ function onKey(e: KeyboardEvent) {
     render();
   } else if (overlay && (e.key === 'Delete' || e.key === 'Backspace')) {
     e.preventDefault();
-    if (e.shiftKey) guides = [];
-    else if (hoverGuide) removeGuide(hoverGuide);
+    if (e.shiftKey) {
+      // Clearing the lot has to forget the one under the cursor too, or the
+      // overlay keeps drawing a position chip for a guide that is gone.
+      guides = [];
+      hoverGuide = null;
+      dragging = null;
+      grabFrom = null;
+    } else if (hoverGuide) removeGuide(hoverGuide);
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();

@@ -20,9 +20,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const run = (cmd, args) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 
-/** npm is a shell script on Windows, so execFile needs the .cmd by name. */
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
 const die = (message) => { console.error(`release: ${message}`); process.exit(1); };
 
 // Anything uncommitted would be swept into the release commit below, so the
@@ -36,8 +33,12 @@ if (dirty.length) die(`commit your work first:\n  ${dirty.join('\n  ')}`);
 const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
 if (branch !== 'main') die(`releases come off main, not ${branch}`);
 
+// The two halves of `npm run build`, run directly. Node refuses to spawn a
+// .cmd without a shell, so going through npm needs one, and a shell is a
+// portability problem of its own — node can launch both of these itself.
 console.log('release: building');
-run(npm, ['run', 'build']);
+run(process.execPath, ['scripts/build.mjs']);
+run(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json']);
 
 const pkgPath = new URL('../package.json', import.meta.url);
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));

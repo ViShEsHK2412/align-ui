@@ -20,6 +20,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const run = (cmd, args) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 
+/** npm is a shell script on Windows, so execFile needs the .cmd by name. */
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
 const die = (message) => { console.error(`release: ${message}`); process.exit(1); };
 
 // Anything uncommitted would be swept into the release commit below, so the
@@ -34,7 +37,7 @@ const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
 if (branch !== 'main') die(`releases come off main, not ${branch}`);
 
 console.log('release: building');
-run('npm', ['run', 'build']);
+run(npm, ['run', 'build']);
 
 const pkgPath = new URL('../package.json', import.meta.url);
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));

@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Config } from './config';
 
@@ -28,10 +29,22 @@ interface VitePluginLike {
  * Vite does not rewrite bare specifiers inside a script it was handed, so the
  * injected module has to name a URL the browser can fetch on its own. The
  * bundle is this file's sibling, and /@fs/ serves any absolute path.
+ *
+ * Stamped with the bundle's mtime, because Vite's watcher ignores node_modules.
+ * Without it the URL never changes when the package is updated, so a running
+ * dev server keeps serving the copy it transformed on first request — you
+ * update the tool, reload, and still get the old one. This runs per request for
+ * the HTML, so a fresh install shows up on the next reload with no restart.
  */
 function bundleUrl(): string {
   const here = fileURLToPath(new URL('.', import.meta.url));
-  return '/@fs/' + (here + 'align.js').replace(/\\/g, '/').replace(/^\/+/, '/');
+  const file = here + 'align.js';
+  const path = '/@fs/' + file.replace(/\\/g, '/').replace(/^\/+/, '/');
+  try {
+    return `${path}?v=${statSync(file).mtimeMs}`;
+  } catch {
+    return path;      // missing bundle: let the import fail with a real error
+  }
 }
 
 export default function align(options: Partial<Config> = {}): VitePluginLike {

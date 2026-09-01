@@ -1,0 +1,110 @@
+/* A design system, so the tool has real tokens to match numbers against.
+   Every value here exists to be measured; the off-scale ones are deliberate. */
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  /* Deliberately shares its value with --space-4: two tokens, one number. */
+  --gap-md: 16px;
+
+  --text-sm: 13px;
+  --text-body: 16px;
+  --text-lg: 20px;
+  --line-body: 24px;
+  --line-lg: 28px;
+
+  --radius: 8px;
+  --brand: #6ea8fe;
+  --ink: #cbd3e1;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: #0f1115;
+  color: var(--ink);
+  font: 14px/1.6 system-ui, sans-serif;
+}
+
+a { color: #7aa2f7; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  padding: var(--space-3) var(--space-6);
+  background: #171a21;
+  border-bottom: 1px solid #232833;
+  font-size: 13px;
+}
+
+main { max-width: 900px; margin: 0 auto; padding: var(--space-6); }
+
+section { padding: 20px 0 28px; border-bottom: 1px solid #1c212b; }
+h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #e8edf6; }
+section > p { margin: 0 0 16px; color: #8b93a7; font-size: 13px; }
+
+.expect { margin-top: 14px; border-collapse: collapse; font-size: 12px; }
+.expect th {
+  text-align: left; padding: 2px 14px 2px 0;
+  font-weight: 500; color: #7aa2f7; white-space: nowrap;
+}
+.expect td { padding: 2px 14px 2px 0; color: #cbd3e1; }
+.expect .note { color: #6b7386; }
+
+.card {
+  background: #1b2029;
+  border: 1px solid #2b3341;
+  display: grid; place-items: center;
+  font-size: 12px;
+  min-width: 90px;
+  height: 64px;
+}
+
+/* 1 · every number on the scale, and one that is not ─────────────────────── */
+#on-scale {
+  margin: var(--space-6) var(--space-4);
+  padding: var(--space-4);
+  border: var(--space-1) solid #3d4757;
+  width: 320px; height: 120px;
+}
+#off-scale {
+  margin: 13px;                 /* nothing in the scale is 13 */
+  padding: var(--space-4);
+  border: 1px solid #3d4757;
+  width: 320px; height: 120px;
+}
+
+/* 2 · the same 24px gap, from three different places ──────────────────────── */
+.from-gap { display: flex; gap: var(--space-6); }
+.from-margins { display: flex; }
+.from-margins > .card + .card { margin-left: var(--space-6); }
+.from-both { display: flex; gap: var(--space-2); }
+.from-both > .card + .card { margin-left: var(--space-4); }
+
+/* 3 · space that comes from neither gap nor margin ────────────────────────── */
+.from-layout { display: flex; justify-content: space-between; width: 480px; }
+
+/* 4 · a grid with different gaps on each axis ─────────────────────────────── */
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(3, 120px);
+  column-gap: var(--space-8);
+  row-gap: var(--space-3);
+}
+
+/* 5 · a token redefined further down the tree ─────────────────────────────── */
+.rescope { --space-4: 20px; }
+.rescope .card { padding: var(--space-4); }
+
+/* 6 · not siblings: a gap the tool must refuse to attribute ───────────────── */
+.left-col, .right-col { display: inline-block; vertical-align: top; }
+.right-col { margin-left: 60px; }
+
+/* 7 · distinctive edges and centres, for snapping ─────────────────────────── */
+.snap-row { display: flex; gap: var(--space-8); margin-top: var(--space-4); }
+.snap-row .card { width: 200px; }

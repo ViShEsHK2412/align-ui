@@ -17,6 +17,8 @@ export interface OverlayState {
     guides: Guide[];
     /** The one under the cursor or being dragged, drawn at full strength. */
     liveGuide: Guide | null;
+    /** The one the keyboard is pointing at, marked with end handles. */
+    activeGuide: number | null;
 }
 export interface Overlay {
     root: ShadowRoot;

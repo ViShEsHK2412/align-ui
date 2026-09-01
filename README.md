@@ -103,6 +103,8 @@ export default function AlignDev() {
 | `R` | rulers along the top and left edges |
 | drag from a rule | pull out a guide; drag it back to remove |
 | `V` / `H` | vertical / horizontal guide at the cursor |
+| arrows | nudge the last guide you touched by 1px; `Shift` for 10 |
+| `L` | pin that guide, so it cannot be moved or deleted |
 | `Alt` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
@@ -122,15 +124,22 @@ for a vertical — so the axis is implied by where the drag started. Or press `V
 or `H` to drop one at the cursor, which works whether or not the rulers are
 showing. Drag a guide back into a rule to throw it away.
 
-They snap onto the edges of whatever is under the cursor within 4px, because a
-guide meant to sit on a card's edge has to sit *on* it rather than a pixel off
-and quietly lying; hold `Alt` to place one freely. And they measure: hover an
+They snap within 4px onto the edges and centre of whatever is under the cursor,
+and onto other guides — because a guide meant to sit on a card's edge has to sit
+*on* it rather than a pixel off and quietly lying; hold `Alt` to place one
+freely. The guide's chip names what it caught (`x 760 · div.card left`), since a
+guide that snapped and one that missed by a pixel look identical otherwise. An
+edge beats a centre when a guide lands exactly between them. And they measure: hover an
 element and the nearest guide on each axis draws the gap and labels it, so
 "is this aligned to my guide" gets a number. A guide passing *through* the
 element draws nothing, since there is no gap to report.
 
-Guides last for the session — kept across toggling the tool off and on, gone on
-reload. Nothing is written to the host page's storage.
+Guides are kept in `localStorage`, namespaced by `location.pathname`: the guides
+you draw on `/pricing` describe `/pricing` and do not turn up on `/blog`. Every
+stored entry is validated on read, so a hand-edited or stale value can never
+throw at startup. Rulers and the panel's position are remembered too. Modes are
+not — x-ray, the type readout and the picker all start off, because a tool that
+reopens in a mode you have forgotten looks broken rather than helpful.
 
 One thing worth knowing when the two disagree: an inset is measured **border
 box to border box**, so it includes the container's border *and* its padding.
@@ -199,6 +208,8 @@ align/
   boxmodel.ts   the draggable box model panel
   indicator.ts  the badge and its key list
   measure.ts    geometry, hit-testing, computed styles
+  inspect.ts    design tokens, gap provenance
+  store.ts      what survives a reload
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
   config.ts     ignore selector, hotkey, panel / ruler / guide keys

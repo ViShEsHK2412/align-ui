@@ -328,3 +328,241 @@ the rulers.
 1. inside a ruler gutter → start a new guide
 2. within grab range of a guide → move that guide
 3. otherwise → the existing lock behaviour
+
+---
+
+# What to take from Mesurer and GuideFrame
+
+Both were read at source (Mesurer `005f9fa`, GuideFrame `aee6735`, both MIT).
+The filter for this list is narrow on purpose: it has to be a **measurement**
+feature, it has to state a fact rather than pass a verdict, and it has to be
+small enough that the tool still reads as one idea. Mesurer is 11,889 lines and
+GuideFrame ~3,200 against our 2,408; most of that difference is things we should
+not want.
+
+## Taking
+
+**1. Gap provenance.** A measured gap also says where the number came from:
+`24 · gap 24 · margins 0`. A bare 24 leaves the only question that matters
+unanswered — flex `gap`, margins, or both. Reads `getComputedStyle` on the
+shared parent and compares each side's margins. Pure and testable. ~40 lines.
+
+**2. Snapping says what it caught.** Today `snapTo` returns a bare number, so a
+snapped guide and a nearly-snapped guide look identical — the exact failure
+snapping exists to prevent. It returns a labelled result instead, and the
+guide's chip reads `x 760 · card left`. ~30 lines on top of point 3.
+
+**3. Snap to more than the hovered box.** We only offer that box's left and
+right edges. Add its centre, and every other guide, as candidates with a
+priority so edges beat centres on ties. ~40 lines.
+
+**4. Distance connectors.** When two locked elements are offset on the other
+axis, the gap line ends in empty space beside the second one — correct number,
+but it never visually reaches what it measures. A short perpendicular stub joins
+them, the way a dimension line works on a drawing. We have this bug now.
+~25 lines in `gapSegments`.
+
+**5. Guides survive a reload.** `localStorage`, namespaced by `location.pathname`
+so guides drawn on one route stay there, and every entry validated on read so a
+stale value can never throw at startup. ~50 lines.
+
+**6. Arrow-key nudge.** Arrow moves the selected guide 1px, Shift+Arrow 10px.
+Removes the mouse from the loop once a guide is roughly placed. ~30 lines.
+
+**7. A locked guide.** One you can select but not nudge or delete. Matters as
+soon as you have a reference guide you keep almost-dragging. ~15 lines.
+
+**8. Undo the last guide wipe.** Shift+Del already clears every guide, and there
+is no way back. One level of undo for that one action — not a command history.
+~20 lines.
+
+**9. Gap distribution, without the verdict.** Measuring several gutters at once
+can report `24 ×3, 18 ×1`. GuideFrame appends `· inconsistent`; we stop before
+that. The distribution is a fact, the grade is the violation detector we deleted
+on day one. ~25 lines.
+
+**10. Copy the reading.** One key puts the current measurements on the clipboard
+as text. The numbers are the output of this tool and right now the only way out
+of it is retyping them. ~20 lines.
+
+## Deciding separately
+
+**CSS-variable provenance.** Mesurer traces a computed value back to the
+`var(--x)` that produced it, so a readout can say `16 (--space-4)` — it tells you
+*where to change it*, which is the natural end of "where did this number come
+from". Genuinely valuable with design tokens, and by far the most expensive item
+here: it walks the CSSOM and handles inheritance (~200 lines, and it is the one
+thing on this page that could go stale against browser behaviour). Worth doing,
+worth doing on its own.
+
+## Not taking, and why
+
+- **Screenshots, colour picker, X-ray, draggable toolbar** — good features, not
+  measurement. They are most of why Mesurer is five times our size. Mesurer's
+  purpose is feeding context to coding agents, so a region screenshot is its core
+  loop; here it would be a second product sharing a toolbar.
+- **A settings panel.** Every setting is a decision refused. Guide colour, dash
+  pattern, ruler opacity each have one right answer today, which is why there is
+  no panel.
+- **Layout grid overlay** (columns, gutters, breakpoints). A different job —
+  checking a design grid, not measuring what rendered.
+- **Undo/redo as a command history.** Point 8 covers the one destructive action.
+  A general history is a state model the tool does not otherwise need.
+- **React.** Mesurer requires it. GuideFrame split a core out to avoid it. We
+  never had it, and that is the one place we are unambiguously better placed than
+  the bigger tool.
+
+## Order
+
+1 needs the box-model reader that already exists, so it can go first or last;
+everything else is cheap. The dependency that matters: **3 before 2** (candidates
+before labels), and **7 before 6** (lock before nudge, since a click currently
+both selects and locks).
+
+
+---
+
+# Build plan: everything from the teardown
+
+Fourteen items, decided together. This is the design that has to be settled
+before any of them is written, because several of them want the same surface and
+would otherwise be built twice.
+
+## Budget
+
+`dist/align.js` is 29,286 bytes against a 32,768 cap with 3.4KB of headroom, and
+this is roughly 8KB of new code. The cap moves to **49,152** (48KB). It was our
+own number, not anyone's requirement, and the tool is private — but a budget only
+means anything if raising it is a decision, so: raised once, deliberately, here.
+No lazy chunk. One bundle stays simpler and nothing about a dev-only tool
+justifies the split.
+
+## The one surface rule
+
+Four new readouts want somewhere to live — typography, token matches, gap
+provenance, a picked colour. They all go in the box model panel, which becomes
+*the* readout, gaining sections that appear only when they have something to say.
+Nothing new floats.
+
+The canvas stays exactly as clean as it is now. Provenance and distribution are
+**panel** facts, not label text — a gap line still reads `24` and nothing more.
+This is the whole reason the canvas is legible at density and it does not get
+spent on prose.
+
+## Guides gain a keyboard target, not a selection model
+
+Today: hover measures, click locks, Del removes the one under the cursor. Arrow
+nudge cannot target "the guide under the cursor" because nudging moves it out of
+grab range within ten presses.
+
+So the guide most recently clicked or dragged becomes the **keyboard target**.
+That is not a new user-facing concept — clicking already does something, this
+adds keyboard reach to the thing you just clicked. Arrows nudge it, `L` pins it.
+Esc clears it along with everything else.
+
+Two flags on a guide, deliberately named apart:
+
+| Flag | Set by | Means |
+|---|---|---|
+| `locked` | click | keeps measuring after the pointer leaves |
+| `pinned` | `L` | cannot be dragged or deleted |
+
+## Keys
+
+Free letters, no collisions with the eleven bindings already in use.
+
+| Key | Does |
+|---|---|
+| `X` | x-ray: outline every element on the page |
+| `T` | typography readout in the panel |
+| `P` | pick a colour from anywhere on screen |
+| `C` | copy the current reading to the clipboard |
+| `L` | pin / unpin the keyboard-target guide |
+| arrows | nudge that guide 1px, 10px with Shift |
+| `Ctrl/Cmd+Z` | restore the guides last deleted |
+
+The help list goes from 15 rows to 22. It already caps its height and scrolls.
+
+## What persists
+
+Guides per `location.pathname`, so guides drawn on one route stay there. Rulers
+and the panel position globally. Every entry validated on read — a hand-edited or
+stale value must never throw at startup.
+
+Modes do not persist. X-ray, typography and the picker all start off; a tool that
+reopens in a mode you forgot you left it in is a tool that appears broken.
+
+## The fourteen
+
+### Measurement
+
+1. **Gap provenance.** Every gap between two siblings reports where the number
+   came from — `24 · gap 24 · margins 0`. Panel only.
+2. **Gap distribution.** With several gaps measured: `24 ×3 · 18 ×1`. The
+   distribution is a fact; the grade GuideFrame appends is not, and we stop
+   before it.
+3. **Named snapping.** `snapTo` returns a labelled result instead of a bare
+   number; the guide chip reads `x 760 · card left`. Today a snapped and a
+   nearly-snapped guide are indistinguishable, which is the exact failure
+   snapping exists to prevent.
+4. **More snap candidates.** Element centres and every other guide, each with a
+   priority so edges beat centres on ties.
+5. **Distance connectors.** A perpendicular stub joining a gap line to an element
+   it does not reach. A bug we have now, visible whenever two locked elements are
+   offset on the other axis.
+6. **Persistence.** As above.
+7. **Pinned guides.** `L`.
+8. **Nudge.** Arrows, 1px and 10px.
+9. **Undo.** One level, covering `Del` and `Shift+Del`. Not a command history.
+10. **Copy the reading.** `C` puts the panel's numbers on the clipboard as text.
+
+### Inspection
+
+11. **Typography.** Family, size, weight, line-height, tracking, shown only when
+    the locked element holds text. Line-height is spacing, so this closes a real
+    gap rather than adding a second product.
+12. **Token matching.** Every distinct number in the element gets checked against
+    the custom properties in scope: `16 --space-4 · 13 no match`. It compares
+    values, so the wording is **matches**, never *from* — a hardcoded 16 matches
+    too, and surfacing that is the point.
+13. **X-ray.** One stylesheet on the host document, one exclusion for our own
+    host. Our overlay is in a closed shadow root, so the page rule cannot reach
+    inside it — no exclusion list needed, unlike Mesurer's.
+14. **Colour picker.** Native EyeDropper, then hex / rgb / hsl / oklch, each row
+    click-to-copy. The conversion chain is real work: sRGB to linear, linear to
+    LMS, LMS to OKLab, OKLab to polar.
+
+## Order
+
+Dependencies first, bug fixes before features, the expensive readout last.
+
+1. Raise the budget — otherwise every later step fails the build
+2. Snap candidates, then labels (4 then 3) — pure, lands with tests
+3. Connectors (5) — a bug we have now
+4. Persistence (6)
+5. Pin, nudge, undo (7, 8, 9) — pin first, it decides what the others target
+6. Typography and token matching (11, 12) — the panel grows here
+7. Gap provenance and distribution (1, 2) — wants the panel from step 6
+8. Copy (10) — wants everything it will be copying
+9. X-ray (13)
+10. Colour picker (14)
+
+## Testing
+
+A second hard-cases page, `tokens.html`, seeded with a real design-token set,
+deliberate off-scale values, flex and grid gaps against equivalent margin
+spacing, and text at sizes whose line-heights are and are not on the scale. Every
+expected number stated in the page, the way `complex.html` does it.
+
+
+## Progress
+
+Shipped and verified in a browser: named snapping with more candidates,
+extension lines, persistence, nudge and pin, token matching, gap provenance,
+and the `tokens.html` fixtures for all of it.
+
+Built, unit-tested, and deliberately **not** shipped until each has been walked
+through in a browser: undo, the type readout, copy, x-ray, and the colour
+picker with its four-format conversion. Holding them back is the point — a
+measuring tool that reports something it has never been watched reporting is
+the one kind of bug it cannot afford.

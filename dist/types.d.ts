@@ -26,6 +26,13 @@ export interface Segment {
     /** Which way the end caps point. */
     axis: 'x' | 'y';
     /**
+     * An extension line: the thin stub that runs from a box's edge out to the
+     * measurement line, the way a dimension is drawn on paper. Carries no label
+     * and no end caps, and is drawn faintly — it is not the measurement, it is
+     * what connects the measurement to the thing it measures.
+     */
+    extension?: boolean;
+    /**
      * Dimmed because the pointer is asking about a different measurement. Set
      * only while something is being pointed at, so the default is undimmed.
      */
@@ -46,4 +53,12 @@ export interface Guide {
      * moved off it. Loose guides only measure while hovered.
      */
     locked: boolean;
+    /**
+     * What the guide snapped onto when it was last placed, e.g. "div.card left",
+     * or '' if it landed on nothing. Shown beside its position, because a guide
+     * that snapped and one that missed by a pixel look identical otherwise.
+     */
+    caught: string;
+    /** A pinned guide can be selected but not dragged or deleted. */
+    pinned: boolean;
 }

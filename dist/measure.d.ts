@@ -29,13 +29,6 @@ export declare function bandsOf(el: Element): Bands;
  * screen. Zeros are kept — flush against an edge is information too. Pure.
  */
 export declare function insetSegments(outer: Box, inner: Box): Segment[];
-/**
- * Shortest edge-to-edge distance between two boxes, as drawable segments.
- *
- * Overlapping on an axis means the gap on that axis is zero and no line is
- * drawn for it; boxes diagonal to each other get both, L-shaped. One box
- * inside another has no gap at all, so it reports insets instead. Pure.
- */
 export declare function gapSegments(a: Box, b: Box): Segment[];
 /**
  * Order a set of boxes along whichever axis they actually vary on, so a row
@@ -58,12 +51,42 @@ export declare function guideAt(g: Guide): number;
 /** The guide under the cursor, if any. Nearest wins when two overlap. */
 export declare function guideUnder(guides: Guide[], x: number, y: number): Guide | null;
 /**
- * Pull a guide onto a nearby edge. A guide meant to sit on a card's edge has to
- * sit *on* it — a pixel off is a guide that quietly lies to you. Pure.
+ * Somewhere a guide could usefully land, and what to call it.
+ *
+ * `rank` breaks ties at equal distance: an edge is a more meaningful place to
+ * put a guide than a centre, and a centre more than another guide, so a guide
+ * dropped exactly between two candidates takes the one that means more.
  */
-export declare function snapTo(value: number, edges: number[], free: boolean): number;
-/** The edges a guide on this axis could snap to, from the box under the cursor. */
-export declare function snapEdges(box: Box | null, axis: 'x' | 'y'): number[];
+export interface SnapCandidate {
+    at: number;
+    what: string;
+    rank: number;
+}
+/** Where a guide ended up, and what it caught — `what` is '' if it caught nothing. */
+export interface Snapped {
+    at: number;
+    what: string;
+}
+/**
+ * Pull a guide onto a nearby candidate. A guide meant to sit on a card's edge
+ * has to sit *on* it — a pixel off is a guide that quietly lies to you.
+ *
+ * It also has to *say* what it caught. Without that a snapped guide and a guide
+ * that missed by a pixel look identical, which is the exact failure snapping
+ * exists to prevent. Pure.
+ */
+export declare function snapTo(value: number, candidates: SnapCandidate[], free: boolean): Snapped;
+/**
+ * Everywhere a guide on this axis could land: the edges and centre of the box
+ * under the cursor, and every other guide already placed.
+ *
+ * Other guides matter because lining one guide up with another is how you check
+ * that two things across the page share an edge.
+ */
+export declare function snapCandidates(box: Box | null, axis: 'x' | 'y', others?: {
+    axis: 'x' | 'y';
+    at: number;
+}[]): SnapCandidate[];
 /**
  * The gap between a box and the nearest guide on each axis, as drawable
  * segments. A guide passing through the box reports nothing — there is no gap.

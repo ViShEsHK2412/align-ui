@@ -16,6 +16,10 @@ export interface BoxModel {
      * by the caller, which is the only place that knows which boxes are paired.
      */
     show(box: Box, gaps?: GapLine[]): void;
+    /** Show or hide the type readout. */
+    toggleType(): void;
+    /** The panel's numbers as text, for the clipboard. */
+    asText(): string;
     /** Nothing is locked any more. */
     hide(): void;
     /** The user asked for it back, or asked it to go away. */

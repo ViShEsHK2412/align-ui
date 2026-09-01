@@ -9,7 +9,7 @@
 <body>
   <header class="bar">
     Align — tokens &amp; provenance &nbsp;·&nbsp; Ctrl/Cmd+Shift+A &nbsp;·&nbsp;
-    click to lock &nbsp;·&nbsp; right-click to add &nbsp;·&nbsp; V / H guides
+    T type &nbsp;·&nbsp; X x-ray &nbsp;·&nbsp; P colour &nbsp;·&nbsp; C copy
     &nbsp;·&nbsp; <a href="/complex.html">hard cases</a>
     &nbsp;·&nbsp; <a href="/">simple page</a>
   </header>
@@ -104,7 +104,28 @@
 
     <!-- 5 ─────────────────────────────────────────────────────────────── -->
     <section>
-      <h2>5 · A token redefined mid-tree</h2>
+      <h2>5 · Type, on and off the scale</h2>
+      <p>Press <code>T</code> with one of these locked. Line height is spacing,
+        so it is measured like any other gap — and checked against the scale the
+        same way.</p>
+
+      <p class="type-on">Body text on the scale — 16px on a 24px line.</p>
+      <p class="type-off">Nearly the same, but 15px on a 22px line.</p>
+      <p class="type-unitless">Unitless 1.4 on 20px text, which resolves to 28.</p>
+
+      <table class="expect">
+        <tr><th>.type-on</th><td>size 16px · line 24px</td>
+            <td class="note">16 --gap-md --space-4 --text-body · 24 --line-body --space-6</td></tr>
+        <tr><th>.type-off</th><td>size 15px · line 22px</td>
+            <td class="note">both dashes — nothing on the scale</td></tr>
+        <tr><th>.type-unitless</th><td>line 28px</td>
+            <td class="note">unitless 1.4 resolves before we see it</td></tr>
+      </table>
+    </section>
+
+    <!-- 6 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>6 · A token redefined mid-tree</h2>
       <p>This block sets <code>--space-4: 20px</code> on itself. Tokens are read
         from the locked element, not from <code>:root</code>, so the padding here
         reports 20 matching <code>--space-4</code> — which is the truth at this
@@ -122,7 +143,7 @@
 
     <!-- 6 ─────────────────────────────────────────────────────────────── -->
     <section>
-      <h2>6 · Not siblings</h2>
+      <h2>7 · Not siblings</h2>
       <p>These two cards live in different parents. There is a real distance
         between them and the canvas measures it, but no <code>gap</code> or
         margin explains it, so the panel refuses to attribute it.</p>
@@ -137,7 +158,7 @@
 
     <!-- 7 ─────────────────────────────────────────────────────────────── -->
     <section>
-      <h2>7 · Snapping targets</h2>
+      <h2>8 · Snapping targets</h2>
       <p>Drop a vertical guide with <code>V</code> near an edge, then near the
         middle of a card. The guide chip names what it caught. Drop a second
         guide near the first and it catches <code>guide</code>. Hold
@@ -160,7 +181,7 @@
 
     <!-- 8 ─────────────────────────────────────────────────────────────── -->
     <section>
-      <h2>8 · Guides that stay</h2>
+      <h2>9 · Guides that stay</h2>
       <p>Guides here are stored against <code>/tokens.html</code>. Drop a few,
         reload, and they come back. Open <a href="/complex.html">the hard cases
         page</a> and they are not there — different route, different guides.</p>
@@ -168,6 +189,7 @@
       <table class="expect">
         <tr><th>nudge</th><td>arrows move 1px, Shift+arrow 10px</td></tr>
         <tr><th>pin</th><td>L — the line thickens and stops moving</td></tr>
+        <tr><th>undo</th><td>Shift+Del then Ctrl+Z brings them all back</td></tr>
       </table>
     </section>
 

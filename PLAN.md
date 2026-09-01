@@ -553,16 +553,3 @@ A second hard-cases page, `tokens.html`, seeded with a real design-token set,
 deliberate off-scale values, flex and grid gaps against equivalent margin
 spacing, and text at sizes whose line-heights are and are not on the scale. Every
 expected number stated in the page, the way `complex.html` does it.
-
-
-## Progress
-
-Shipped and verified in a browser: named snapping with more candidates,
-extension lines, persistence, nudge and pin, token matching, gap provenance,
-and the `tokens.html` fixtures for all of it.
-
-Built, unit-tested, and deliberately **not** shipped until each has been walked
-through in a browser: undo, the type readout, copy, x-ray, and the colour
-picker with its four-format conversion. Holding them back is the point — a
-measuring tool that reports something it has never been watched reporting is
-the one kind of bug it cannot afford.

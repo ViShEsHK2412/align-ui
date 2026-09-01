@@ -1,4 +1,6 @@
-import { gapDistribution, tokenSummary, tokensInScope } from './inspect';
+import {
+  gapDistribution, ownText, tokenSummary, tokensInScope, typographyOf,
+} from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 import type { Box, Quad } from './types';
@@ -21,6 +23,10 @@ export interface BoxModel {
    * by the caller, which is the only place that knows which boxes are paired.
    */
   show(box: Box, gaps?: GapLine[]): void;
+  /** Show or hide the type readout. */
+  toggleType(): void;
+  /** The panel's numbers as text, for the clipboard. */
+  asText(): string;
   /** Nothing is locked any more. */
   hide(): void;
   /** The user asked for it back, or asked it to go away. */
@@ -35,6 +41,9 @@ export interface GapLine {
 }
 
 type Region = 'margin' | 'border' | 'padding';
+
+/** Joining clipboard lines; written out so it survives a source rewrite. */
+const NEWLINE = String.fromCharCode(10);
 
 const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
 const CARD = 3;         // the panel floats over the page: Fluid surface-3
@@ -212,6 +221,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   panel.className = 'panel';
   dock.appendChild(panel);
 
+  /** Off by default: a tool that reopens in a mode you forgot looks broken. */
+  let showType = false;
+
   /** A labelled block under the box, one row per fact. */
   function readout(title: string, rows: [string, string][]): HTMLElement {
     const el = document.createElement('div');
@@ -374,6 +386,16 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
             region('padding', 3, b.padding, content))),
       ];
 
+      // Type, only when asked for. Line-height is spacing, so this is the same
+      // job as the box above it rather than a second tool bolted on.
+      if (showType) {
+        const text = ownText(box.el);
+        const rows = typographyOf(box.el);
+        parts.push(rows.length && text
+          ? readout('type', rows.map((r) => [r.label, r.value] as [string, string]))
+          : readout('type', [['', 'nothing of its own to set type on']]));
+      }
+
       // Where each gap in the locked set came from. The canvas keeps showing
       // the bare number; this is the part that would not fit on a line.
       if (gaps.length) {
@@ -388,7 +410,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       const tokens = tokensInScope(box.el);
       const summary = tokenSummary(
         [w, h, ...b.margin, ...b.border, ...b.padding,
-        ],
+         ...(showType ? typographyOf(box.el).map((r) => r.px) : [])],
         tokens,
       );
       if (summary) parts.push(readout('tokens', [['', summary]]));
@@ -400,6 +422,29 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       // A frame first, so the browser paints the closed state before it moves.
       requestAnimationFrame(() => dock.setAttribute('data-open', ''));
     },
+    toggleType() {
+      showType = !showType;
+      if (current) this.show(current);
+    },
+
+    asText() {
+      if (!current) return '';
+      const b = bandsOf(current.el);
+      const s = scaleOf(current.el);
+      const w = current.width / s.x, h = current.height / s.y;
+      const quad = (q: readonly number[]) => q.map((n) => fmt(n)).join(' ');
+      const lines = [
+        `${current.label}  ${fmt(w)} × ${fmt(h)}`,
+        `margin   ${quad(b.margin)}`,
+        `border   ${quad(b.border)}`,
+        `padding  ${quad(b.padding)}`,
+      ];
+      if (showType) {
+        for (const r of typographyOf(current.el)) lines.push(`${r.label.padEnd(8)} ${r.value}`);
+      }
+      return lines.join(NEWLINE);
+    },
+
     hide() { current = null; dock.removeAttribute('data-open'); },
     toggle() {
       if (!current) return;              // nothing locked, nothing to show

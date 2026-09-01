@@ -1,3 +1,4 @@
+import { gapDistribution, tokenSummary, tokensInScope } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
 import type { Box, Quad } from './types';
@@ -14,13 +15,23 @@ import type { Box, Quad } from './types';
  */
 
 export interface BoxModel {
-  /** A lock changed: re-render, and open unless the user closed the panel. */
-  show(box: Box): void;
+  /**
+   * A lock changed: re-render, and open unless the user closed the panel.
+   * `gaps` are the measured gaps within the locked set, already accounted for
+   * by the caller, which is the only place that knows which boxes are paired.
+   */
+  show(box: Box, gaps?: GapLine[]): void;
   /** Nothing is locked any more. */
   hide(): void;
   /** The user asked for it back, or asked it to go away. */
   toggle(): void;
   destroy(): void;
+}
+
+/** One measured gap, and where its number came from. */
+export interface GapLine {
+  px: number;
+  detail: string;
 }
 
 type Region = 'margin' | 'border' | 'padding';
@@ -161,6 +172,20 @@ ${shadow('.region, .content', NESTED)}
 .row > .edge { flex: 0 0 22px; }
 .row > .fill { flex: 1 1 auto; min-width: 0; }
 
+/* Type and tokens sit under the box, in the same muted register as the band
+   labels — they annotate the measurement rather than competing with it. */
+.readout {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.readout-tag { position: static; margin-bottom: 5px; }
+.readout-row {
+  display: grid; grid-template-columns: 62px 1fr;
+  gap: 8px; align-items: baseline;
+  font-size: ${TYPE.tag}px; line-height: 1.5;
+}
+.readout-key { color: var(--muted); }
+.readout-value { color: var(--fg); overflow-wrap: anywhere; }
 .content {
   border-radius: 0; padding: 14px 8px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
@@ -186,6 +211,29 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   const panel = document.createElement('div');
   panel.className = 'panel';
   dock.appendChild(panel);
+
+  /** A labelled block under the box, one row per fact. */
+  function readout(title: string, rows: [string, string][]): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'readout';
+    const tag = document.createElement('div');
+    tag.className = 'tag readout-tag';
+    tag.textContent = title;
+    el.appendChild(tag);
+    for (const [label, value] of rows) {
+      const row = document.createElement('div');
+      row.className = 'readout-row';
+      const k = document.createElement('span');
+      k.className = 'readout-key';
+      k.textContent = label;
+      const v = document.createElement('span');
+      v.className = 'readout-value';
+      v.textContent = value;
+      row.append(k, v);
+      el.appendChild(row);
+    }
+    return el;
+  }
   root.appendChild(dock);
 
   const clamp = (v: number, max: number) =>
@@ -266,7 +314,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   }
 
   return {
-    show(box) {
+    show(box, gaps = []) {
       const b = bandsOf(box.el);
       const [bt, br, bb, bl] = b.border;
       const [pt, pr, pb, pl] = b.padding;
@@ -319,12 +367,33 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       content.className = 'content';
       content.textContent = `${fmt(w - bl - br - pl - pr)} × ${fmt(h - bt - bb - pt - pb)}`;
 
-      panel.replaceChildren(
+      const parts: HTMLElement[] = [
         header,
         region('margin', 1, b.margin,
           region('border', 2, b.border,
             region('padding', 3, b.padding, content))),
+      ];
+
+      // Where each gap in the locked set came from. The canvas keeps showing
+      // the bare number; this is the part that would not fit on a line.
+      if (gaps.length) {
+        const rows = gaps.map((g) => [fmt(g.px), g.detail] as [string, string]);
+        const spread = gapDistribution(gaps.map((g) => g.px));
+        if (spread) rows.push(['', spread]);
+        parts.push(readout('gaps', rows));
+      }
+
+      // Which of this element's numbers are on the token scale, and which are
+      // not. Silent on a page that defines no tokens.
+      const tokens = tokensInScope(box.el);
+      const summary = tokenSummary(
+        [w, h, ...b.margin, ...b.border, ...b.padding,
+        ],
+        tokens,
       );
+      if (summary) parts.push(readout('tokens', [['', summary]]));
+
+      panel.replaceChildren(...parts);
       current = box;
       place();
       if (dismissed) return;

@@ -110,6 +110,23 @@ export function insetSegments(outer: Box, inner: Box): Segment[] {
  * drawn for it; boxes diagonal to each other get both, L-shaped. One box
  * inside another has no gap at all, so it reports insets instead. Pure.
  */
+/**
+ * The stub joining one box's edge to a measurement line that runs past it.
+ *
+ * A gap between two boxes that share no row is drawn between them, level with
+ * neither — so without this the line floats in space beside both things it
+ * claims to measure. Returns nothing when the line already crosses the box.
+ */
+function extension(
+  at: number, spanFrom: number, spanTo: number, level: number, axis: 'x' | 'y',
+): Segment[] {
+  const from = level < spanFrom ? spanFrom : level > spanTo ? spanTo : null;
+  if (from === null) return [];
+  return [axis === 'x'
+    ? { x1: at, y1: from, x2: at, y2: level, label: '', axis: 'y', extension: true }
+    : { x1: from, y1: at, x2: level, y2: at, label: '', axis: 'x', extension: true }];
+}
+
 export function gapSegments(a: Box, b: Box): Segment[] {
   const out: Segment[] = [];
   const overlapX = a.left < b.right && b.left < a.right;
@@ -133,6 +150,8 @@ export function gapSegments(a: Box, b: Box): Segment[] {
       : (a.top + a.height / 2 + b.top + b.height / 2) / 2;
     out.push({ x1: l.right, y1: y, x2: r.left, y2: y,
                label: `${fmt(r.left - l.right)}`, axis: 'x' });
+    out.push(...extension(l.right, l.top, l.bottom, y, 'x'));
+    out.push(...extension(r.left, r.top, r.bottom, y, 'x'));
   }
   if (!overlapY) {
     const [t, btm] = a.bottom <= b.top ? [a, b] : [b, a];
@@ -141,6 +160,8 @@ export function gapSegments(a: Box, b: Box): Segment[] {
       : (a.left + a.width / 2 + b.left + b.width / 2) / 2;
     out.push({ x1: x, y1: t.bottom, x2: x, y2: btm.top,
                label: `${fmt(btm.top - t.bottom)}`, axis: 'y' });
+    out.push(...extension(t.bottom, t.left, t.right, x, 'y'));
+    out.push(...extension(btm.top, btm.left, btm.right, x, 'y'));
   }
   return out;
 }
@@ -197,24 +218,75 @@ export function guideUnder(guides: Guide[], x: number, y: number): Guide | null 
 }
 
 /**
- * Pull a guide onto a nearby edge. A guide meant to sit on a card's edge has to
- * sit *on* it — a pixel off is a guide that quietly lies to you. Pure.
+ * Somewhere a guide could usefully land, and what to call it.
+ *
+ * `rank` breaks ties at equal distance: an edge is a more meaningful place to
+ * put a guide than a centre, and a centre more than another guide, so a guide
+ * dropped exactly between two candidates takes the one that means more.
  */
-export function snapTo(value: number, edges: number[], free: boolean): number {
-  if (free) return value;
-  let best = value;
-  let bestGap = SNAP;
-  for (const e of edges) {
-    const gap = Math.abs(e - value);
-    if (gap < bestGap) { best = e; bestGap = gap; }
-  }
-  return best;
+export interface SnapCandidate {
+  at: number;
+  what: string;
+  rank: number;
 }
 
-/** The edges a guide on this axis could snap to, from the box under the cursor. */
-export function snapEdges(box: Box | null, axis: 'x' | 'y'): number[] {
-  if (!box) return [];
-  return axis === 'x' ? [box.left, box.right] : [box.top, box.bottom];
+/** Where a guide ended up, and what it caught — `what` is '' if it caught nothing. */
+export interface Snapped {
+  at: number;
+  what: string;
+}
+
+/**
+ * Pull a guide onto a nearby candidate. A guide meant to sit on a card's edge
+ * has to sit *on* it — a pixel off is a guide that quietly lies to you.
+ *
+ * It also has to *say* what it caught. Without that a snapped guide and a guide
+ * that missed by a pixel look identical, which is the exact failure snapping
+ * exists to prevent. Pure.
+ */
+export function snapTo(value: number, candidates: SnapCandidate[], free: boolean): Snapped {
+  if (free) return { at: value, what: '' };
+  let best: SnapCandidate | null = null;
+  let bestGap = SNAP;
+  for (const c of candidates) {
+    const gap = Math.abs(c.at - value);
+    if (gap > bestGap) continue;
+    // Strictly nearer wins; equally near is settled by rank.
+    if (gap < bestGap - 0.001 || (best !== null && c.rank < best.rank)) {
+      best = c;
+      bestGap = gap;
+    }
+  }
+  return best ? { at: best.at, what: best.what } : { at: value, what: '' };
+}
+
+/**
+ * Everywhere a guide on this axis could land: the edges and centre of the box
+ * under the cursor, and every other guide already placed.
+ *
+ * Other guides matter because lining one guide up with another is how you check
+ * that two things across the page share an edge.
+ */
+export function snapCandidates(
+  box: Box | null,
+  axis: 'x' | 'y',
+  others: { axis: 'x' | 'y'; at: number }[] = [],
+): SnapCandidate[] {
+  const out: SnapCandidate[] = [];
+
+  if (box) {
+    const near = axis === 'x' ? box.left : box.top;
+    const far = axis === 'x' ? box.right : box.bottom;
+    out.push({ at: near, what: `${box.label} ${axis === 'x' ? 'left' : 'top'}`, rank: 0 });
+    out.push({ at: far, what: `${box.label} ${axis === 'x' ? 'right' : 'bottom'}`, rank: 0 });
+    out.push({ at: (near + far) / 2, what: `${box.label} centre`, rank: 1 });
+  }
+
+  for (const g of others) {
+    if (g.axis === axis) out.push({ at: g.at, what: 'guide', rank: 2 });
+  }
+
+  return out;
 }
 
 /**

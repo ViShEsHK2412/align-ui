@@ -18,6 +18,8 @@ export interface OverlayState {
   guides: Guide[];
   /** The one under the cursor or being dragged, drawn at full strength. */
   liveGuide: Guide | null;
+  /** The one the keyboard is pointing at, marked with end handles. */
+  activeGuide: number | null;
 }
 
 const CAP = 5;          // end-cap length on a distance line
@@ -58,7 +60,7 @@ export function mountOverlay(): Overlay {
 
   const state: OverlayState = {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false,
-    guides: [], liveGuide: null,
+    guides: [], liveGuide: null, activeGuide: null,
   };
   let c: Ink = ink(prefersDark());
   let frame = 0;
@@ -119,12 +121,13 @@ export function mountOverlay(): Overlay {
 
   /** A distance line with perpendicular end caps, the way a ruler reads. */
   function distance(seg: Segment) {
-    ctx.strokeStyle = c.measure;
+    ctx.strokeStyle = seg.extension ? alpha(c.measure, 0.45) : c.measure;
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(Math.round(seg.x1), Math.round(seg.y1));
     ctx.lineTo(Math.round(seg.x2), Math.round(seg.y2));
+    if (seg.extension) { ctx.stroke(); return; }
     if (seg.axis === 'x') {
       for (const x of [seg.x1, seg.x2]) {
         ctx.moveTo(Math.round(x), Math.round(seg.y1) - CAP);
@@ -292,13 +295,31 @@ export function mountOverlay(): Overlay {
     for (const g of state.guides) {
       const live = state.liveGuide?.id === g.id;
       ctx.strokeStyle = g.locked || live ? c.guide : alpha(c.guide, 0.55);
-      ctx.lineWidth = 1;
+      // A pinned guide is drawn heavier. It is anchored, and weight is the one
+      // thing that reads as anchored without spending another colour.
+      ctx.lineWidth = g.pinned ? 2 : 1;
       ctx.setLineDash(g.locked ? [] : [4, 4]);
       ctx.beginPath();
       const at = Math.round(guideAt(g));
       if (g.axis === 'x') { ctx.moveTo(at, 0); ctx.lineTo(at, innerHeight); }
       else { ctx.moveTo(0, at); ctx.lineTo(innerWidth, at); }
       ctx.stroke();
+
+      // Handles at both ends mark the guide the arrow keys will move.
+      if (state.activeGuide === g.id) {
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        const H = 7;
+        if (g.axis === 'x') {
+          ctx.moveTo(at, 0); ctx.lineTo(at, H);
+          ctx.moveTo(at, innerHeight - H); ctx.lineTo(at, innerHeight);
+        } else {
+          ctx.moveTo(0, at); ctx.lineTo(H, at);
+          ctx.moveTo(innerWidth - H, at); ctx.lineTo(innerWidth, at);
+        }
+        ctx.stroke();
+      }
     }
 
     for (const seg of state.lines) {
@@ -310,7 +331,8 @@ export function mountOverlay(): Overlay {
     // Labels last, always on top. A distance label sits clear of its own line:
     // above a horizontal one, beside a vertical one — then they are nudged off
     // each other, because a number underneath another number reads as neither.
-    const wanted = state.lines.map((seg) => {
+    const labelled = state.lines.filter((seg) => seg.label !== '');
+    const wanted = labelled.map((seg) => {
       const mx = (seg.x1 + seg.x2) / 2;
       const my = (seg.y1 + seg.y2) / 2;
       const { w, h } = chipSize(seg.label);
@@ -319,7 +341,7 @@ export function mountOverlay(): Overlay {
         : { x: mx + 26 - w / 2, y: my - h / 2, w, h, axis: seg.axis };
     });
     spreadLabels(wanted, { w: innerWidth, h: innerHeight }, EDGE).forEach((at, i) => {
-      const seg = state.lines[i]!;
+      const seg = labelled[i]!;
       ctx.globalAlpha = seg.faded ? FADED : 1;
       chipAt(seg.label, at.x, at.y, c.measure);
     });
@@ -332,7 +354,9 @@ export function mountOverlay(): Overlay {
     if (state.liveGuide) {
       const g = state.liveGuide;
       const at = Math.round(guideAt(g));
-      chip(`${g.axis} ${fmt(g.at)}`,
+      // Saying what it caught is the whole point of snapping: a guide on an
+      // edge and a guide a pixel off it are otherwise indistinguishable.
+      chip([`${g.axis} ${fmt(g.at)}`, g.caught, g.pinned ? 'pinned' : ''].filter(Boolean).join(' · '),
         g.axis === 'x' ? at + 6 : 30,
         g.axis === 'x' ? 30 : at + 6, c.guide);
     }

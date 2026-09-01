@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chain, chainPairs, fmt, gapSegments, guideGapSegments, scaleFromTransform,
+  chain, chainPairs, fmt, snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
   spreadLabels, type LabelBox,
 } from './measure';
 import type { Box } from './types';
@@ -39,7 +39,8 @@ describe('gapSegments', () => {
   });
 
   it('draws both, L-shaped, when the boxes are diagonal', () => {
-    const segs = gapSegments(box(0, 0), box(200, 200));
+    // Extension lines come too; the measurements are the labelled ones.
+    const segs = gapSegments(box(0, 0), box(200, 200)).filter((s) => !s.extension);
     expect(segs.map((s) => s.axis)).toEqual(['x', 'y']);
   });
 
@@ -359,5 +360,100 @@ describe('spreadLabels', () => {
     const [wayIn] = spreadLabels([lab(9999, 9999)], { w: 300, h: 300 });
     expect(wayIn!.x + wayIn!.w).toBe(300 - 12);   // the whole box, not its corner
     expect(wayIn!.y + wayIn!.h).toBe(300 - 12);
+  });
+});
+
+describe('snapCandidates', () => {
+  const b = box(100, 50, 200, 80);   // left 100, right 300, top 50, bottom 130
+
+  it('offers both edges and the centre of the box under the cursor', () => {
+    const out = snapCandidates(b, 'x');
+    expect(out.map((c) => c.at)).toEqual([100, 300, 200]);
+    expect(out.map((c) => c.what.split(' ').pop())).toEqual(['left', 'right', 'centre']);
+  });
+
+  it('ranks an edge above a centre, so a tie lands on the edge', () => {
+    const out = snapCandidates(b, 'x');
+    const edge = out.find((c) => c.what.endsWith('left'))!;
+    const centre = out.find((c) => c.what.endsWith('centre'))!;
+    expect(edge.rank).toBeLessThan(centre.rank);
+  });
+
+  it('uses the other axis for a horizontal guide', () => {
+    expect(snapCandidates(b, 'y').map((c) => c.at)).toEqual([50, 130, 90]);
+  });
+
+  it('offers other guides on the same axis, and never the other axis', () => {
+    const others = [{ axis: 'x' as const, at: 640 }, { axis: 'y' as const, at: 12 }];
+    const out = snapCandidates(null, 'x', others);
+    expect(out).toEqual([{ at: 640, what: 'guide', rank: 2 }]);
+  });
+
+  it('has nothing to offer over empty space', () => {
+    expect(snapCandidates(null, 'x')).toEqual([]);
+  });
+});
+
+describe('snapTo', () => {
+  const at = (n: number, what = 'edge', rank = 0) => ({ at: n, what, rank });
+
+  it('catches a candidate within range and names it', () => {
+    expect(snapTo(302, [at(300, 'div.card right')], false))
+      .toEqual({ at: 300, what: 'div.card right' });
+  });
+
+  it('leaves the value alone when nothing is near, and says so', () => {
+    expect(snapTo(500, [at(300)], false)).toEqual({ at: 500, what: '' });
+  });
+
+  it('takes the nearer of two', () => {
+    expect(snapTo(302, [at(300, 'near'), at(305, 'far')], false).what).toBe('near');
+  });
+
+  it('settles an exact tie by rank, so an edge beats a centre', () => {
+    // 200 sits the same distance from both; the edge is the meaningful one.
+    const out = snapTo(200, [at(198, 'centre', 1), at(202, 'edge', 0)], false);
+    expect(out.what).toBe('edge');
+  });
+
+  it('does nothing at all when the drag asked to be free', () => {
+    expect(snapTo(302, [at(300)], true)).toEqual({ at: 302, what: '' });
+  });
+
+  it('ignores a candidate further away than the snap radius', () => {
+    expect(snapTo(400, [at(300)], false)).toEqual({ at: 400, what: '' });
+  });
+});
+
+describe('extension lines', () => {
+  const meas = (segs: ReturnType<typeof gapSegments>) => segs.filter((s) => !s.extension);
+  const ext = (segs: ReturnType<typeof gapSegments>) => segs.filter((s) => s.extension);
+
+  it('draws none when the boxes share a row', () => {
+    // Side by side, same vertical span: the line already crosses both.
+    const out = gapSegments(box(0, 0, 100, 50), box(140, 0, 100, 50));
+    expect(meas(out).map((s) => s.label)).toEqual(['40']);
+    expect(ext(out)).toEqual([]);
+  });
+
+  it('joins both boxes when they share no row', () => {
+    // Diagonal: the gap line runs level with neither box.
+    const out = gapSegments(box(0, 0, 100, 50), box(140, 300, 100, 50));
+    expect(ext(out)).toHaveLength(4);          // two per axis
+    for (const e of ext(out)) expect(e.label).toBe('');
+  });
+
+  it('reaches from the near edge to the measurement line', () => {
+    const a = box(0, 0, 100, 50);              // right 100, spans y 0..50
+    const b = box(140, 300, 100, 50);          // left 140, spans y 300..350
+    const line = gapSegments(a, b).find((s) => s.label === '40')!;
+    const stub = ext(gapSegments(a, b)).find((s) => s.x1 === 100 && s.axis === 'y')!;
+    expect(stub.y1).toBe(50);                  // a's bottom, its nearest edge
+    expect(stub.y2).toBe(line.y1);             // out to the line
+  });
+
+  it('never labels an extension, so it cannot enter the label layout', () => {
+    const out = gapSegments(box(0, 0, 40, 40), box(200, 200, 40, 40));
+    expect(out.filter((s) => s.label !== '').every((s) => !s.extension)).toBe(true);
   });
 });

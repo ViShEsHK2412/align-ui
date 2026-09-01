@@ -3,10 +3,13 @@ import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator } from './indicator';
 import {
   boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
-  snapEdges, snapTo,
+  snapCandidates, snapTo,
 } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
+import { describeGap, gapFactOf } from './inspect';
+import { loadFlag, loadGuides, saveFlag, saveGuides } from './store';
+import type { GapLine } from './boxmodel';
 import type { Box, Guide, Segment } from './types';
 
 /**
@@ -29,10 +32,34 @@ let hover: Box | null = null;
 let pinned: Box[] = [];
 let watching = 0;
 /** Sticky across open and close, like the panel's position. */
-let rulers = false;
+let rulers = loadFlag('rulers');
 /** Guides live for the session: across toggling, gone on reload. */
 let guides: Guide[] = [];
 let nextGuideId = 1;
+/** Stored guides are read once, on first open — not at import. */
+let restored = false;
+/**
+ * The guide the keyboard is pointing at: whichever was last clicked or dragged.
+ *
+ * Nudging cannot target "the guide under the cursor", because ten presses move
+ * it out of grab range and the keyboard loses hold of the thing it is moving.
+ * This is not a selection model — clicking a guide already did something, and
+ * this gives the keyboard reach to the thing you just clicked.
+ */
+let activeGuideId: number | null = null;
+
+function activeGuide(): Guide | null {
+  return guides.find((g) => g.id === activeGuideId) ?? null;
+}
+
+/**
+ * Every path that changes the guide list funnels through here, so nothing can
+ * quietly change them without the change surviving a reload.
+ */
+function setGuides(next: Guide[]): void {
+  guides = next;
+  saveGuides(guides);
+}
 let dragging: Guide | null = null;
 let hoverGuide: Guide | null = null;
 /**
@@ -60,19 +87,25 @@ function inRuler(x: number, y: number): 'x' | 'y' | null {
 function placeGuide(g: Guide, x: number, y: number, free: boolean) {
   const under = hitTest(x, y, cfg);
   const viewport = g.axis === 'x' ? x : y;
-  const snapped = snapTo(viewport, snapEdges(under, g.axis), free);
-  g.at = snapped + (g.axis === 'x' ? scrollX : scrollY);
+  // Every guide but this one: a guide cannot usefully snap to itself.
+  const others = guides
+    .filter((o) => o.id !== g.id)
+    .map((o) => ({ axis: o.axis, at: viewportGuide(o).pos }));
+  const snapped = snapTo(viewport, snapCandidates(under, g.axis, others), free);
+  g.at = snapped.at + (g.axis === 'x' ? scrollX : scrollY);
+  g.caught = snapped.what;
 }
 
 function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
-  const g: Guide = { id: nextGuideId++, axis, at: 0, locked: false };
+  const g: Guide = { id: nextGuideId++, axis, at: 0, locked: false, caught: '', pinned: false };
   placeGuide(g, x, y, free);
-  guides = [...guides, g];
+  setGuides([...guides, g]);
   return g;
 }
 
 function removeGuide(g: Guide) {
-  guides = guides.filter((o) => o.id !== g.id);
+  if (g.pinned) return;              // pinned guides are not deletable either
+  setGuides(guides.filter((o) => o.id !== g.id));
   if (hoverGuide?.id === g.id) hoverGuide = null;
   if (dragging?.id === g.id) dragging = null;
 }
@@ -90,6 +123,23 @@ function matchesHotkey(e: KeyboardEvent): boolean {
 /** A guide in viewport coordinates, which is what the segment maths wants. */
 function viewportGuide(g: Guide) {
   return { axis: g.axis, pos: g.axis === 'x' ? g.at - scrollX : g.at - scrollY };
+}
+
+/**
+ * Every gap inside the locked set, accounted for. Only the caller knows which
+ * boxes are paired, so the panel is handed the answer rather than the boxes.
+ */
+function gapFacts(): GapLine[] {
+  if (pinned.length < 2) return [];
+  const out: GapLine[] = [];
+  for (const [a, b] of chainPairs(pinned)) {
+    for (const seg of gapSegments(a, b)) {
+      if (seg.extension || !seg.label) continue;
+      const f = gapFactOf(a.el, b.el, parseFloat(seg.label), seg.axis);
+      out.push({ px: f.px, detail: describeGap(f) });
+    }
+  }
+  return out;
 }
 
 function render(cursor?: { x: number; y: number }) {
@@ -156,6 +206,7 @@ function render(cursor?: { x: number; y: number }) {
     rulers,
     guides,
     liveGuide: dragging ?? hoverGuide,
+    activeGuide: activeGuideId,
     lines,
     ...(cursor ? { cursor } : {}),
   });
@@ -171,9 +222,9 @@ function onMouseMove(e: MouseEvent) {
     if (grabFrom && Math.hypot(e.clientX - grabFrom.x, e.clientY - grabFrom.y) > CLICK_SLOP) {
       grabFrom = null;     // travelled: this is a drag now, and stays one
     }
-    if (!grabFrom) {
+    if (!grabFrom && !dragging.pinned) {
       placeGuide(dragging, e.clientX, e.clientY, e.altKey);
-      guides = [...guides];
+      setGuides([...guides]);
     }
     render({ x: e.clientX, y: e.clientY });
     return;
@@ -190,7 +241,8 @@ function onMouseUp(e: MouseEvent) {
   // it go quiet.
   if (grabFrom) {
     dragging.locked = !dragging.locked;
-    guides = [...guides];
+    activeGuideId = dragging.id;
+    setGuides([...guides]);
   } else if (inRuler(e.clientX, e.clientY) || e.clientX < RULER || e.clientY < RULER) {
     // Dropped back in a rule: that is how you throw a guide away.
     removeGuide(dragging);
@@ -223,6 +275,8 @@ function onMouseDown(e: MouseEvent) {
   const grabbed = guideUnder(guides, e.clientX, e.clientY);
   if (grabbed) {
     swallow(e);
+    activeGuideId = grabbed.id;
+    // A pinned guide still takes focus and still clicks, it just cannot travel.
     dragging = grabbed;
     grabFrom = { x: e.clientX, y: e.clientY };
     render({ x: e.clientX, y: e.clientY });
@@ -233,7 +287,7 @@ function onMouseDown(e: MouseEvent) {
   indicator?.closeHelp();
   pinned = [onPage];
   hover = onPage;
-  boxmodel?.show(onPage);
+  boxmodel?.show(onPage, gapFacts());
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -257,7 +311,7 @@ function onContextMenu(e: MouseEvent) {
 
   hover = hit;
   const last = pinned[pinned.length - 1];
-  if (last) boxmodel?.show(last); else boxmodel?.hide();
+  if (last) boxmodel?.show(last, gapFacts()); else boxmodel?.hide();
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -330,7 +384,7 @@ function watch() {
   pinned = next;
   hover = nextHover;
   const last = pinned[pinned.length - 1];
-  if (last) boxmodel?.show(last); else boxmodel?.hide();
+  if (last) boxmodel?.show(last, gapFacts()); else boxmodel?.hide();
   render();
 }
 
@@ -340,6 +394,12 @@ function onViewportChange() {
 }
 
 function activate() {
+  // Deferred to here so an unopened tool touches no storage at all, and so the
+  // ids come from a counter that is certainly initialised by now.
+  if (!restored) {
+    restored = true;
+    guides = loadGuides().map((g) => ({ ...g, id: nextGuideId++ }));
+  }
   if (overlay) return;
   // Loaded here rather than at init, so the tool still costs nothing at rest.
   loadFont();
@@ -400,15 +460,42 @@ function onKey(e: KeyboardEvent) {
     if (e.shiftKey) {
       // Clearing the lot has to forget the one under the cursor too, or the
       // overlay keeps drawing a position chip for a guide that is gone.
-      guides = [];
+      setGuides(guides.filter((g) => g.pinned));
       hoverGuide = null;
       dragging = null;
       grabFrom = null;
+      // Only if the keyboard's guide was actually one of the ones taken — a
+      // pinned guide survives the wipe and should keep the keyboard with it.
+      if (!guides.some((g) => g.id === activeGuideId)) activeGuideId = null;
     } else if (hoverGuide) removeGuide(hoverGuide);
+    render();
+  } else if (overlay && e.key.startsWith('Arrow')) {
+    // Arrows move the guide the keyboard is pointing at. Horizontal keys move
+    // vertical guides and vice versa: you push the line, not the axis it names.
+    const g = activeGuide();
+    const wants = e.key === 'ArrowLeft' || e.key === 'ArrowRight' ? 'x' : 'y';
+    if (!g || g.axis !== wants) return;
+    e.preventDefault();
+    if (g.pinned) return;
+    const step = e.shiftKey ? 10 : 1;
+    g.at += (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -step : step;
+    // Nudged by hand, so whatever it had snapped to is no longer what it is on.
+    g.caught = '';
+    setGuides([...guides]);
+    render();
+  } else if (overlay && e.key.toLowerCase() === 'l') {
+    // Pin the guide the keyboard is pointing at: still selectable, still
+    // measuring, but no longer draggable or deletable by accident.
+    const g = activeGuide();
+    if (!g) return;
+    e.preventDefault();
+    g.pinned = !g.pinned;
+    setGuides([...guides]);
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();
     rulers = !rulers;
+    saveFlag('rulers', rulers);
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.panelKey) {
     // A plain letter is safe here: while the tool is on it swallows clicks, so

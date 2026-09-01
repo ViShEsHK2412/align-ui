@@ -27,6 +27,8 @@ export const KEYS: [string, string][] = [
   ['H', 'horizontal guide at the cursor'],
   ['Hover a guide', 'distance from it to every locked element'],
   ['Click a guide', 'keep those distances up; click again to release'],
+  ['Arrows', 'nudge the last guide you touched; Shift for 10px'],
+  ['L', 'pin that guide so it cannot be moved or deleted'],
   ['Alt while placing', 'ignore snapping'],
   ['Del', 'remove the guide under the cursor; Shift+Del for all'],
   ['Esc', 'clear the locks, then close'],

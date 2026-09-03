@@ -121,3 +121,20 @@ export declare function coloursOf(el: Element): {
     label: string;
     value: string;
 }[];
+/**
+ * A selector that finds this element's kind. Pure: the DOM reading is done by
+ * the caller so the shape of the selector can be tested on its own.
+ *
+ * An id is unique by definition, so it short-circuits: counting how many
+ * elements share an id answers a question nobody asked.
+ */
+export declare function buildSelector(tag: string, id: string, classes: string[]): string;
+export declare function selectorOf(el: Element): string;
+/**
+ * How many elements on the page are built the same way.
+ *
+ * A number that is only interesting above one: it is the difference between a
+ * value you can change locally and one that seven other places share. From
+ * InterfaceKit, which shows it before you edit rather than after.
+ */
+export declare function similarCount(el: Element): number;

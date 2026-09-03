@@ -296,3 +296,42 @@ export function coloursOf(el: Element): { label: string; value: string }[] {
   add('background', cs.backgroundColor);
   return out;
 }
+
+// ── How many others look like this one ──────────────────────────────────────
+
+/**
+ * A selector that finds this element's kind. Pure: the DOM reading is done by
+ * the caller so the shape of the selector can be tested on its own.
+ *
+ * An id is unique by definition, so it short-circuits: counting how many
+ * elements share an id answers a question nobody asked.
+ */
+export function buildSelector(tag: string, id: string, classes: string[]): string {
+  const esc = (s: string) =>
+    (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/[^\w-]/g, '\\$&'));
+  if (id) return `#${esc(id)}`;
+  if (classes.length) return tag + classes.map((c) => `.${esc(c)}`).join('');
+  return tag;
+}
+
+export function selectorOf(el: Element): string {
+  const classes = typeof el.className === 'string'
+    ? el.className.trim().split(/\s+/).filter(Boolean)
+    : [];
+  return buildSelector(el.tagName.toLowerCase(), el.id, classes);
+}
+
+/**
+ * How many elements on the page are built the same way.
+ *
+ * A number that is only interesting above one: it is the difference between a
+ * value you can change locally and one that seven other places share. From
+ * InterfaceKit, which shows it before you edit rather than after.
+ */
+export function similarCount(el: Element): number {
+  try {
+    return document.querySelectorAll(selectorOf(el)).length;
+  } catch {
+    return 0;          // a class name no selector can express
+  }
+}

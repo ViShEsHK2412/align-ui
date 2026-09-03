@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  describeGap, distinctValues, firstFamily, gapDistribution, looksLikeColour,
+  buildSelector, describeGap, distinctValues, firstFamily, gapDistribution,
+  looksLikeColour,
   matchTokens,
   tokenSummary, weightName, type Token,
 } from './inspect';
@@ -161,5 +162,26 @@ describe('looksLikeColour', () => {
   it('does not care about case or padding', () => {
     expect(looksLikeColour('  OKLCH(0.7 0.1 250)  ')).toBe(true);
     expect(looksLikeColour('  #ABCDEF ')).toBe(true);
+  });
+});
+
+describe('buildSelector', () => {
+  it('uses an id alone, because an id is already unique', () => {
+    expect(buildSelector('div', 'main', ['card', 'wide'])).toBe('#main');
+  });
+
+  it('joins every class, not just the first', () => {
+    // The first class alone would over-count: .card matches more than .card.wide.
+    expect(buildSelector('div', '', ['card', 'wide'])).toBe('div.card.wide');
+  });
+
+  it('falls back to the tag when there is nothing else', () => {
+    expect(buildSelector('section', '', [])).toBe('section');
+  });
+
+  it('escapes a class a selector could not otherwise express', () => {
+    // Tailwind writes these constantly, and a bare `.md:flex` is a syntax error.
+    expect(buildSelector('div', '', ['md:flex'])).toBe('div.md\\:flex');
+    expect(buildSelector('div', '', ['w-1/2'])).toBe('div.w-1\\/2');
   });
 });

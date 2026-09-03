@@ -1,6 +1,6 @@
 import {
-  coloursOf, gapDistribution, looksLikeColour, matchColourTokens, tokenSummary,
-  tokensInScope,
+  coloursOf, gapDistribution, looksLikeColour, matchColourTokens, selectorOf,
+  similarCount, tokenSummary, tokensInScope,
 } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import {
@@ -387,6 +387,13 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         tokens,
       );
       if (summary) parts.push(readout('tokens', [['', summary]]));
+
+      // Whether a change here would be local or systemic. Only above one:
+      // "1 element matches this" is not a fact anybody needs.
+      const alike = similarCount(box.el);
+      if (alike > 1) {
+        parts.push(readout('matches', [['', `${alike} elements share ${selectorOf(box.el)}`]]));
+      }
 
       // The same question asked of colour. Shown only where there are colour
       // tokens to compare against — without a palette this is just a picker,

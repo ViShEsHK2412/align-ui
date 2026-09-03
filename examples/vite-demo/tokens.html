@@ -214,6 +214,28 @@
       </table>
     </section>
 
+    <!-- 10 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>10 &middot; Things that move</h2>
+      <p>Press <code>F</code>. The spinner stops where it is and the slider
+        holds mid-travel &mdash; both become measurable. Press it again and they
+        carry on from exactly there, rather than restarting.</p>
+
+      <div class="motion-row">
+        <div class="spinner"></div>
+        <div class="track"><div class="slider" id="slider"></div></div>
+      </div>
+
+      <table class="expect">
+        <tr><th>the spinner</th><td>stops at whatever angle it had reached</td></tr>
+        <tr><th>the slider</th><td>holds its margin mid-transition</td>
+            <td class="note">a transition is an animation too, and pauses like one</td></tr>
+        <tr><th>not covered</th><td colspan="2" class="note">anything driven by
+          requestAnimationFrame or a timer &mdash; freezing those means patching the
+          host page's clocks</td></tr>
+      </table>
+    </section>
+
     <div class="tail" style="padding: 40px 0; color: #6b7386">
       end of page — scroll back up
     </div>

@@ -137,3 +137,23 @@ section > p { margin: 0 0 16px; color: #8b93a7; font-size: 13px; }
 .on-palette { background: var(--brand); }
 /* #6ea9ff against #6ea8fe. One step. Nobody sees this by eye. */
 .off-palette { background: #6ea9ff; }
+
+/* 10 · things that move, so freeze has something to hold ─────────────────── */
+.motion-row { display: flex; gap: var(--space-6); align-items: center;
+              margin-top: var(--space-4); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 48px; height: 48px;
+  border: 6px solid #2b3341; border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 3s linear infinite;
+}
+/* A deliberately slow transition, so it can be caught in the middle. */
+.slider {
+  width: 80px; height: 48px;
+  background: var(--brand);
+  transition: margin-left 6s linear;
+  margin-left: 0;
+}
+.slider.go { margin-left: 400px; }
+.track { flex: 1; border-left: 1px dashed #3d4757; padding-left: 0; }

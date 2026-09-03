@@ -31,6 +31,7 @@ export const KEYS: [string, string][] = [
   ['L', 'pin that guide so it cannot be moved or deleted'],
   ['Ctrl/Cmd + Z', 'bring back the guides you just deleted'],
   ['T', 'type and token readout for the locked element'],
+  ['F', 'freeze the page so a moving thing can be measured'],
   ['X', 'x-ray: outline every element on the page'],
   ['P', 'pick a colour from anywhere on screen'],
   ['C', 'copy the numbers in the panel'],

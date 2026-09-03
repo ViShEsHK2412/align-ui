@@ -9,6 +9,7 @@ import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
 import { describeGap, gapFactOf } from './inspect';
 import { createPicker, type Picker } from './picker';
+import { isFrozen, setFrozen } from './freeze';
 import { setXray } from './xray';
 import { loadFlag, loadGuides, saveFlag, saveGuides } from './store';
 import type { GapLine } from './boxmodel';
@@ -457,6 +458,7 @@ function deactivate() {
   picker = null;
   // Never leave the page outlined because the tool was closed while x-ray was on.
   if (xray) { xray = false; setXray(false); }
+  setFrozen(false);
   indicator = null;
   boxmodel?.destroy();
   boxmodel = null;
@@ -508,6 +510,12 @@ function onKey(e: KeyboardEvent) {
     // Nudged by hand, so whatever it had snapped to is no longer what it is on.
     g.caught = '';
     setGuides([...guides]);
+    render();
+  } else if (overlay && e.key.toLowerCase() === 'f') {
+    // Hold the page still. Everything worth measuring that moves — a hover, a
+    // dropdown mid-open, a skeleton — is unmeasurable until this exists.
+    e.preventDefault();
+    setFrozen(!isFrozen());
     render();
   } else if (overlay && e.key.toLowerCase() === 'x') {
     e.preventDefault();

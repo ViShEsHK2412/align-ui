@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chain, chainPairs, fmt, snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
+  chain, chainPairs, fmt, insetSegments, sharedScale, snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
   spreadLabels, type LabelBox,
 } from './measure';
 import type { Box } from './types';
 
-function box(left: number, top: number, width = 100, height = 40): Box {
+function box(left: number, top: number, width = 100, height = 40, z = 1): Box {
   return {
     el: {} as Element,
     label: 'div.x',
     left, top, width, height,
     right: left + width,
     bottom: top + height,
+    scale: { x: z, y: z },
   };
 }
 
@@ -462,5 +463,61 @@ describe('extension lines', () => {
   it('never labels an extension, so it cannot enter the label layout', () => {
     const out = gapSegments(box(0, 0, 40, 40), box(200, 200, 40, 40));
     expect(out.filter((s) => s.label !== '').every((s) => !s.extension)).toBe(true);
+  });
+});
+
+describe('measuring inside something zoomed', () => {
+  it('reports the gap in the units the elements live in, not on screen', () => {
+    // Two boxes inside a canvas at 150%. On screen they are 30 apart; in the
+    // canvas they are 20, and 20 is the number you would type into the CSS.
+    const a = box(0, 0, 100, 40, 1.5);
+    const b = box(130, 0, 100, 40, 1.5);
+    const gap = gapSegments(a, b).find((s) => !s.extension)!;
+    expect(gap.label).toBe('20');
+  });
+
+  it('still draws where the pixels actually are', () => {
+    const a = box(0, 0, 100, 40, 1.5);
+    const b = box(130, 0, 100, 40, 1.5);
+    const gap = gapSegments(a, b).find((s) => !s.extension)!;
+    // The label is canvas units; the line is viewport pixels, or it would be
+    // drawn in the wrong place.
+    expect(gap.x1).toBe(100);
+    expect(gap.x2).toBe(130);
+  });
+
+  it('reports insets in the same units', () => {
+    const outer = box(0, 0, 200, 200, 2);
+    const inner = box(20, 20, 160, 160, 2);
+    expect(insetSegments(outer, inner).map((s) => s.label)).toEqual(['10', '10', '10', '10']);
+  });
+
+  it('falls back to screen pixels when two boxes share no scale', () => {
+    // Different scaled subtrees agree on nothing but the screen between them.
+    const a = box(0, 0, 100, 40, 1.5);
+    const b = box(130, 0, 100, 40, 1);
+    expect(gapSegments(a, b).find((s) => !s.extension)!.label).toBe('30');
+  });
+
+  it('changes nothing on an ordinary page', () => {
+    const gap = gapSegments(box(0, 0), box(140, 0)).find((s) => !s.extension)!;
+    expect(gap.label).toBe('40');
+  });
+});
+
+describe('sharedScale', () => {
+  it('agrees when both boxes are in the same zoomed thing', () => {
+    expect(sharedScale(box(0, 0, 10, 10, 1.5), box(0, 0, 10, 10, 1.5)))
+      .toEqual({ x: 1.5, y: 1.5 });
+  });
+
+  it('refuses to guess when they are not', () => {
+    expect(sharedScale(box(0, 0, 10, 10, 1.5), box(0, 0, 10, 10, 2)))
+      .toEqual({ x: 1, y: 1 });
+  });
+
+  it('tolerates the float noise a matrix leaves behind', () => {
+    expect(sharedScale(box(0, 0, 10, 10, 1.5), box(0, 0, 10, 10, 1.50005)).x)
+      .toBeCloseTo(1.5);
   });
 });

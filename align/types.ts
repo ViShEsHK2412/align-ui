@@ -2,12 +2,21 @@
 export interface Box {
   el: Element;
   label: string;          // "div.card", "button#submit"
+  /**
+   * Everything below is in VIEWPORT pixels, because that is what the canvas
+   * draws in. It is not what the numbers should say: inside a canvas app zoomed
+   * to 150%, a 20px gap measures 30 on screen and 20 in the units you work in.
+   * `scale` is what converts between the two, and every reported number divides
+   * by it.
+   */
   left: number;
   right: number;
   top: number;
   bottom: number;
   width: number;
   height: number;
+  /** Accumulated transform scale from every ancestor. 1 on an ordinary page. */
+  scale: { x: number; y: number };
 }
 
 /** Top, right, bottom, left — the order every CSS shorthand uses. */

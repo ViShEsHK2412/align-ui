@@ -157,3 +157,25 @@ section > p { margin: 0 0 16px; color: #8b93a7; font-size: 13px; }
 }
 .slider.go { margin-left: 400px; }
 .track { flex: 1; border-left: 1px dashed #3d4757; padding-left: 0; }
+
+/* 11 · a zoomed canvas, the way a design tool draws one ──────────────────── */
+.canvas-frame {
+  margin-top: var(--space-4);
+  border: 1px dashed #3d4757;
+  overflow: hidden;
+  width: 620px; height: 200px;
+}
+/* Exactly what a canvas app does: one transformed layer, children at their own
+   coordinates inside it. */
+.canvas-layer {
+  transform: scale(1.5);
+  transform-origin: 0 0;
+  display: flex;
+  gap: 20px;                      /* 20 in canvas units, 30 on screen */
+  padding: 20px;
+}
+.canvas-layer > div {
+  width: 120px; height: 80px;
+  background: #1b2029; border: 1px solid #2b3341;
+  display: grid; place-items: center; font-size: 11px;
+}

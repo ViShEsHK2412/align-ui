@@ -27,7 +27,23 @@ export function boxOf(el: Element): Box {
     label: label(el),
     left: r.left, right: r.right, top: r.top, bottom: r.bottom,
     width: r.width, height: r.height,
+    scale: scaleOf(el),
   };
+}
+
+/**
+ * The scale two boxes agree on, or 1 when they do not.
+ *
+ * Two elements inside the same zoomed canvas share its scale, and the distance
+ * between them means something in that canvas's units. Two elements in
+ * different scaled subtrees share nothing, so the only honest answer is the
+ * viewport distance actually on screen. Pure.
+ */
+export function sharedScale(a: Box, b: Box): { x: number; y: number } {
+  const near = (p: number, q: number) => Math.abs(p - q) < 0.001;
+  return near(a.scale.x, b.scale.x) && near(a.scale.y, b.scale.y)
+    ? a.scale
+    : { x: 1, y: 1 };
 }
 
 /** Up through the tree, crossing out of a shadow root via its host. */
@@ -89,17 +105,18 @@ function outerOf(a: Box, b: Box): [Box, Box] {
  * screen. Zeros are kept — flush against an edge is information too. Pure.
  */
 export function insetSegments(outer: Box, inner: Box): Segment[] {
+  const s = sharedScale(outer, inner);
   const cx = inner.left + inner.width / 2;
   const cy = inner.top + inner.height / 2;
   return [
     { x1: outer.left, y1: cy, x2: inner.left, y2: cy,
-      label: fmt(inner.left - outer.left), axis: 'x' },
+      label: fmt((inner.left - outer.left) / s.x), axis: 'x' },
     { x1: inner.right, y1: cy, x2: outer.right, y2: cy,
-      label: fmt(outer.right - inner.right), axis: 'x' },
+      label: fmt((outer.right - inner.right) / s.x), axis: 'x' },
     { x1: cx, y1: outer.top, x2: cx, y2: inner.top,
-      label: fmt(inner.top - outer.top), axis: 'y' },
+      label: fmt((inner.top - outer.top) / s.y), axis: 'y' },
     { x1: cx, y1: inner.bottom, x2: cx, y2: outer.bottom,
-      label: fmt(outer.bottom - inner.bottom), axis: 'y' },
+      label: fmt((outer.bottom - inner.bottom) / s.y), axis: 'y' },
   ];
 }
 
@@ -129,6 +146,8 @@ function extension(
 
 export function gapSegments(a: Box, b: Box): Segment[] {
   const out: Segment[] = [];
+  // Drawn in viewport pixels, reported in the boxes' own units.
+  const s = sharedScale(a, b);
   const overlapX = a.left < b.right && b.left < a.right;
   const overlapY = a.top < b.bottom && b.top < a.bottom;
 
@@ -149,7 +168,7 @@ export function gapSegments(a: Box, b: Box): Segment[] {
       ? (Math.max(a.top, b.top) + Math.min(a.bottom, b.bottom)) / 2
       : (a.top + a.height / 2 + b.top + b.height / 2) / 2;
     out.push({ x1: l.right, y1: y, x2: r.left, y2: y,
-               label: `${fmt(r.left - l.right)}`, axis: 'x' });
+               label: `${fmt((r.left - l.right) / s.x)}`, axis: 'x' });
     out.push(...extension(l.right, l.top, l.bottom, y, 'x'));
     out.push(...extension(r.left, r.top, r.bottom, y, 'x'));
   }
@@ -159,7 +178,7 @@ export function gapSegments(a: Box, b: Box): Segment[] {
       ? (Math.max(a.left, b.left) + Math.min(a.right, b.right)) / 2
       : (a.left + a.width / 2 + b.left + b.width / 2) / 2;
     out.push({ x1: x, y1: t.bottom, x2: x, y2: btm.top,
-               label: `${fmt(btm.top - t.bottom)}`, axis: 'y' });
+               label: `${fmt((btm.top - t.bottom) / s.y)}`, axis: 'y' });
     out.push(...extension(t.bottom, t.left, t.right, x, 'y'));
     out.push(...extension(btm.top, btm.left, btm.right, x, 'y'));
   }

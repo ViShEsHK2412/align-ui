@@ -329,8 +329,12 @@ export function selectorOf(el: Element): string {
  * InterfaceKit, which shows it before you edit rather than after.
  */
 export function similarCount(el: Element): number {
+  const sel = selectorOf(el);
+  // A bare tag says how many divs the page has, which is not the question.
+  // Without a class or an id there is nothing that makes these elements alike.
+  if (!/[.#]/.test(sel)) return 0;
   try {
-    return document.querySelectorAll(selectorOf(el)).length;
+    return document.querySelectorAll(sel).length;
   } catch {
     return 0;          // a class name no selector can express
   }

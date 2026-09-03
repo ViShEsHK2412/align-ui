@@ -350,8 +350,9 @@ export function mountOverlay(): Overlay {
     });
     ctx.globalAlpha = 1;
     if (state.hover && state.cursor) {
-      const { width, height } = state.hover;
-      chip(`${fmt(width)} × ${fmt(height)}`,
+      // In the element's own units, like every other number the tool reports.
+      const { width, height, scale } = state.hover;
+      chip(`${fmt(width / scale.x)} × ${fmt(height / scale.y)}`,
         state.cursor.x + 14, state.cursor.y + 14, c.accent);
     }
     if (state.liveGuide) {

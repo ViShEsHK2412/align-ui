@@ -209,3 +209,11 @@ describe('shortFile', () => {
     expect(shortFile('http://localhost/my styles/app.css')).toBe('my styles/app.css');
   });
 });
+
+describe('similarCount, on what makes elements alike', () => {
+  it('says nothing about a bare tag, which is a census not a similarity', () => {
+    // selectorOf falls back to the tag when there is no class and no id; the
+    // count would then be "how many divs does this page have".
+    expect(buildSelector('div', '', [])).toBe('div');
+  });
+});

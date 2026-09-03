@@ -9,6 +9,18 @@ export declare function fmt(n: number): string;
 /** Measure an element right now — nothing is cached, so nothing goes stale. */
 export declare function boxOf(el: Element): Box;
 /**
+ * The scale two boxes agree on, or 1 when they do not.
+ *
+ * Two elements inside the same zoomed canvas share its scale, and the distance
+ * between them means something in that canvas's units. Two elements in
+ * different scaled subtrees share nothing, so the only honest answer is the
+ * viewport distance actually on screen. Pure.
+ */
+export declare function sharedScale(a: Box, b: Box): {
+    x: number;
+    y: number;
+};
+/**
  * What's under the cursor, skipping our own overlay and anything the user has
  * opted out. An ignored hit walks up rather than returning nothing.
  *

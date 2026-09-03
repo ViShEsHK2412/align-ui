@@ -236,6 +236,28 @@
       </table>
     </section>
 
+    <!-- 11 ────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>11 &middot; Inside a zoomed canvas</h2>
+      <p>A layer at <code>scale(1.5)</code>, which is how every canvas app
+        draws one. The two boxes are 20 apart in canvas units and 30 apart on
+        screen. Lock both: the gap must read <strong>20</strong>, because 20 is
+        the number you would type into the CSS.</p>
+
+      <div class="canvas-frame">
+        <div class="canvas-layer">
+          <div>a</div><div>b</div>
+        </div>
+      </div>
+
+      <table class="expect">
+        <tr><th>gap a &rarr; b</th><td>20</td><td class="note">not 30, which is only what the screen shows</td></tr>
+        <tr><th>each box</th><td>120 &times; 80</td><td class="note">with a &times;1.5 badge in the header</td></tr>
+        <tr><th>the line itself</th><td colspan="2" class="note">still drawn where the pixels
+          are &mdash; the label is canvas units, the geometry is the screen</td></tr>
+      </table>
+    </section>
+
     <div class="tail" style="padding: 40px 0; color: #6b7386">
       end of page — scroll back up
     </div>

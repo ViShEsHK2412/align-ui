@@ -1,6 +1,6 @@
 import {
   coloursOf, gapDistribution, looksLikeColour, matchColourTokens, selectorOf,
-  similarCount, tokenSummary, tokensInScope,
+  similarCount, stylingRules, tokenSummary, tokensInScope,
 } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import {
@@ -387,6 +387,14 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         tokens,
       );
       if (summary) parts.push(readout('tokens', [['', summary]]));
+
+      // Where the styling lives. Candidates in likeliest-first order, never a
+      // verdict: naming the winner would mean re-deriving the cascade.
+      const rules = stylingRules(box.el);
+      if (rules.length) {
+        parts.push(readout('styled by',
+          rules.slice(0, 4).map((r) => [r.selector, r.file] as [string, string])));
+      }
 
       // Whether a change here would be local or systemic. Only above one:
       // "1 element matches this" is not a fact anybody needs.

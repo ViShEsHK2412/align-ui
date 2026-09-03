@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSelector, describeGap, distinctValues, firstFamily, gapDistribution,
-  looksLikeColour,
+  looksLikeColour, shortFile,
   matchTokens,
   tokenSummary, weightName, type Token,
 } from './inspect';
@@ -183,5 +183,29 @@ describe('buildSelector', () => {
     // Tailwind writes these constantly, and a bare `.md:flex` is a syntax error.
     expect(buildSelector('div', '', ['md:flex'])).toBe('div.md\\:flex');
     expect(buildSelector('div', '', ['w-1/2'])).toBe('div.w-1\\/2');
+  });
+});
+
+describe('shortFile', () => {
+  it('gives the path a dev server actually serves the file from', () => {
+    expect(shortFile('http://localhost:5173/src/styles/cards.css'))
+      .toBe('src/styles/cards.css');
+  });
+
+  it('drops the cache-buster a dev server appends', () => {
+    expect(shortFile('http://localhost:5173/src/app.css?t=1738000000000'))
+      .toBe('src/app.css');
+  });
+
+  it('names an inline stylesheet as one, since it has no file', () => {
+    expect(shortFile(null)).toBe('inline <style>');
+  });
+
+  it('keeps a cross-origin path readable', () => {
+    expect(shortFile('https://cdn.example.com/lib/reset.css')).toBe('lib/reset.css');
+  });
+
+  it('leaves a path with a space readable rather than percent-encoded', () => {
+    expect(shortFile('http://localhost/my styles/app.css')).toBe('my styles/app.css');
   });
 });

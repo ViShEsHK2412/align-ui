@@ -335,3 +335,110 @@ export function similarCount(el: Element): number {
     return 0;          // a class name no selector can express
   }
 }
+
+
+// ── Where a style was set ───────────────────────────────────────────────────
+
+/** A rule that matches the element and sets something we measure. */
+export interface RuleSource {
+  selector: string;
+  /** The stylesheet, shortened to the part that identifies it. */
+  file: string;
+}
+
+/**
+ * `http://localhost:5173/src/styles/cards.css?t=1` -> `src/styles/cards.css`.
+ *
+ * A dev server serves CSS from its real path, so the tail of the URL is the
+ * file you would open. The query is a cache-buster and never part of it. Pure.
+ */
+export function shortFile(href: string | null): string {
+  if (!href) return 'inline <style>';
+  const noQuery = href.split('?')[0] ?? href;
+  try {
+    const path = new URL(noQuery, 'http://x').pathname;
+    // A pathname is percent-encoded, and a file with a space in its name is
+    // meant to be read, not decoded by eye.
+    return decodeURI(path).replace(/^\//, '') || noQuery;
+  } catch {
+    return noQuery;
+  }
+}
+
+/** The properties worth tracing: the ones the panel puts a number on. */
+const TRACKED = [
+  'width', 'height', 'padding', 'margin', 'border-width', 'gap',
+  'font-size', 'line-height', 'letter-spacing', 'color', 'background-color',
+];
+
+function setsSomethingTracked(style: CSSStyleDeclaration): boolean {
+  for (let i = 0; i < style.length; i += 1) {
+    const prop = style.item(i);
+    if (TRACKED.some((t) => prop === t || prop.startsWith(`${t}-`))) return true;
+  }
+  return false;
+}
+
+/**
+ * Every rule that matches this element and sets one of the things we measure.
+ *
+ * These are **candidates**, in document order, and deliberately not a verdict.
+ * Naming the winning rule would mean re-implementing the cascade — specificity,
+ * `!important`, source order, layers — which is what Mesurer does and what
+ * `:is()`, `:where()`, `@layer` and `@scope` each break. A short list of places
+ * to look is honest and is what you actually need.
+ *
+ * Cross-origin stylesheets throw on `.cssRules` and are skipped: their rules
+ * are unreadable by design, not missing.
+ */
+export function stylingRules(el: Element): RuleSource[] {
+  const out: RuleSource[] = [];
+  const seen = new Set<string>();
+
+  const walk = (rules: CSSRuleList, file: string) => {
+    for (const rule of Array.from(rules)) {
+      // A rule inside a media query that does not currently apply is not
+      // styling anything, and listing it would send you to the wrong place.
+      if (rule instanceof CSSMediaRule) {
+        if (matchMedia(rule.conditionText).matches) walk(rule.cssRules, file);
+        continue;
+      }
+      if (rule instanceof CSSSupportsRule) {
+        if (CSS.supports(rule.conditionText)) walk(rule.cssRules, file);
+        continue;
+      }
+      // @layer and anything else that simply groups.
+      const grouping = (rule as CSSGroupingRule).cssRules;
+      if (grouping && !(rule instanceof CSSStyleRule)) { walk(grouping, file); continue; }
+
+      if (!(rule instanceof CSSStyleRule)) continue;
+      let matches = false;
+      try {
+        matches = el.matches(rule.selectorText);
+      } catch {
+        continue;                     // a selector this browser cannot parse
+      }
+      if (!matches || !setsSomethingTracked(rule.style)) continue;
+
+      const key = `${rule.selectorText}|${file}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ selector: rule.selectorText, file });
+    }
+  };
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    if (sheet.ownerNode instanceof Element
+        && sheet.ownerNode.hasAttribute('data-align-ignore')) continue;
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;                       // cross-origin, unreadable by design
+    }
+    walk(rules, shortFile(sheet.href));
+  }
+
+  // Later rules win more often than earlier ones, so the likeliest is first.
+  return out.reverse();
+}

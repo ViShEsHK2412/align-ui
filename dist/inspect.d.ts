@@ -138,3 +138,29 @@ export declare function selectorOf(el: Element): string;
  * InterfaceKit, which shows it before you edit rather than after.
  */
 export declare function similarCount(el: Element): number;
+/** A rule that matches the element and sets something we measure. */
+export interface RuleSource {
+    selector: string;
+    /** The stylesheet, shortened to the part that identifies it. */
+    file: string;
+}
+/**
+ * `http://localhost:5173/src/styles/cards.css?t=1` -> `src/styles/cards.css`.
+ *
+ * A dev server serves CSS from its real path, so the tail of the URL is the
+ * file you would open. The query is a cache-buster and never part of it. Pure.
+ */
+export declare function shortFile(href: string | null): string;
+/**
+ * Every rule that matches this element and sets one of the things we measure.
+ *
+ * These are **candidates**, in document order, and deliberately not a verdict.
+ * Naming the winning rule would mean re-implementing the cascade — specificity,
+ * `!important`, source order, layers — which is what Mesurer does and what
+ * `:is()`, `:where()`, `@layer` and `@scope` each break. A short list of places
+ * to look is honest and is what you actually need.
+ *
+ * Cross-origin stylesheets throw on `.cssRules` and are skipped: their rules
+ * are unreadable by design, not missing.
+ */
+export declare function stylingRules(el: Element): RuleSource[];

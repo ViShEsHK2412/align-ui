@@ -83,7 +83,19 @@ function inRuler(x: number, y: number): 'x' | 'y' | null {
   return null;
 }
 
-/** Place a guide, pulling it onto a nearby edge unless Alt says otherwise. */
+/**
+ * Whether this gesture asked to ignore snapping.
+ *
+ * Ctrl in Figma, on both platforms; GuideFrame takes either Ctrl or Cmd.
+ * We take either too, because Ctrl-click is a secondary click on macOS and
+ * a Mac user reaches for Cmd. This used to be Alt, which is the wrong key
+ * to overload: Alt is Figma's duplicate-drag.
+ */
+function free(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
+  return e.ctrlKey || e.metaKey;
+}
+
+/** Place a guide, pulling it onto a nearby candidate unless asked not to. */
 function placeGuide(g: Guide, x: number, y: number, free: boolean) {
   const under = hitTest(x, y, cfg);
   const viewport = g.axis === 'x' ? x : y;
@@ -223,7 +235,7 @@ function onMouseMove(e: MouseEvent) {
       grabFrom = null;     // travelled: this is a drag now, and stays one
     }
     if (!grabFrom && !dragging.pinned) {
-      placeGuide(dragging, e.clientX, e.clientY, e.altKey);
+      placeGuide(dragging, e.clientX, e.clientY, free(e));
       setGuides([...guides]);
     }
     render({ x: e.clientX, y: e.clientY });
@@ -268,7 +280,7 @@ function onMouseDown(e: MouseEvent) {
   if (fromRuler) {
     swallow(e);
     grabFrom = null;
-    dragging = addGuide(fromRuler, e.clientX, e.clientY, e.altKey);
+    dragging = addGuide(fromRuler, e.clientX, e.clientY, free(e));
     render({ x: e.clientX, y: e.clientY });
     return;
   }
@@ -453,7 +465,7 @@ function onKey(e: KeyboardEvent) {
                                   || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
     e.preventDefault();
     const axis = e.key.toLowerCase() === cfg.guideKeys.vertical ? 'x' : 'y';
-    addGuide(axis, cursorAt.x, cursorAt.y, e.altKey);
+    addGuide(axis, cursorAt.x, cursorAt.y, free(e));
     render();
   } else if (overlay && (e.key === 'Delete' || e.key === 'Backspace')) {
     e.preventDefault();

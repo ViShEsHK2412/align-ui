@@ -44,8 +44,18 @@ export declare function chain(boxes: Box[]): Box[];
 export declare function chainPairs(boxes: Box[]): [Box, Box][];
 /** How near the cursor has to be to pick a guide up, in px. */
 export declare const GRAB = 5;
-/** How near an edge a guide has to be to snap onto it, in px. */
-export declare const SNAP = 4;
+/**
+ * How near a candidate a guide has to be to snap onto it, in px.
+ *
+ * Eight is the field consensus, not a guess: tldraw ships
+ * `snapThreshold: 8` and Excalidraw `SNAP_DISTANCE = 8`, both applied as
+ * `8 / zoom` so the tolerance stays constant on screen; Penpot is the
+ * outlier at 10. Four was ours, and it made snapping feel like it was not
+ * working — you had to be almost exactly on the edge already.
+ *
+ * The `/ zoom` half of that formula waits for there to be a zoom.
+ */
+export declare const SNAP = 8;
 /** Viewport position of a guide — page coordinates minus the scroll. */
 export declare function guideAt(g: Guide): number;
 /** The guide under the cursor, if any. Nearest wins when two overlap. */

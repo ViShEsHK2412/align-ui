@@ -423,6 +423,13 @@ describe('snapTo', () => {
   it('ignores a candidate further away than the snap radius', () => {
     expect(snapTo(400, [at(300)], false)).toEqual({ at: 400, what: '' });
   });
+
+  it('reaches eight pixels, the tolerance tldraw and Excalidraw both ship', () => {
+    // Ours was four, which made snapping feel broken: you had to be almost
+    // exactly on the edge before it would take.
+    expect(snapTo(307, [at(300, 'edge')], false).what).toBe('edge');
+    expect(snapTo(309, [at(300, 'edge')], false).what).toBe('');
+  });
 });
 
 describe('extension lines', () => {

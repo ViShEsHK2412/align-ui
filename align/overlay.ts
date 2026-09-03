@@ -121,9 +121,11 @@ export function mountOverlay(): Overlay {
 
   /** A distance line with perpendicular end caps, the way a ruler reads. */
   function distance(seg: Segment) {
-    ctx.strokeStyle = seg.extension ? alpha(c.measure, 0.45) : c.measure;
+    ctx.strokeStyle = seg.extension ? alpha(c.measure, 0.55) : c.measure;
     ctx.lineWidth = 1;
-    ctx.setLineDash([]);
+    // Dashed, the way Figma draws an extension line — it is the convention,
+    // and it keeps a stub from reading as a measurement of its own.
+    ctx.setLineDash(seg.extension ? [3, 3] : []);
     ctx.beginPath();
     ctx.moveTo(Math.round(seg.x1), Math.round(seg.y1));
     ctx.lineTo(Math.round(seg.x2), Math.round(seg.y2));

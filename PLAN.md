@@ -706,7 +706,11 @@ Grouped by which step of the loop each serves.
    canvas apps regardless of anything else here, and the fix that stops a gap
    inside a zoomed canvas reading 30 when it is 20.
 
-6. **Field-consensus corrections** *(the prompt, citing tldraw, Excalidraw,
+6. **Field-consensus corrections** — *snap tolerance, dashed extensions and
+   the Ctrl bypass are done. Two are deliberately deferred: d3 ruler ticks earn
+   nothing until a camera zoom exists, since our rulers draw page px at 1:1 and
+   fixed 10/50/100 is currently correct; nudge-undo coalescing waits for undo to
+   come off the branch.* *(the prompt, citing tldraw, Excalidraw,
    Penpot and Figma source)*. Snap tolerance `8 / zoom`, not our flat 4. Ruler
    ticks at the nice step `1/2/5 × 10ⁿ` spanning ≥ 56 screen px, rather than a
    fixed 10/50/100. Extension lines dashed, the way Figma draws them. `Ctrl` to

@@ -105,7 +105,7 @@ export default function AlignDev() {
 | `V` / `H` | vertical / horizontal guide at the cursor |
 | arrows | nudge the last guide you touched by 1px; `Shift` for 10 |
 | `L` | pin that guide, so it cannot be moved or deleted |
-| `Alt` while placing | ignore snapping |
+| `Ctrl/Cmd` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
 
@@ -124,10 +124,11 @@ for a vertical — so the axis is implied by where the drag started. Or press `V
 or `H` to drop one at the cursor, which works whether or not the rulers are
 showing. Drag a guide back into a rule to throw it away.
 
-They snap within 4px onto the edges and centre of whatever is under the cursor,
+They snap within 8px onto the edges and centre of whatever is under the cursor,
 and onto other guides — because a guide meant to sit on a card's edge has to sit
 *on* it rather than a pixel off and quietly lying; hold `Alt` to place one
-freely. The guide's chip names what it caught (`x 760 · div.card left`), since a
+freely — 8px being the tolerance tldraw and Excalidraw both ship. The guide's
+chip names what it caught (`x 760 · div.card left`), since a
 guide that snapped and one that missed by a pixel look identical otherwise. An
 edge beats a centre when a guide lands exactly between them. And they measure: hover an
 element and the nearest guide on each axis draws the gap and labels it, so

@@ -33,6 +33,13 @@ export const INK = {
   /** The ruler gutters: a surface, slightly translucent over the page. */
   rulerBg: pair('oklch(1 0 0 / 0.92)', 'oklch(0.235 0 0 / 0.92)'),
   rulerLine: pair('oklch(0.205 0 0 / 0.28)', 'oklch(0.97 0 0 / 0.28)'),
+  /**
+   * The pixel texture. Its own pair rather than a faded `rulerLine`, because
+   * `alpha()` appends a slash-alpha and cannot fade a colour that already has
+   * one — `oklch(... / 0.28 / 0.5)` does not parse, and canvas answers an
+   * unparseable colour by silently keeping the last one it was given.
+   */
+  pixelLine: pair('oklch(0.205 0 0 / 0.14)', 'oklch(0.97 0 0 / 0.14)'),
 } as const;
 
 /**
@@ -187,8 +194,56 @@ export function ink(dark: boolean): Ink {
   return out;
 }
 
-export function prefersDark(): boolean {
+/**
+ * Is the page we are drawing over dark?
+ *
+ * Not the same question as `prefers-color-scheme`, and asking that one instead
+ * is a mistake worth spelling out: a page is free to be dark on a machine set
+ * to light, and plenty are — a docs site with its own toggle, a product whose
+ * brand is dark, a demo that simply hard-codes it. Trust the media query and
+ * you draw light-theme ink on a dark page, where a 14% black hairline is
+ * invisible and every reading you came for is unreadable.
+ *
+ * Three sources, strongest first:
+ *
+ *  1. An explicit `color-scheme` on the root. A page that says `dark` has
+ *     stated its intent, and the browser has already believed it.
+ *  2. The background actually painted behind the page — body's if it has one,
+ *     otherwise the root's. This is what the eye sees, so it is what the
+ *     overlay has to contrast against.
+ *  3. The media query, when the page is transparent and says nothing.
+ */
+export function pageIsDark(): boolean {
+  const root = document.documentElement;
+  const declared = getComputedStyle(root).colorScheme;
+  if (/dark/.test(declared) && !/light/.test(declared)) return true;
+  if (/light/.test(declared) && !/dark/.test(declared)) return false;
+
+  for (const el of [document.body, root]) {
+    if (!el) continue;
+    const lum = luminance(getComputedStyle(el).backgroundColor);
+    if (lum !== null) return lum < 0.5;
+  }
   return matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/**
+ * Perceived lightness of a computed background, or null if it paints nothing.
+ *
+ * `getComputedStyle` hands back `rgb()`/`rgba()` for a background colour on
+ * every engine, so a small parse is enough — no canvas round-trip needed. A
+ * mostly-transparent colour is treated as painting nothing, because whatever is
+ * behind it is what will actually be seen.
+ */
+function luminance(color: string): number | null {
+  const m = /^rgba?\(([^)]+)\)$/.exec(color.trim());
+  if (!m) return null;
+  const parts = m[1]!.split(/[\s,/]+/).filter(Boolean).map(Number);
+  const [r, g, b, a = 1] = parts;
+  if (r === undefined || g === undefined || b === undefined) return null;
+  if (a < 0.5) return null;
+  // Rec. 709 luma, on 0..1. Good enough to answer light-or-dark.
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
 
 /** `oklch(...)` → `oklch(... / alpha)`, so alphas stay in the same colour space. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chain, chainPairs, fmt, insetSegments, sharedScale, snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
+  chain, chainPairs, fmt, gridColumns, insetSegments, pixelGridStep, sharedScale,
+  snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
   spreadLabels, type LabelBox,
 } from './measure';
 import type { Box } from './types';
@@ -519,5 +520,51 @@ describe('sharedScale', () => {
   it('tolerates the float noise a matrix leaves behind', () => {
     expect(sharedScale(box(0, 0, 10, 10, 1.5), box(0, 0, 10, 10, 1.50005)).x)
       .toBeCloseTo(1.5);
+  });
+});
+
+describe('gridColumns', () => {
+  const spec = { columns: 12, gutter: 24, margin: 24, maxWidth: 1200 };
+
+  it('gives one column per column', () => {
+    expect(gridColumns(spec, 1400)).toHaveLength(12);
+  });
+
+  it('centres the grid in the viewport when it has a max width', () => {
+    const [first] = gridColumns(spec, 1400);
+    // (1400 - 1200) / 2 = 100 to the container, then the 24 margin.
+    expect(first!.left).toBe(124);
+  });
+
+  it('leaves a gutter between every pair and none at the ends', () => {
+    const cols = gridColumns(spec, 1200);
+    const gaps = cols.slice(1).map((c, i) => c.left - (cols[i]!.left + cols[i]!.width));
+    expect(gaps.every((g) => Math.abs(g - 24) < 0.001)).toBe(true);
+    // Content spans margin to margin exactly.
+    expect(cols[0]!.left).toBe(24);
+    const last = cols[cols.length - 1]!;
+    expect(last.left + last.width).toBeCloseTo(1200 - 24, 6);
+  });
+
+  it('fills the viewport when no max width is set', () => {
+    const [first] = gridColumns({ ...spec, maxWidth: 0 }, 800);
+    expect(first!.left).toBe(24);
+  });
+
+  it('gives nothing rather than negative columns in a narrow window', () => {
+    expect(gridColumns(spec, 100)).toEqual([]);
+    expect(gridColumns({ ...spec, columns: 0 }, 1200)).toEqual([]);
+  });
+});
+
+describe('pixelGridStep', () => {
+  it('draws at its own step when there is room to see it', () => {
+    expect(pixelGridStep(10, 1)).toBe(10);
+  });
+
+  it('stops drawing once the lines would be closer than eight pixels', () => {
+    // Below that a grid stops being a grid and becomes a wash.
+    expect(pixelGridStep(10, 0.5)).toBe(0);
+    expect(pixelGridStep(10, 0.8)).toBe(10);
   });
 });

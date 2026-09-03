@@ -7,12 +7,14 @@
 export interface ToolState {
     rulers: boolean;
     xray: boolean;
+    grid: boolean;
+    pixels: boolean;
     freeze: boolean;
     type: boolean;
     panel: boolean;
 }
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'freeze' | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
 export interface Indicator {
     update(locked: number, state: ToolState): void;
     /** True if it was open — lets Escape dismiss the topmost layer first. */

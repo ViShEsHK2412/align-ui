@@ -1,4 +1,10 @@
 export interface Config {
+  /**
+   * The design grid to check against, if the project has one. There is no
+   * sensible default — twelve columns at 24 means nothing without knowing the
+   * system — so it stays off until described.
+   */
+  grid: { columns: number; gutter: number; margin: number; maxWidth: number } | null;
   /** Extra CSS selector to skip when hit-testing. */
   ignore: string;
   hotkey: string;
@@ -16,6 +22,7 @@ export interface Config {
 
 export const DEFAULTS: Config = {
   ignore: '',
+  grid: null,
   hotkey: 'mod+shift+a',
   panelKey: 'b',
   rulerKey: 'r',

@@ -1,6 +1,8 @@
-import { fmt, guideAt, spreadLabels } from './measure';
 import {
-  alpha, ink, prefersDark, RULER, TYPE, WEIGHT, whenFontReady, type Ink,
+  fmt, gridColumns, guideAt, pixelGridStep, spreadLabels, type GridSpec,
+} from './measure';
+import {
+  alpha, ink, pageIsDark, RULER, TYPE, WEIGHT, whenFontReady, type Ink,
 } from './theme';
 import type { Box, Guide, Segment } from './types';
 
@@ -17,6 +19,10 @@ export interface OverlayState {
   lines: Segment[];
   cursor: { x: number; y: number } | null;
   rulers: boolean;
+  /** The design grid to check against, or null for none. */
+  grid: GridSpec | null;
+  /** Whether to lay the pixel texture under everything. */
+  pixels: boolean;
   guides: Guide[];
   /** The one under the cursor or being dragged, drawn at full strength. */
   liveGuide: Guide | null;
@@ -61,13 +67,29 @@ export function mountOverlay(): Overlay {
 
   const state: OverlayState = {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false,
+    grid: null, pixels: false,
     guides: [], liveGuide: null, activeGuide: null,
   };
-  let c: Ink = ink(prefersDark());
+  let c: Ink = ink(pageIsDark());
   let frame = 0;
 
+  /**
+   * The canvas resolves its own colours and the panels resolve `light-dark()`,
+   * so both have to be told the same answer or they disagree. `all: initial`
+   * pins the host to `color-scheme: normal`, which would resolve every
+   * `light-dark()` inside to its light branch regardless — so setting it here
+   * is what makes the panels follow the page rather than the machine.
+   */
+  function applyScheme() {
+    const dark = pageIsDark();
+    c = ink(dark);
+    host.style.colorScheme = dark ? 'dark' : 'light';
+    schedule();
+  }
+  applyScheme();
+
   const scheme = matchMedia('(prefers-color-scheme: dark)');
-  const onScheme = () => { c = ink(scheme.matches); schedule(); };
+  const onScheme = () => applyScheme();
   scheme.addEventListener('change', onScheme);
 
   // Canvas measures text with whatever face is resolved at draw time, so redraw
@@ -280,12 +302,44 @@ export function mountOverlay(): Overlay {
     ctx.strokeRect(-0.5, -0.5, RULER, RULER);
   }
 
+  /**
+   * The pixel texture, under everything. Screen-space, so it does not scroll:
+   * it is a ruler for the eye, not a property of the page.
+   */
+  function pixelGrid() {
+    const step = pixelGridStep(10, 1);
+    if (!step) return;
+    ctx.strokeStyle = c.pixelLine;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    for (let x = 0; x <= innerWidth; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, innerHeight); }
+    for (let y = 0; y <= innerHeight; y += step) { ctx.moveTo(0, y); ctx.lineTo(innerWidth, y); }
+    ctx.stroke();
+  }
+
+  /** The design grid: columns filled, gutters left empty. */
+  function grid(spec: GridSpec) {
+    // The layout viewport, not `innerWidth`: a classic scrollbar takes width
+    // from what the browser centres in, so centring in `innerWidth` would put
+    // the grid half a scrollbar to the right of everything it measures.
+    const cols = gridColumns(spec, document.documentElement.clientWidth);
+    ctx.fillStyle = alpha(c.measure, 0.08);
+    for (const col of cols) {
+      ctx.fillRect(snap(col.left), -0.5, Math.round(col.width), innerHeight + 1);
+    }
+  }
+
   function draw() {
     frame = 0;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
+
+    // Both are references to measure against, so both go under everything.
+    if (state.pixels) pixelGrid();
+    if (state.grid) grid(state.grid);
 
     for (const box of state.pinned) outline(box, c.accent);
     if (state.hover) {

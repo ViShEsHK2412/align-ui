@@ -1,3 +1,4 @@
+import { type GridSpec } from './measure';
 import type { Box, Guide, Segment } from './types';
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
@@ -14,6 +15,10 @@ export interface OverlayState {
         y: number;
     } | null;
     rulers: boolean;
+    /** The design grid to check against, or null for none. */
+    grid: GridSpec | null;
+    /** Whether to lay the pixel texture under everything. */
+    pixels: boolean;
     guides: Guide[];
     /** The one under the cursor or being dragged, drawn at full strength. */
     liveGuide: Guide | null;

@@ -12,14 +12,16 @@ import {
 export interface ToolState {
   rulers: boolean;
   xray: boolean;
+  grid: boolean;
+  pixels: boolean;
   freeze: boolean;
   type: boolean;
   panel: boolean;
 }
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'freeze' | 'type' | 'panel'
-  | 'copy' | 'pick' | 'undo';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
+  | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
@@ -47,6 +49,8 @@ export const KEYS: [string, string][] = [
   ['Ctrl/Cmd + Z', 'bring back the guides you just deleted'],
   ['T', 'type and token readout for the locked element'],
   ['F', 'freeze the page so a moving thing can be measured'],
+  ['G', 'your column grid, if one is configured'],
+  ['K', 'a ten-pixel texture to read against'],
   ['X', 'x-ray: outline every element on the page'],
   ['P', 'pick a colour from anywhere on screen'],
   ['C', 'copy the numbers in the panel'],
@@ -77,7 +81,6 @@ const CSS = `
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
   line-height: 1;
   -webkit-font-smoothing: antialiased;
-  color-scheme: light dark;
   color: ${TEXT.primary};
   background: ${GROUND};
   box-shadow: ${SHADOW};
@@ -128,7 +131,6 @@ const CSS = `
   font-synthesis: none;
   font-size: ${TYPE.tag}px; line-height: 1.4;
   -webkit-font-smoothing: antialiased;
-  color-scheme: light dark;
   color: ${TEXT.primary};
   background: ${GROUND};
   box-shadow: ${SHADOW};
@@ -170,6 +172,8 @@ const CSS = `
 const TOOLS: { name: ToolName; label: string; title: string; toggle: boolean }[] = [
   { name: 'rulers', label: 'R', title: 'rulers down the top and left edges', toggle: true },
   { name: 'xray', label: 'X', title: 'outline every element on the page', toggle: true },
+  { name: 'grid', label: 'G', title: 'your column grid, if one is configured', toggle: true },
+  { name: 'pixels', label: 'K', title: 'a ten-pixel texture to read against', toggle: true },
   { name: 'type', label: 'T', title: 'type and token readout', toggle: true },
   { name: 'panel', label: 'B', title: 'the box model panel', toggle: true },
   { name: 'freeze', label: 'F', title: 'hold the page still', toggle: true },

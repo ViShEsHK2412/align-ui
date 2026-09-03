@@ -34,6 +34,8 @@ let indicator: Indicator | null = null;
 let picker: Picker | null = null;
 /** X-ray is the one thing that writes to the page, so it is tracked here. */
 let xray = false;
+let grid = loadFlag('grid');
+let pixels = loadFlag('pixels');
 let hover: Box | null = null;
 let pinned: Box[] = [];
 let watching = 0;
@@ -225,6 +227,8 @@ function render(cursor?: { x: number; y: number }) {
     hover,
     pinned,
     rulers,
+    grid: grid && cfg.grid ? cfg.grid : null,
+    pixels,
     guides,
     liveGuide: dragging ?? hoverGuide,
     activeGuide: activeGuideId,
@@ -234,6 +238,8 @@ function render(cursor?: { x: number; y: number }) {
   indicator?.update(pinned.length, {
     rulers,
     xray,
+    grid,
+    pixels,
     freeze: isFrozen(),
     type: boxmodel?.showsType() ?? false,
     panel: boxmodel?.isOpen() ?? false,
@@ -262,6 +268,8 @@ function onTool(name: ToolName): void {
   switch (name) {
     case 'rulers': rulers = !rulers; saveFlag('rulers', rulers); break;
     case 'xray': xray = !xray; setXray(xray); break;
+    case 'grid': grid = !grid; saveFlag('grid', grid); break;
+    case 'pixels': pixels = !pixels; saveFlag('pixels', pixels); break;
     case 'freeze': setFrozen(!isFrozen()); break;
     case 'type': boxmodel?.toggleType(); break;
     case 'panel': boxmodel?.toggle(); break;
@@ -467,7 +475,7 @@ function activate() {
   indicator = createIndicator(overlay.root, onTool);
   picker = createPicker(overlay.root);
   indicator.update(0, {
-    rulers, xray, freeze: isFrozen(), type: false, panel: false,
+    rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
   });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
@@ -551,6 +559,14 @@ function onKey(e: KeyboardEvent) {
     g.caught = '';
     setGuides([...guides]);
     render();
+  } else if (overlay && e.key.toLowerCase() === 'g') {
+    e.preventDefault();
+    onTool('grid');
+    return;
+  } else if (overlay && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    onTool('pixels');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'f') {
     // Hold the page still. Everything worth measuring that moves — a hover, a
     // dropdown mid-open, a skeleton — is unmeasurable until this exists.

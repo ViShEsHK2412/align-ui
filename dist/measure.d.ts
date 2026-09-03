@@ -162,6 +162,35 @@ export declare function spreadLabels(boxes: LabelBox[], within: {
     w: number;
     h: number;
 }, edge?: number): LabelBox[];
+/**
+ * Where the columns of a layout grid fall, in viewport x.
+ *
+ * The grid a design is built on is a reference you measure against, exactly
+ * like a guide — the difference is that it comes from your system rather than
+ * from your hand. Pure, so the arithmetic can be checked without a page.
+ */
+export interface GridSpec {
+    columns: number;
+    gutter: number;
+    margin: number;
+    /** The content width the grid is centred in. `0` means the full viewport. */
+    maxWidth: number;
+}
+export interface Column {
+    left: number;
+    width: number;
+}
+export declare function gridColumns(spec: GridSpec, viewportWidth: number): Column[];
+/**
+ * The spacing a pixel grid should draw at, or 0 for none.
+ *
+ * A grid whose lines fall closer than about 8px on screen stops being a grid
+ * and becomes a wash, so below that it is not drawn at all. One tier only: the
+ * Interaction Lab notes are emphatic that a second, coarser tier was tried and
+ * rejected, because the grid has to read as a single texture rather than two
+ * grids laid over each other. Pure.
+ */
+export declare function pixelGridStep(step: number, zoom: number): number;
 export interface Scale {
     x: number;
     y: number;

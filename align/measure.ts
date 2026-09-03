@@ -457,6 +457,53 @@ export function spreadLabels(
   return placed;
 }
 
+/**
+ * Where the columns of a layout grid fall, in viewport x.
+ *
+ * The grid a design is built on is a reference you measure against, exactly
+ * like a guide — the difference is that it comes from your system rather than
+ * from your hand. Pure, so the arithmetic can be checked without a page.
+ */
+export interface GridSpec {
+  columns: number;
+  gutter: number;
+  margin: number;
+  /** The content width the grid is centred in. `0` means the full viewport. */
+  maxWidth: number;
+}
+
+export interface Column { left: number; width: number }
+
+export function gridColumns(spec: GridSpec, viewportWidth: number): Column[] {
+  const { columns, gutter, margin } = spec;
+  if (columns <= 0) return [];
+
+  const width = spec.maxWidth > 0 ? Math.min(spec.maxWidth, viewportWidth) : viewportWidth;
+  const left = Math.max(0, (viewportWidth - width) / 2);
+  const content = Math.max(0, width - margin * 2);
+  const each = (content - gutter * (columns - 1)) / columns;
+  if (each <= 0) return [];
+
+  const out: Column[] = [];
+  for (let i = 0; i < columns; i += 1) {
+    out.push({ left: left + margin + i * (each + gutter), width: each });
+  }
+  return out;
+}
+
+/**
+ * The spacing a pixel grid should draw at, or 0 for none.
+ *
+ * A grid whose lines fall closer than about 8px on screen stops being a grid
+ * and becomes a wash, so below that it is not drawn at all. One tier only: the
+ * Interaction Lab notes are emphatic that a second, coarser tier was tried and
+ * rejected, because the grid has to read as a single texture rather than two
+ * grids laid over each other. Pure.
+ */
+export function pixelGridStep(step: number, zoom: number): number {
+  return step * zoom >= 8 ? step : 0;
+}
+
 // ── Scale ───────────────────────────────────────────────────────────────────
 
 export interface Scale { x: number; y: number }

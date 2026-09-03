@@ -31,7 +31,6 @@ const CSS = `
   font-synthesis: none;
   font-size: ${TYPE.tag}px; line-height: 1.4;
   -webkit-font-smoothing: antialiased;
-  color-scheme: light dark;
   color: ${TEXT.primary};
   background: ${GROUND};
   box-shadow: ${SHADOW};

@@ -37,5 +37,9 @@ class FancyCard extends HTMLElement {
 customElements.define('fancy-card', FancyCard);
 
 if (import.meta.env.DEV) {
-  import('../../align/index').then((m) => m.initAlign());
+  // The grid this page is actually built on, so G has something true to draw.
+  // `main` is 900px wide with 24px of padding either side.
+  import('../../align/index').then((m) => m.initAlign({
+    grid: { columns: 12, gutter: 24, margin: 24, maxWidth: 900 },
+  }));
 }

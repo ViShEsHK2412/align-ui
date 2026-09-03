@@ -32,6 +32,13 @@ export declare const INK: {
     /** The ruler gutters: a surface, slightly translucent over the page. */
     readonly rulerBg: Pair;
     readonly rulerLine: Pair;
+    /**
+     * The pixel texture. Its own pair rather than a faded `rulerLine`, because
+     * `alpha()` appends a slash-alpha and cannot fade a colour that already has
+     * one — `oklch(... / 0.28 / 0.5)` does not parse, and canvas answers an
+     * unparseable colour by silently keeping the last one it was given.
+     */
+    readonly pixelLine: Pair;
 };
 /**
  * Colours we author in OKLCH already render in the widest gamut the display
@@ -126,7 +133,26 @@ export type Ink = {
 };
 /** Resolve every pair for the viewer's current theme. */
 export declare function ink(dark: boolean): Ink;
-export declare function prefersDark(): boolean;
+/**
+ * Is the page we are drawing over dark?
+ *
+ * Not the same question as `prefers-color-scheme`, and asking that one instead
+ * is a mistake worth spelling out: a page is free to be dark on a machine set
+ * to light, and plenty are — a docs site with its own toggle, a product whose
+ * brand is dark, a demo that simply hard-codes it. Trust the media query and
+ * you draw light-theme ink on a dark page, where a 14% black hairline is
+ * invisible and every reading you came for is unreadable.
+ *
+ * Three sources, strongest first:
+ *
+ *  1. An explicit `color-scheme` on the root. A page that says `dark` has
+ *     stated its intent, and the browser has already believed it.
+ *  2. The background actually painted behind the page — body's if it has one,
+ *     otherwise the root's. This is what the eye sees, so it is what the
+ *     overlay has to contrast against.
+ *  3. The media query, when the page is transparent and says nothing.
+ */
+export declare function pageIsDark(): boolean;
 /** `oklch(...)` → `oklch(... / alpha)`, so alphas stay in the same colour space. */
 export declare function alpha(color: string, a: number): string;
 export {};

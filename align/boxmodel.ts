@@ -57,10 +57,10 @@ const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
 
 const CSS = `
 .dock {
-  /* On .dock, not :host — the host's inline all:initial outranks a :host rule,
-     which would pin color-scheme to normal and resolve light-dark() to its
-     light branch on a dark page. */
-  color-scheme: light dark;
+  /* No color-scheme here: the overlay sets it inline on the shadow host, from
+     what the page actually looks like rather than what the machine prefers, and
+     it inherits down. Declaring 'light dark' again would undo that and hand
+     light-dark() back to the media query. */
   position: fixed; left: ${MARGIN}px; top: 0; width: 340px;
   /* An opacity:0 element still receives pointer events, and a closed panel
      parked over the page would silently swallow every hit test underneath. */

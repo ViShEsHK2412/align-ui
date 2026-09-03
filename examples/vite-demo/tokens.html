@@ -258,6 +258,32 @@
       </table>
     </section>
 
+    <section>
+      <h2>12 &middot; Two grids to check against</h2>
+      <p>
+        Both are references rather than readings, so both draw under everything
+        else. <b>G</b> is the design grid this page is actually built on &mdash;
+        twelve columns, 24px gutters, 24px margins, in a 900px container. The
+        columns are filled and the gutters are left empty, so an element that
+        sits in a gutter is visibly in the wrong place. <b>K</b> is the pixel
+        grid: a fixed 10px texture in screen space, for reading an offset off
+        the page without measuring it.
+      </p>
+      <p>
+        The design grid is centred in the layout viewport rather than
+        <code>innerWidth</code>. On a page with a classic scrollbar those differ
+        by half the scrollbar, which is exactly enough to make a correct layout
+        look wrong.
+      </p>
+
+      <table class="expect">
+        <tr><th>first column, left edge</th><td>197.5</td><td class="note">the same x as card <b>a</b> and every section rule</td></tr>
+        <tr><th>last column, right edge</th><td>1049.5</td><td class="note">at a 1262px viewport &mdash; both move with the window</td></tr>
+        <tr><th>gutters</th><td>24</td><td class="note">unfilled, between every pair and at neither end</td></tr>
+        <tr><th>pixel grid</th><td>10</td><td class="note">screen space, so it does not scroll with the page</td></tr>
+      </table>
+    </section>
+
     <div class="tail" style="padding: 40px 0; color: #6b7386">
       end of page — scroll back up
     </div>

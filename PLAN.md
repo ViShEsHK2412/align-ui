@@ -566,3 +566,231 @@ through in a browser: undo, the type readout, copy, x-ray, and the colour
 picker with its four-format conversion. Holding them back is the point — a
 measuring tool that reports something it has never been watched reporting is
 the one kind of bug it cannot afford.
+
+---
+
+# The workbench: twelve features and a toolbar
+
+Decided after reading six tools at source — mesurer, guide-frame, dialkit,
+interface-kit, agentation, and the Interaction Lab prompt. The infinite canvas
+is specced separately; nothing here depends on it.
+
+## What this is for
+
+The loop this serves is: **ask an agent for UI, look at it, find what is wrong,
+say what is wrong.** Everything below earns its place by helping one of those
+four steps. A feature that helps you admire the page is not in scope.
+
+## Design system
+
+**Agentation's, rebased.** Chosen over dialkit for one disqualifying reason:
+dialkit is glassmorphic, and a `backdrop-filter: blur(20px)` panel sits over
+the thing being measured and smears it. Every other tool in that list can
+afford blur because none of them ask you to judge a 1px edge through the panel.
+
+The thing that made this an easy choice: agentation's surfaces are **white
+alpha over an opaque ground**, not fixed greys. That model is theme-portable by
+construction — the same alphas over a light ground give light mode for free. So
+taking it costs us nothing, where taking dialkit's would have.
+
+### Tokens
+
+| | Value | From |
+|---|---|---|
+| Ground | `#1a1a1a` dark · near-white light | agentation |
+| Surface ladder | alpha over ground: `.07 .08 .10 .12 .15 .20` | agentation |
+| Text | alpha: `.9` primary · `.6` secondary · `.4` tertiary | agentation + dialkit's explicit third level |
+| Shadow | `0 2px 8px rgb(0 0 0 / .2), 0 4px 16px rgb(0 0 0 / .1)` | agentation |
+| Spacing | `2 · 4 · 8` px | agentation |
+| Row height | `36px`, one constant | dialkit |
+| Type | `13 · 11 · 10` px | agentation |
+| Gamut | sRGB, then `color(display-p3 ...)` behind `@supports` | agentation |
+| Expand | `width` 400ms `cubic-bezier(0.19, 1, 0.22, 1)` | agentation |
+| Entrance | 500ms `cubic-bezier(0.34, 1.2, 0.64, 1)`, slight overshoot | agentation |
+
+Replaces Fluid Functionalism's opaque eight-step ladder. Same idea — depth by
+surface rather than by border — expressed as alpha, which is what makes it work
+in both themes from one set of numbers.
+
+### Two things kept from before, deliberately
+
+**Square corners.** Both source systems use 8-22px radii. Radius 0 was an
+explicit instruction for this tool and it still reads as an instrument rather
+than an app. Adopting their radii would undo it for no gain.
+
+**Inter.** Both use system-ui. Inter with `tabular-nums` was an explicit
+instruction, and tabular figures are not optional in a tool whose entire output
+is columns of numbers.
+
+### Not taken
+
+agentation's defensive CSS reset — 30 lines of `:where(button, input, ...) {
+background: unset; ... }`. It portals into `document.body`, so host page globals
+leak in and must be unset. We are in a closed shadow root and the page cannot
+reach us.
+
+## The toolbar
+
+mesurer solves feature sprawl with a mode palette — two groups, `inspect` and
+`annotate`, in 1,204 lines. Wrong shape for us, because **almost nothing we
+have is a mode.** Sorted by kind:
+
+| Kind | Behaviour | Members |
+|---|---|---|
+| **Layers** | independent, stack freely | rulers, layout grid, pixel grid, x-ray |
+| **Page state** | changes the page, not the view | freeze, and scrub while frozen |
+| **Readouts** | what the panel says about the locked element | box model, type, tokens, gaps, source |
+| **Actions** | one-shot | copy, pick colour, undo, clear guides |
+
+So it is a **layers bar**, not a tool palette: toggles that stack rather than
+tools that exclude one another.
+
+**It grows out of the badge.** The badge already sits top-right and already
+reads `Align · 2 locked`. It expands into a row rather than us inventing a
+third surface — the panel is the readout, the badge is the controls, and there
+is no third thing.
+
+```
+Align   ▦ ▤ ⊞ ◫  │  ❄ freeze  │  ⧉ ⊙ ↺   2 locked
+        └ layers ┘  └  state  ┘  └ actions ┘
+```
+
+- Layers are toggles, each with its own on-state, because they are independent.
+- Freeze sits in its own compartment with a stronger on-state: it is the only
+  control that changes the page rather than the overlay. Its scrub track appears
+  beside it only while frozen.
+- Readouts never appear here. They are sections in the panel, which is how
+  type, tokens and gaps are already built.
+
+**Every control shows its key on hover.** The toolbar does not replace the
+keyboard, it teaches it — the same job the key list does, discoverable by
+pointing instead of remembering. Clicking the badge still opens the full list.
+
+This is also the argument against a settings panel, for the third time: nearly
+everything one would hold is a layer toggle, and layer toggles now have a home.
+
+**The risk to watch.** Panel bottom-left, toolbar top-right, measurements
+everywhere between. Build it, then deliberately measure something in the
+top-right corner and see whether it is in the way.
+
+## The twelve
+
+Grouped by which step of the loop each serves.
+
+### See — find what is wrong
+
+1. **Freeze** *(agentation)*. Patch `setTimeout`, `setInterval` and `rAF`;
+   inject `animation-play-state: paused`; pause running WAAPI animations only,
+   since pausing finished ones restarts them on `play()`; pause video; queue
+   what was skipped and replay it on unfreeze. Hover states, open dropdowns,
+   toasts and loading skeletons are currently unmeasurable. This is what makes
+   them measurable, and it is the cheapest large win here.
+
+2. **X-ray** *(mesurer)*. One stylesheet. `outline`, never `border`, so layout
+   cannot move. Neutral grey, because structure is not a measurement, a
+   selection or a guide. One exclusion — our own host — since a page rule
+   cannot reach into a closed shadow root.
+
+3. **Layout grid** *(guide-frame)*. Columns, gutter, margin, per breakpoint.
+   A reference to measure against; the same category as a guide.
+
+4. **Pixel grid** *(prompt)*. One uniform tier, fading out below ~8px on
+   screen. Their note is emphatic that two tiers were tried and rejected: the
+   grid must read as a single texture.
+
+### Measure — get the number
+
+5. **Canvas-true measuring.** `measure.ts:24` is the only place a rect is read
+   for measurement, so teaching the tool to measure inside a transformed
+   subtree is one function plus a few boundary conversions. Needed for our own
+   canvas apps regardless of anything else here, and the fix that stops a gap
+   inside a zoomed canvas reading 30 when it is 20.
+
+6. **Field-consensus corrections** *(the prompt, citing tldraw, Excalidraw,
+   Penpot and Figma source)*. Snap tolerance `8 / zoom`, not our flat 4. Ruler
+   ticks at the nice step `1/2/5 × 10ⁿ` spanning ≥ 56 screen px, rather than a
+   fixed 10/50/100. Extension lines dashed, the way Figma draws them. `Ctrl` to
+   bypass snapping, which is what Figma and guide-frame both use where we use
+   `Alt`.
+
+### Explain — why it is that number
+
+7. **CSS rule and file** *(mesurer's technique)*. `set by .card in
+   cards.css:42`. The missing link: it turns a measurement from an observation
+   into an instruction. Reports **candidate** rules and never a verdict — the
+   cascade cannot be re-derived reliably, and `:is()`, `:where()`, cascade
+   layers and cross-origin sheets each defeat it.
+
+8. **Colour tokens.** Numbers are already matched against the custom properties
+   in scope; nothing matches *colours*. This is the exact failure mode of
+   agent-written CSS — a `#6ea8fe` one notch off the brand blue, invisible by
+   eye and obvious to a comparison.
+
+9. **Parent diagnostics** *(guide-frame)*. When the locked element sits in a
+   flex or grid container, show the container's resolved tracks and its real
+   gaps. Half the time the number is strange because the parent decided it.
+
+10. **similarCount** *(interface-kit)*. Six other elements match this selector —
+    known before you touch it rather than after.
+
+### Fix — change it and hand it back
+
+11. **Diffs, not edits** *(interface-kit)*. Record `padding-left: 16 → 20`,
+    revertable one at a time or wholesale. This is why the editor built in an
+    earlier session felt wrong: an editor was built where the right object was
+    a diff. Element-level, and token-level — change `--space-4` and everything
+    using it moves at once.
+
+12. **Copy out.** Already shipped as `C`. dialkit states the philosophy the
+    whole of section 4 rests on: **preview, copy, replace.** The tool is never
+    the source of truth.
+
+## Build order
+
+Foundational first, then the thing that unlocks the most, then the rest.
+
+**0. Land the branch.** `wip/inspection` already holds the type readout, copy,
+undo, x-ray and the colour picker, built and unit-tested but never watched
+working. Two of them — x-ray and the type readout — are on the list of twelve.
+Verify them in a browser and merge before building anything new, or the same
+work gets done twice.
+
+**1. The design system.** `theme.ts` moves from Fluid's opaque ladder to the
+alpha-over-ground model, gains a third text level and a row constant, and picks
+up the p3 enhancement. Everything visual sits on this, so it goes before the
+toolbar rather than after.
+
+**2. The toolbar.** Grown out of the badge, with the expand curve from
+agentation. It is where every later feature is switched on, so building it early
+means each one arrives with a home instead of a new key nobody remembers.
+
+**3. Freeze.** The largest single win, and independent of everything above.
+Turns hover states, open dropdowns, toasts and loading skeletons from
+un-measurable into measurable.
+
+**4. Colour and type tokens.** Extends the matching already shipped for
+numbers. Catches the exact failure of agent-written CSS: values that are almost
+right.
+
+**5. CSS rule and file.** Turns a measurement into an instruction.
+
+**6. The rest**, in the order they stop being blocked: canvas-true measuring,
+the field-consensus corrections, layout and pixel grids, parent diagnostics,
+`similarCount`, then diffs.
+
+Steps 1 and 2 are scaffolding; 3, 4 and 5 are the three that would be built
+first if only three ever got built.
+
+## If only three get built
+
+**Freeze**, **colour and type tokens**, and **CSS rule and file**. With what is
+already on `main`, the tool then answers *is it right · is it on system · where
+do I change it*, which is the whole of what needs saying back to an agent.
+
+## Still deliberately out
+
+- **dialkit's parameter panel** — needs hooks wired into your components.
+  Everything else here works on a page it has never seen.
+- **Annotations: arrows, pen, text** — mesurer's direction, and right for
+  mesurer, whose job is passing feedback to a person. A whole second UI.
+- **Screenshots** — only worth it if they are being sent somewhere.

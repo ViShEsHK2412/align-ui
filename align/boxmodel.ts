@@ -1,5 +1,6 @@
 import {
   coloursOf, gapDistribution, looksLikeColour, matchColourTokens, ownText,
+  parentLayoutOf,
   selectorOf, similarCount, stylingRules, tokenSummary, tokensInScope,
   typographyOf,
 } from './inspect';
@@ -401,6 +402,17 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         parts.push(rows.length && text
           ? readout('type', rows.map((r) => [r.label, r.value] as [string, string]))
           : readout('type', [['', 'nothing of its own to set type on']]));
+      }
+
+      // How the parent places this element. For anything inside a flex or grid
+      // container this is the answer to "why is it here?", and the child's own
+      // CSS usually does not contain it. Shown under type, above the gaps.
+      const layout = parentLayoutOf(box.el);
+      if (layout && layout.rows.length) {
+        parts.push(readout(
+          `laid out by ${layout.display}`,
+          layout.rows.map((r) => [r.label, r.value] as [string, string]),
+        ));
       }
 
       // Where each gap in the locked set came from. The canvas keeps showing

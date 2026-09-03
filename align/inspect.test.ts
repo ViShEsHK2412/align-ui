@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSelector, describeGap, distinctValues, firstFamily, gapDistribution,
-  looksLikeColour, shortFile,
-  matchTokens,
-  tokenSummary, weightName, type Token,
+  looksLikeColour, matchTokens, parseTracks, shortFile, tokenSummary,
+  trackIndex, weightName, type Token,
 } from './inspect';
 
 const t = (name: string, value: string): Token =>
@@ -215,5 +214,46 @@ describe('similarCount, on what makes elements alike', () => {
     // selectorOf falls back to the tag when there is no class and no id; the
     // count would then be "how many divs does this page have".
     expect(buildSelector('div', '', [])).toBe('div');
+  });
+});
+
+describe('parseTracks', () => {
+  it('reads the used sizes a template resolved to', () => {
+    expect(parseTracks('232px 232px 232px')).toEqual([232, 232, 232]);
+    expect(parseTracks('  120.5px   60px ')).toEqual([120.5, 60]);
+  });
+
+  it('gives nothing rather than a guess when a track is not a length', () => {
+    // A subgrid, or a template read off a display:none parent.
+    expect(parseTracks('none')).toEqual([]);
+    expect(parseTracks('')).toEqual([]);
+    expect(parseTracks('1fr 1fr')).toEqual([]);
+    expect(parseTracks('232px auto')).toEqual([]);
+  });
+});
+
+describe('trackIndex', () => {
+  const tracks = [100, 100, 100];
+
+  it('finds the track an offset starts in', () => {
+    expect(trackIndex(tracks, 20, 0)).toBe(0);
+    expect(trackIndex(tracks, 20, 120)).toBe(1);
+    expect(trackIndex(tracks, 20, 240)).toBe(2);
+  });
+
+  it('reads an item sitting exactly on a track edge as inside it', () => {
+    expect(trackIndex(tracks, 20, 100)).toBe(0);
+    expect(trackIndex(tracks, 20, 100.4)).toBe(0);
+    expect(trackIndex(tracks, 20, 119.9)).toBe(1);
+  });
+
+  it('answers with the track an item belongs to when it lands in a gutter', () => {
+    // A margin or a transform moved it; it cannot have begun in the gutter.
+    expect(trackIndex(tracks, 20, 110)).toBe(1);
+  });
+
+  it('says nothing about an implicit track the template does not list', () => {
+    expect(trackIndex(tracks, 20, 400)).toBe(-1);
+    expect(trackIndex([], 20, 0)).toBe(-1);
   });
 });

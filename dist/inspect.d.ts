@@ -164,3 +164,46 @@ export declare function shortFile(href: string | null): string;
  * are unreadable by design, not missing.
  */
 export declare function stylingRules(el: Element): RuleSource[];
+/** One line of the layout readout. */
+export interface LayoutRow {
+    label: string;
+    value: string;
+}
+export interface LayoutFact {
+    /** The parent's `display`, already resolved. */
+    display: string;
+    /** How the parent lays its children out, and how this one is placed in it. */
+    rows: LayoutRow[];
+}
+/**
+ * Resolved grid tracks, in px: `"232px 232px 232px"` → `[232, 232, 232]`.
+ *
+ * The computed value of `grid-template-columns` is the *used* value, so `1fr`
+ * arrives already turned into the pixels it won. That is most of the value of
+ * reading it at all — what a fraction became is the thing you cannot work out
+ * by looking. `none`, and any track that is not a plain length (a subgrid, an
+ * unresolved `auto` on a display:none parent), yields nothing rather than a
+ * guess. Pure.
+ */
+export declare function parseTracks(value: string): number[];
+/**
+ * Which track an offset falls in, 0-based, or -1 for none.
+ *
+ * An item in a gutter answers with the track it starts inside, because a grid
+ * item cannot begin in a gutter — if the offset lands in one, the item has been
+ * moved by a margin or a transform and the honest answer is the track it
+ * belongs to. Offsets past the last track answer -1: that is an implicit track,
+ * which the computed template does not list. Pure.
+ */
+export declare function trackIndex(tracks: number[], gap: number, offset: number): number;
+/**
+ * How this element's parent places it.
+ *
+ * A box model tells you an element's own numbers. It does not tell you why the
+ * element is where it is, and for anything inside a flex or grid container that
+ * is the actual question — the child's own CSS often says nothing at all, and
+ * the answer lives one level up. Reported as facts, with no verdict.
+ *
+ * Returns null when there is no parent to report on.
+ */
+export declare function parentLayoutOf(el: Element): LayoutFact | null;

@@ -446,3 +446,149 @@ export function stylingRules(el: Element): RuleSource[] {
   // Later rules win more often than earlier ones, so the likeliest is first.
   return out.reverse();
 }
+
+// ── What the parent is doing ────────────────────────────────────────────────
+
+/** One line of the layout readout. */
+export interface LayoutRow { label: string; value: string }
+
+export interface LayoutFact {
+  /** The parent's `display`, already resolved. */
+  display: string;
+  /** How the parent lays its children out, and how this one is placed in it. */
+  rows: LayoutRow[];
+}
+
+/**
+ * Resolved grid tracks, in px: `"232px 232px 232px"` → `[232, 232, 232]`.
+ *
+ * The computed value of `grid-template-columns` is the *used* value, so `1fr`
+ * arrives already turned into the pixels it won. That is most of the value of
+ * reading it at all — what a fraction became is the thing you cannot work out
+ * by looking. `none`, and any track that is not a plain length (a subgrid, an
+ * unresolved `auto` on a display:none parent), yields nothing rather than a
+ * guess. Pure.
+ */
+export function parseTracks(value: string): number[] {
+  if (!value || value === 'none') return [];
+  const parts = value.trim().split(/\s+/);
+  const out: number[] = [];
+  for (const p of parts) {
+    if (!p.endsWith('px')) return [];
+    const n = Number.parseFloat(p);
+    if (!Number.isFinite(n)) return [];
+    out.push(n);
+  }
+  return out;
+}
+
+/**
+ * Which track an offset falls in, 0-based, or -1 for none.
+ *
+ * An item in a gutter answers with the track it starts inside, because a grid
+ * item cannot begin in a gutter — if the offset lands in one, the item has been
+ * moved by a margin or a transform and the honest answer is the track it
+ * belongs to. Offsets past the last track answer -1: that is an implicit track,
+ * which the computed template does not list. Pure.
+ */
+export function trackIndex(tracks: number[], gap: number, offset: number): number {
+  let at = 0;
+  for (let i = 0; i < tracks.length; i += 1) {
+    const end = at + tracks[i]!;
+    // Half a pixel of slack: a track edge is a float, and an item on it should
+    // read as inside rather than as the track before.
+    if (offset < end + 0.5) return i;
+    at = end + gap;
+  }
+  return -1;
+}
+
+/**
+ * How this element's parent places it.
+ *
+ * A box model tells you an element's own numbers. It does not tell you why the
+ * element is where it is, and for anything inside a flex or grid container that
+ * is the actual question — the child's own CSS often says nothing at all, and
+ * the answer lives one level up. Reported as facts, with no verdict.
+ *
+ * Returns null when there is no parent to report on.
+ */
+export function parentLayoutOf(el: Element): LayoutFact | null {
+  const parent = el.parentElement;
+  if (!parent) return null;
+
+  const pcs = getComputedStyle(parent);
+  const cs = getComputedStyle(el);
+  const display = pcs.display;
+  const rows: LayoutRow[] = [];
+
+  // An out-of-flow child is not laid out by its parent at all, and reporting
+  // the parent's flex settings would be actively misleading.
+  if (cs.position === 'absolute' || cs.position === 'fixed') {
+    rows.push({ label: 'placed by', value: `${cs.position}, not by the parent` });
+    return { display, rows };
+  }
+  if (cs.float !== 'none') {
+    rows.push({ label: 'placed by', value: `float: ${cs.float}` });
+    return { display, rows };
+  }
+
+  const flex = display.includes('flex');
+  const grid = display.includes('grid');
+  if (!flex && !grid) {
+    rows.push({ label: 'flow', value: display });
+    return { display, rows };
+  }
+
+  // Named axes rather than the shorthand's order. `12 / 32` is correct and
+  // unreadable: nothing on the row says which number belongs to which axis, and
+  // getting it backwards is the whole reason you looked.
+  const rowGap = fmtLen(pcs.rowGap === 'normal' ? '0px' : pcs.rowGap);
+  const colGap = fmtLen(pcs.columnGap === 'normal' ? '0px' : pcs.columnGap);
+  const gap = rowGap === colGap ? rowGap : `row ${rowGap} · column ${colGap}`;
+
+  if (flex) {
+    const dir = pcs.flexDirection;
+    rows.push({ label: 'direction', value: pcs.flexWrap === 'nowrap' ? dir : `${dir} · ${pcs.flexWrap}` });
+    rows.push({ label: 'justify', value: pcs.justifyContent });
+    rows.push({ label: 'align', value: pcs.alignItems });
+    rows.push({ label: 'gap', value: gap });
+    // The child's own share. `flex: 0 1 auto` is the default and says nothing,
+    // so it is only worth a row when it differs.
+    const own = `${cs.flexGrow} ${cs.flexShrink} ${cs.flexBasis}`;
+    if (own !== '0 1 auto') rows.push({ label: 'this child', value: `flex: ${own}` });
+    if (cs.alignSelf !== 'auto') rows.push({ label: 'align-self', value: cs.alignSelf });
+    return { display, rows };
+  }
+
+  const cols = parseTracks(pcs.gridTemplateColumns);
+  const rowTracks = parseTracks(pcs.gridTemplateRows);
+  if (cols.length) rows.push({ label: 'columns', value: `${cols.length} · ${cols.map(round).join(' ')}` });
+  if (rowTracks.length) rows.push({ label: 'rows', value: `${rowTracks.length} · ${rowTracks.map(round).join(' ')}` });
+  rows.push({ label: 'gap', value: gap });
+
+  // Where this child actually landed. Measured rather than read off
+  // `grid-column-start`, which is `auto` for every auto-placed item — which is
+  // to say, for almost every item on a real page.
+  const pr = parent.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const originX = pr.left + px(pcs.borderLeftWidth) + px(pcs.paddingLeft);
+  const originY = pr.top + px(pcs.borderTopWidth) + px(pcs.paddingTop);
+  const col = trackIndex(cols, px(pcs.columnGap === 'normal' ? '0' : pcs.columnGap), r.left - originX);
+  const row = trackIndex(rowTracks, px(pcs.rowGap === 'normal' ? '0' : pcs.rowGap), r.top - originY);
+  const cell: string[] = [];
+  if (col >= 0) cell.push(`column ${col + 1} of ${cols.length}`);
+  if (row >= 0) cell.push(`row ${row + 1} of ${rowTracks.length}`);
+  if (cell.length) rows.push({ label: 'this child', value: cell.join(' · ') });
+
+  return { display, rows };
+}
+
+/** `24px` → `24`, `0px` → `0`. Lengths read better without the unit here. */
+function fmtLen(v: string): string {
+  return v.endsWith('px') ? round(Number.parseFloat(v)) : v;
+}
+
+function round(n: number): string {
+  return String(Math.round(n * 100) / 100);
+}

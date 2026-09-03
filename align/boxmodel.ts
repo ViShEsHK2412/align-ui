@@ -65,6 +65,11 @@ const CSS = `
 }
 .panel {
   padding: 10px; border-radius: 0;
+  /* Five sections now — box, tokens, styled by, matches, colour — and on a
+     laptop that is taller than the window. place() clamps the position but
+     cannot rescue a panel taller than the screen, so it scrolls instead. */
+  max-height: calc(100vh - ${MARGIN * 2}px);
+  overflow-y: auto; overscroll-behavior: contain;
   font-size: ${TYPE.body}px; line-height: 1.4;
   color: var(--fg);
   background: ${GROUND};
@@ -93,6 +98,10 @@ const CSS = `
 }
 
 header {
+  /* Stays put while the body scrolls: it is also the drag handle, and a handle
+     you have to scroll back up to find is not a handle. */
+  position: sticky; top: -10px; z-index: 1;
+  background: ${GROUND};
   display: flex; align-items: baseline; gap: 8px;
   padding-bottom: 8px; margin-bottom: 8px;
   border-bottom: 1px solid var(--border);

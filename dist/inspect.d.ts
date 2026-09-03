@@ -207,3 +207,28 @@ export declare function trackIndex(tracks: number[], gap: number, offset: number
  * Returns null when there is no parent to report on.
  */
 export declare function parentLayoutOf(el: Element): LayoutFact | null;
+export interface DiffRow {
+    prop: string;
+    a: string;
+    b: string;
+}
+/**
+ * Which of those properties differ between two elements. Pure — it is handed
+ * the two readings rather than the two elements, so it can be tested.
+ *
+ * Values are compared as strings, which is the right call for a computed
+ * style: the browser has already normalised both sides into the same form, so
+ * a difference in the string is a real difference in the rendering.
+ */
+export declare function diffStyles(a: Record<string, string>, b: Record<string, string>): DiffRow[];
+/** Read exactly the diffable properties off an element. */
+export declare function diffReading(el: Element): Record<string, string>;
+/**
+ * What is different about `b` compared with `a`.
+ *
+ * The question behind almost every session with a tool like this is "these two
+ * should look the same and they don't". Measuring each in turn and comparing by
+ * eye is how that gets answered today, and it is exactly the kind of work that
+ * should not need a person.
+ */
+export declare function diffOf(a: Element, b: Element): DiffRow[];

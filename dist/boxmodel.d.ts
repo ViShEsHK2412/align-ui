@@ -15,7 +15,7 @@ export interface BoxModel {
      * `gaps` are the measured gaps within the locked set, already accounted for
      * by the caller, which is the only place that knows which boxes are paired.
      */
-    show(box: Box, gaps?: GapLine[]): void;
+    show(box: Box, gaps?: GapLine[], against?: Box): void;
     /** Show or hide the type readout. */
     toggleType(): void;
     /** Whether the type readout is showing, for the toolbar. */

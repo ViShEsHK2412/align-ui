@@ -152,6 +152,14 @@ function viewportGuide(g: Guide) {
  * Every gap inside the locked set, accounted for. Only the caller knows which
  * boxes are paired, so the panel is handed the answer rather than the boxes.
  */
+/**
+ * The lock before the newest one, which is what the newest is compared with.
+ * Undefined until there are two, because a diff needs something to diff against.
+ */
+function previousLock(): Box | undefined {
+  return pinned.length >= 2 ? pinned[pinned.length - 2] : undefined;
+}
+
 function gapFacts(): GapLine[] {
   if (pinned.length < 2) return [];
   const out: GapLine[] = [];
@@ -354,7 +362,7 @@ function onMouseDown(e: MouseEvent) {
   indicator?.closeHelp();
   pinned = [onPage];
   hover = onPage;
-  boxmodel?.show(onPage, gapFacts());
+  boxmodel?.show(onPage, gapFacts(), previousLock());
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -378,7 +386,7 @@ function onContextMenu(e: MouseEvent) {
 
   hover = hit;
   const last = pinned[pinned.length - 1];
-  if (last) boxmodel?.show(last, gapFacts()); else boxmodel?.hide();
+  if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -451,7 +459,7 @@ function watch() {
   pinned = next;
   hover = nextHover;
   const last = pinned[pinned.length - 1];
-  if (last) boxmodel?.show(last, gapFacts()); else boxmodel?.hide();
+  if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
   render();
 }
 

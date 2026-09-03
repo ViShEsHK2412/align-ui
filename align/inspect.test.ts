@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSelector, describeGap, distinctValues, firstFamily, gapDistribution,
   looksLikeColour, matchTokens, parseTracks, shortFile, tokenSummary,
-  trackIndex, weightName, type Token,
+  diffStyles, trackIndex, weightName, type Token,
 } from './inspect';
 
 const t = (name: string, value: string): Token =>
@@ -255,5 +255,33 @@ describe('trackIndex', () => {
   it('says nothing about an implicit track the template does not list', () => {
     expect(trackIndex(tracks, 20, 400)).toBe(-1);
     expect(trackIndex([], 20, 0)).toBe(-1);
+  });
+});
+
+describe('diffStyles', () => {
+  const base = { 'font-size': '16px', color: 'rgb(0, 0, 0)', display: 'block' };
+
+  it('says nothing when two readings agree', () => {
+    expect(diffStyles(base, { ...base })).toEqual([]);
+  });
+
+  it('reports each property that differs, with both sides', () => {
+    const rows = diffStyles(base, { ...base, 'font-size': '14px' });
+    expect(rows).toEqual([{ prop: 'font-size', a: '16px', b: '14px' }]);
+  });
+
+  it('reports in a fixed order rather than the order they were found', () => {
+    // Box before type before colour, every time, so a repeated comparison
+    // does not shuffle its own rows under you.
+    const rows = diffStyles(base, { display: 'flex', color: 'red', 'font-size': '2px' });
+    expect(rows.map((r) => r.prop)).toEqual(['display', 'font-size', 'color']);
+  });
+
+  it('counts a property present on one side and missing on the other', () => {
+    expect(diffStyles({ color: 'red' }, {})).toEqual([{ prop: 'color', a: 'red', b: '' }]);
+  });
+
+  it('ignores properties outside the curated set', () => {
+    expect(diffStyles({ zoom: '1' }, { zoom: '2' })).toEqual([]);
   });
 });

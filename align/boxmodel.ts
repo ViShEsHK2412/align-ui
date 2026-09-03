@@ -1,6 +1,6 @@
 import {
   coloursOf, gapDistribution, looksLikeColour, matchColourTokens, ownText,
-  parentLayoutOf,
+  diffOf, parentLayoutOf,
   selectorOf, similarCount, stylingRules, tokenSummary, tokensInScope,
   typographyOf,
 } from './inspect';
@@ -27,7 +27,7 @@ export interface BoxModel {
    * `gaps` are the measured gaps within the locked set, already accounted for
    * by the caller, which is the only place that knows which boxes are paired.
    */
-  show(box: Box, gaps?: GapLine[]): void;
+  show(box: Box, gaps?: GapLine[], against?: Box): void;
   /** Show or hide the type readout. */
   toggleType(): void;
   /** Whether the type readout is showing, for the toolbar. */
@@ -196,12 +196,18 @@ header .scale {
   border-top: 1px solid var(--border);
 }
 .readout-tag { position: static; margin-bottom: 5px; }
-.readout-row {
-  display: grid; grid-template-columns: 62px 1fr;
-  gap: 8px; align-items: baseline;
+/* One grid for the whole section rather than one per row, so every key in a
+   section shares a column and the column sizes to the longest key in it. A
+   fixed 62px was right until a diff started printing 'background-color', which
+   it broke across two lines mid-word. The 62px floor keeps the rhythm the
+   other sections already had. */
+.readout-rows {
+  display: grid; grid-template-columns: minmax(62px, max-content) 1fr;
+  gap: 0 8px; align-items: baseline;
   font-size: ${TYPE.tag}px; line-height: 1.5;
 }
-.readout-key { color: var(--muted); }
+.readout-row { display: contents; }
+.readout-key { color: var(--muted); white-space: nowrap; }
 .readout-value { color: var(--fg); overflow-wrap: anywhere; }
 .content {
   border-radius: 0; padding: 14px 8px;
@@ -240,6 +246,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
     tag.className = 'tag readout-tag';
     tag.textContent = title;
     el.appendChild(tag);
+    const grid = document.createElement('div');
+    grid.className = 'readout-rows';
+    el.appendChild(grid);
     for (const [label, value] of rows) {
       const row = document.createElement('div');
       row.className = 'readout-row';
@@ -250,7 +259,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       v.className = 'readout-value';
       v.textContent = value;
       row.append(k, v);
-      el.appendChild(row);
+      grid.appendChild(row);
     }
     return el;
   }
@@ -334,7 +343,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   }
 
   return {
-    show(box, gaps = []) {
+    show(box, gaps = [], against) {
       const b = bandsOf(box.el);
       const [bt, br, bb, bl] = b.border;
       const [pt, pr, pb, pl] = b.padding;
@@ -402,6 +411,25 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         parts.push(rows.length && text
           ? readout('type', rows.map((r) => [r.label, r.value] as [string, string]))
           : readout('type', [['', 'nothing of its own to set type on']]));
+      }
+
+      // What is different about this one and the one locked before it. The
+      // question behind most of these sessions is "these two should match and
+      // they don't", and answering it by measuring each in turn and comparing
+      // by eye is exactly the work that should not need a person.
+      if (against && against.el !== box.el) {
+        const rows = diffOf(against.el, box.el)
+          .map((d) => [d.prop, `${d.a || '—'} → ${d.b || '—'}`] as [string, string]);
+        // Capped: two elements that differ in twenty ways are two different
+        // elements, and the list stops being an answer somewhere before that.
+        const shown = rows.slice(0, 10);
+        if (rows.length > shown.length) {
+          shown.push(['', `and ${rows.length - shown.length} more`]);
+        }
+        parts.push(readout(
+          `differs from ${against.label}`,
+          shown.length ? shown : [['', 'nothing in the properties it compares']],
+        ));
       }
 
       // How the parent places this element. For anything inside a flex or grid

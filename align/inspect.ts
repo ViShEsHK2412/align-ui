@@ -592,3 +592,72 @@ function fmtLen(v: string): string {
 function round(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
+
+// ── What is different about these two ───────────────────────────────────────
+
+/**
+ * The properties a diff looks at, in the order it reports them.
+ *
+ * Curated, not exhaustive. `getComputedStyle` enumerates well over three
+ * hundred properties, and diffing all of them buries the one line you wanted
+ * under every longhand of every shorthand plus a dozen resolved values that
+ * differ without meaning anything. These are the ones a person actually asks
+ * about when two things that should match do not.
+ */
+const DIFF_PROPS: readonly string[] = [
+  'display', 'position', 'width', 'height',
+  'padding', 'margin', 'border-width', 'border-style', 'border-radius',
+  'font-family', 'font-size', 'font-weight', 'font-style',
+  'line-height', 'letter-spacing', 'text-transform', 'text-align',
+  'color', 'background-color', 'border-color', 'opacity',
+  'flex-direction', 'justify-content', 'align-items', 'gap',
+  'flex-grow', 'flex-shrink', 'flex-basis', 'align-self',
+  'box-shadow', 'overflow', 'text-overflow', 'white-space',
+];
+
+export interface DiffRow {
+  prop: string;
+  a: string;
+  b: string;
+}
+
+/**
+ * Which of those properties differ between two elements. Pure — it is handed
+ * the two readings rather than the two elements, so it can be tested.
+ *
+ * Values are compared as strings, which is the right call for a computed
+ * style: the browser has already normalised both sides into the same form, so
+ * a difference in the string is a real difference in the rendering.
+ */
+export function diffStyles(
+  a: Record<string, string>,
+  b: Record<string, string>,
+): DiffRow[] {
+  const out: DiffRow[] = [];
+  for (const prop of DIFF_PROPS) {
+    const av = a[prop] ?? '';
+    const bv = b[prop] ?? '';
+    if (av !== bv) out.push({ prop, a: av, b: bv });
+  }
+  return out;
+}
+
+/** Read exactly the diffable properties off an element. */
+export function diffReading(el: Element): Record<string, string> {
+  const cs = getComputedStyle(el);
+  const out: Record<string, string> = {};
+  for (const prop of DIFF_PROPS) out[prop] = cs.getPropertyValue(prop);
+  return out;
+}
+
+/**
+ * What is different about `b` compared with `a`.
+ *
+ * The question behind almost every session with a tool like this is "these two
+ * should look the same and they don't". Measuring each in turn and comparing by
+ * eye is how that gets answered today, and it is exactly the kind of work that
+ * should not need a person.
+ */
+export function diffOf(a: Element, b: Element): DiffRow[] {
+  return diffStyles(diffReading(a), diffReading(b));
+}

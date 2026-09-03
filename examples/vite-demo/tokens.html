@@ -171,6 +171,27 @@
       </table>
     </section>
 
+    <!-- 9 ─────────────────────────────────────────────────────────────── -->
+    <section>
+      <h2>9 &middot; On the palette, and beside it</h2>
+      <p>These two are one step apart. Lock each and read the
+        <code>colour</code> row: the first is <code>--brand</code>, the second
+        matches nothing. This is the failure an agent hands you most often, and
+        the one you cannot see.</p>
+
+      <div class="swatch-row">
+        <div class="on-palette">var(--brand)</div>
+        <div class="off-palette">#6ea9ff</div>
+      </div>
+
+      <table class="expect">
+        <tr><th>.on-palette</th><td>rgb(110, 168, 254)</td><td class="note">--brand</td></tr>
+        <tr><th>.off-palette</th><td>rgb(110, 169, 255)</td><td class="note">&mdash;</td></tr>
+        <tr><th>the row is silent</th><td colspan="2" class="note">on any page whose
+          tokens hold no colours &mdash; without a palette this would only be a picker</td></tr>
+      </table>
+    </section>
+
     <div class="tail" style="padding: 40px 0; color: #6b7386">
       end of page — scroll back up
     </div>

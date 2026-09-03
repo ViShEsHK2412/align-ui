@@ -222,3 +222,77 @@ export function gapDistribution(values: number[]): string {
     .map(([value, n]) => `${value} ×${n}`)
     .join(' · ');
 }
+
+// ── Colour ──────────────────────────────────────────────────────────────────
+
+/**
+ * Does this look like a colour, before we ask the browser to parse it?
+ *
+ * A cheap syntactic filter, so a scale of eighty tokens is not eighty canvas
+ * round-trips. Pure, and wrong only in the safe direction: anything it lets
+ * through is still verified by the parser below.
+ */
+export function looksLikeColour(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v) return false;
+  if (v.startsWith('#')) return true;
+  if (/^(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/.test(v)) return true;
+  // Named colours are a closed set, but only the ones a design token would
+  // plausibly hold are worth carrying.
+  return ['black', 'white', 'transparent', 'currentcolor'].includes(v);
+}
+
+/**
+ * One canvas, reused, as a colour parser.
+ *
+ * `fillStyle` accepts every colour syntax the browser does and hands back a
+ * canonical form, so `#6ea8fe`, `rgb(110 168 254)` and the oklch that resolves
+ * to the same place all compare equal. It is also the only parser guaranteed to
+ * agree with the one that painted the page.
+ */
+let parser: CanvasRenderingContext2D | null | undefined;
+
+function canonicalColour(value: string): string {
+  if (parser === undefined) parser = document.createElement('canvas').getContext('2d');
+  if (!parser) return '';
+  // An unparseable value leaves fillStyle untouched, so two different sentinels
+  // are what tells "it parsed" apart from "it was ignored".
+  parser.fillStyle = '#000000';
+  parser.fillStyle = value;
+  const first = parser.fillStyle;
+  parser.fillStyle = '#ffffff';
+  parser.fillStyle = value;
+  return first === parser.fillStyle ? String(first) : '';
+}
+
+/**
+ * Which tokens hold this colour.
+ *
+ * The same *matches, never from* rule as the numbers: this compares resolved
+ * colours, so a hardcoded `#6ea8fe` matches `--brand` exactly as well as one
+ * that uses it. That is the point — an agent writing a colour one notch off
+ * your brand blue is invisible by eye and obvious to a comparison.
+ */
+export function matchColourTokens(value: string, tokens: Token[]): string[] {
+  const want = canonicalColour(value);
+  if (!want) return [];
+  return tokens
+    .filter((t) => looksLikeColour(t.value) && canonicalColour(t.value) === want)
+    .map((t) => t.name)
+    .sort();
+}
+
+/** The colours an element actually paints with, skipping the invisible ones. */
+export function coloursOf(el: Element): { label: string; value: string }[] {
+  const cs = getComputedStyle(el);
+  const out: { label: string; value: string }[] = [];
+  const add = (label: string, raw: string) => {
+    const v = raw.trim();
+    // Fully transparent is not a colour decision, it is the absence of one.
+    if (!v || v === 'transparent' || /rgba?\([^)]*,\s*0\s*\)$/.test(v)) return;
+    out.push({ label, value: v });
+  };
+  add('text', cs.color);
+  add('background', cs.backgroundColor);
+  return out;
+}

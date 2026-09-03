@@ -1,4 +1,7 @@
-import { gapDistribution, tokenSummary, tokensInScope } from './inspect';
+import {
+  coloursOf, gapDistribution, looksLikeColour, matchColourTokens, tokenSummary,
+  tokensInScope,
+} from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import {
   GROUND, HAIRLINE, SHADOW, SHADOW_LIFTED, surface, TEXT, TYPE, WEIGHT,
@@ -384,6 +387,19 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         tokens,
       );
       if (summary) parts.push(readout('tokens', [['', summary]]));
+
+      // The same question asked of colour. Shown only where there are colour
+      // tokens to compare against — without a palette this is just a picker,
+      // and the point here is whether a colour is on the palette or beside it.
+      const palette = tokens.filter((t) => looksLikeColour(t.value));
+      if (palette.length) {
+        const rows = coloursOf(box.el).map(({ label, value }) => {
+          const hit = matchColourTokens(value, palette);
+          return [label, hit.length ? `${value}  ${hit.join(' ')}` : `${value}  —`] as
+            [string, string];
+        });
+        if (rows.length) parts.push(readout('colour', rows));
+      }
 
       panel.replaceChildren(...parts);
       current = box;

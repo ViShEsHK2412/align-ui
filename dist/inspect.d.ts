@@ -99,3 +99,25 @@ export declare function describeGap(f: GapFact): string;
  * and that is the judgement this tool deliberately does not make.
  */
 export declare function gapDistribution(values: number[]): string;
+/**
+ * Does this look like a colour, before we ask the browser to parse it?
+ *
+ * A cheap syntactic filter, so a scale of eighty tokens is not eighty canvas
+ * round-trips. Pure, and wrong only in the safe direction: anything it lets
+ * through is still verified by the parser below.
+ */
+export declare function looksLikeColour(value: string): boolean;
+/**
+ * Which tokens hold this colour.
+ *
+ * The same *matches, never from* rule as the numbers: this compares resolved
+ * colours, so a hardcoded `#6ea8fe` matches `--brand` exactly as well as one
+ * that uses it. That is the point — an agent writing a colour one notch off
+ * your brand blue is invisible by eye and obvious to a comparison.
+ */
+export declare function matchColourTokens(value: string, tokens: Token[]): string[];
+/** The colours an element actually paints with, skipping the invisible ones. */
+export declare function coloursOf(el: Element): {
+    label: string;
+    value: string;
+}[];

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  describeGap, distinctValues, firstFamily, gapDistribution, matchTokens,
+  describeGap, distinctValues, firstFamily, gapDistribution, looksLikeColour,
+  matchTokens,
   tokenSummary, weightName, type Token,
 } from './inspect';
 
@@ -138,5 +139,27 @@ describe('gapDistribution', () => {
   it('states the distribution and never grades it', () => {
     // GuideFrame appends "· inconsistent" here; that is the judgement we do not make.
     expect(gapDistribution([24, 18])).not.toContain('inconsistent');
+  });
+});
+
+describe('looksLikeColour', () => {
+  it('takes every syntax a token might be written in', () => {
+    for (const v of ['#fff', '#6ea8fe', 'rgb(1 2 3)', 'rgba(1,2,3,.5)',
+                     'hsl(200 50% 50%)', 'oklch(0.7 0.1 250)', 'lab(50 20 -30)',
+                     'color(display-p3 1 0 0)', 'white', 'black']) {
+      expect(looksLikeColour(v)).toBe(true);
+    }
+  });
+
+  it('rejects the lengths and keywords it sits beside in a token scale', () => {
+    for (const v of ['16px', '1.5', '0', '', '  ', 'auto', 'Inter, sans-serif',
+                     '2px solid', '50%']) {
+      expect(looksLikeColour(v)).toBe(false);
+    }
+  });
+
+  it('does not care about case or padding', () => {
+    expect(looksLikeColour('  OKLCH(0.7 0.1 250)  ')).toBe(true);
+    expect(looksLikeColour('  #ABCDEF ')).toBe(true);
   });
 });

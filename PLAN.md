@@ -806,6 +806,30 @@ Built and verified: freeze, x-ray, type readout, copy, undo, colour picker,
 colour tokens, similarCount, CSS rule and file, and the toolbar itself. Three
 of the five field-consensus corrections. The design system is rebased.
 
-Left: the layout grid, the pixel grid, canvas-true measuring, parent flex/grid
-diagnostics, and diffs. Two corrections wait on a camera zoom that does not
-exist yet.
+All twelve are built and verified in the browser. The last five went in as:
+canvas-true measuring, the layout grid and the pixel grid, parent flex/grid
+diagnostics, and diffs.
+
+Three things came out of building them that were not in the plan.
+
+- **The theme has to be read off the page, not off the machine.** The demo is
+  hard-coded dark on a machine set to light, and the tool was drawing a 14%
+  black hairline on a near-black ground. `prefers-color-scheme` is a statement
+  about the viewer, and the overlay's question is about the page. Now it reads
+  an explicit `color-scheme` first, then the background actually painted, and
+  falls back to the media query only when the page says nothing. The same
+  answer is set inline on the shadow host, so the canvas and the panels'
+  `light-dark()` cannot disagree.
+
+- **`alpha()` cannot fade a colour that already has one.** It appends
+  `/ a`, so a faded `rulerLine` came out as `oklch(... / 0.28 / 0.5)` — which
+  does not parse, and which canvas answers by silently keeping the last colour
+  it was given. The pixel grid was drawing in the guide hue. It has its own
+  token now.
+
+- **A grid centres in the layout viewport, not `innerWidth`.** A classic
+  scrollbar takes width from what the browser centres in, and half a scrollbar
+  is exactly enough to make a correct layout look wrong.
+
+Two corrections still wait on a camera zoom that does not exist yet: d3-style
+ruler ticks, and coalescing a run of nudges into one undo.

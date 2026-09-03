@@ -284,6 +284,34 @@
       </table>
     </section>
 
+    <section>
+      <h2>13 &middot; Two that should match, and don't</h2>
+      <p>
+        These two buttons are meant to be the same component. They are not
+        &mdash; one picked up a second class. Lock the left one, then
+        right-click the right one, and the panel says what changed rather than
+        making you read two box models side by side. The section under it says
+        how the parent places each: same flex row, different
+        <code>align-self</code>. Five rows, in the order the diff always uses
+        &mdash; box, then type, then colour &mdash; so a repeated comparison
+        does not shuffle itself under you.
+      </p>
+
+      <div class="twins">
+        <button class="btn">Save</button>
+        <button class="btn btn-odd">Save</button>
+      </div>
+
+      <table class="expect">
+        <tr><th>width</th><td>61.27 &rarr; 56.55</td><td class="note">a consequence of the padding, not a second bug</td></tr>
+        <tr><th>padding</th><td>8px 16px &rarr; 8px 14px</td><td class="note">the 2px that makes them look wrong</td></tr>
+        <tr><th>border-radius</th><td>0px &rarr; 4px</td><td class="note"></td></tr>
+        <tr><th>font-weight</th><td>500 &rarr; 400</td><td class="note">not visible until you put them next to each other</td></tr>
+        <tr><th>align-self</th><td>auto &rarr; flex-end</td><td class="note">and again under <i>laid out by flex</i>, which is where the rest of the parent's doing is</td></tr>
+        <tr><th>everything else</th><td colspan="2" class="note">not listed, because it is the same</td></tr>
+      </table>
+    </section>
+
     <div class="tail" style="padding: 40px 0; color: #6b7386">
       end of page — scroll back up
     </div>

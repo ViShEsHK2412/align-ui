@@ -179,3 +179,28 @@ section > p { margin: 0 0 16px; color: #8b93a7; font-size: 13px; }
   background: #1b2029; border: 1px solid #2b3341;
   display: grid; place-items: center; font-size: 11px;
 }
+
+/* 13 · Two that should match, and don't. The differences are deliberate and
+   small enough that you would not find them by looking. */
+.twins {
+  display: flex;
+  align-items: flex-start;
+  /* Ranged right so the pair is not underneath the panel where it parks by
+     default. You are meant to be looking at both while reading the diff. */
+  justify-content: flex-end;
+  gap: 24px;
+}
+.btn {
+  padding: 8px 16px;
+  font: 500 13px/1.2 var(--font, system-ui, sans-serif);
+  color: var(--ink, #cbd3e1);
+  background: #2b3341;
+  border: 1px solid #3a4557;
+  border-radius: 0;
+}
+.btn-odd {
+  padding: 8px 14px;
+  font-weight: 400;
+  border-radius: 4px;
+  align-self: flex-end;
+}

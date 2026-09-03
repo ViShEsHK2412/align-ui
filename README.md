@@ -108,7 +108,7 @@ ticks they exist to show.
 | `Ctrl/Cmd + Shift + A` | turn the tool on or off |
 | hover | outline, dotted edge guides, size tooltip |
 | click | lock an element, and open the box model |
-| right-click | add to the locked set, or drop one from it |
+| right-click | add to the locked set, or drop one from it — with two locked, the panel says what is different about them |
 | drag the panel header | move the box model |
 | `B`, or the `×` | hide the box model, and bring it back |
 | `R` | rulers along the top and left edges |
@@ -120,6 +120,8 @@ ticks they exist to show.
 | `T` | type and token readout for the locked element |
 | `F` | freeze the page so a moving thing can be measured |
 | `X` | x-ray: outline every element on the page |
+| `G` | the design grid, when one is configured |
+| `K` | a 10px pixel grid, for reading an offset off the page |
 | `P` | pick a colour from anywhere on screen |
 | `C` | copy the numbers in the panel |
 | `Ctrl/Cmd` while placing | ignore snapping |
@@ -197,8 +199,17 @@ initAlign({
   panelKey: 'b',
   rulerKey: 'r',
   guideKeys: { vertical: 'v', horizontal: 'h' },
+
+  // The grid the design is built on, for `G`. There is no default: twelve
+  // columns at 24 means nothing without knowing whose system it is, and a
+  // guessed grid is worse than none, because it looks authoritative.
+  grid: { columns: 12, gutter: 24, margin: 24, maxWidth: 1200 },
 });
 ```
+
+`maxWidth` is the content width the grid is centred in; `0` fills the window.
+The centring is against the layout viewport rather than `window.innerWidth`, so
+it lands on the same pixels the browser centres your container on.
 
 Mark anything the tool should never measure with `data-align-ignore` — hovering
 it walks up to the nearest ancestor that isn't ignored.

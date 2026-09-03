@@ -1,4 +1,4 @@
-import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
+import { GROUND, HAIRLINE, SHADOW, surface, TEXT, TYPE, WEIGHT } from './theme';
 
 /**
  * The badge, top-right, saying the tool is running. Clicking it opens the list
@@ -56,18 +56,15 @@ const CSS = `
   line-height: 1;
   -webkit-font-smoothing: antialiased;
   color-scheme: light dark;
-  color: ${themed(SEMANTIC.fg)};
-  background: ${nest(0)};
-  box-shadow: ${surfaceShadow(3, false)};
+  color: ${TEXT.primary};
+  background: ${GROUND};
+  box-shadow: ${SHADOW};
 }
 /* Scoped to .flag: this stylesheet shares a shadow root with the box model,
    which has a .name of its own — an unscoped rule restyled its header too. */
 .flag .name { letter-spacing: -0.02em; }
-.flag:hover { background: ${nest(1)}; }
-@media (prefers-color-scheme: dark) {
-  .flag { box-shadow: ${surfaceShadow(3, true)}; }
-}
-.flag .count { color: ${themed(SEMANTIC.muted)}; }
+.flag:hover { background: ${surface(1)}; }
+.flag .count { color: ${TEXT.secondary}; }
 /* With nothing locked the count is empty but still a flex item, so the gap
    before it padded the right side and the pill sat lopsided. */
 .flag .count:empty { display: none; }
@@ -84,13 +81,10 @@ const CSS = `
   font-size: ${TYPE.tag}px; line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   color-scheme: light dark;
-  color: ${themed(SEMANTIC.fg)};
-  background: ${nest(0)};
-  box-shadow: ${surfaceShadow(4, false)};
+  color: ${TEXT.primary};
+  background: ${GROUND};
+  box-shadow: ${SHADOW};
   display: none;
-}
-@media (prefers-color-scheme: dark) {
-  .help { box-shadow: ${surfaceShadow(4, true)}; }
 }
 .help[data-open] { display: block; }
 /* Baselines, not boxes. A key sits in a bordered chip and its description does
@@ -107,10 +101,10 @@ const CSS = `
 .help kbd {
   display: inline-block; padding: 3px 5px;
   font: inherit; font-weight: ${WEIGHT.medium};
-  border: 1px solid color-mix(in oklab, ${themed(SEMANTIC.fg)} 14%, transparent);
-  background: ${nest(2)};
+  border: 1px solid ${HAIRLINE};
+  background: ${surface(2)};
 }
-.help dd { margin: 0; color: ${themed(SEMANTIC.muted)}; }
+.help dd { margin: 0; color: ${TEXT.secondary}; }
 `;
 
 export function createIndicator(root: ShadowRoot): Indicator {

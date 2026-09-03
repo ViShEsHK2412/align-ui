@@ -1,6 +1,8 @@
 import { gapDistribution, tokenSummary, tokensInScope } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
-import { nest, SEMANTIC, surfaceShadow, themed, TYPE, WEIGHT } from './theme';
+import {
+  GROUND, HAIRLINE, SHADOW, SHADOW_LIFTED, surface, TEXT, TYPE, WEIGHT,
+} from './theme';
 import type { Box, Quad } from './types';
 
 /**
@@ -37,16 +39,6 @@ export interface GapLine {
 type Region = 'margin' | 'border' | 'padding';
 
 const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
-const CARD = 3;         // the panel floats over the page: Fluid surface-3
-const LIFTED = 5;       // while dragging, it lifts
-const NESTED = 4;       // every nested region, so the depth reads evenly
-
-/** `box-shadow` can't be themed with light-dark(), which takes colours only. */
-const shadow = (sel: string, level: number) => `
-${sel} { box-shadow: ${surfaceShadow(level, false)}; }
-@media (prefers-color-scheme: dark) {
-  ${sel} { box-shadow: ${surfaceShadow(level, true)}; }
-}`;
 
 const CSS = `
 .dock {
@@ -64,15 +56,17 @@ const CSS = `
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --fg: ${themed(SEMANTIC.fg)};
-  --muted: ${themed(SEMANTIC.muted)};
-  --border: color-mix(in oklab, var(--fg) 12%, transparent);
+  --fg: ${TEXT.primary};
+  --muted: ${TEXT.secondary};
+  --border: ${HAIRLINE};
 }
 .panel {
   padding: 10px; border-radius: 0;
   font-size: ${TYPE.body}px; line-height: 1.4;
   color: var(--fg);
-  background: ${nest(0)};
+  background: ${GROUND};
+
+  box-shadow: ${SHADOW};
 
   /* The one animation in the tool: a panel that must land exactly, so the
      Fluid spring.moderate tier at 160ms, critically damped. */
@@ -94,8 +88,6 @@ const CSS = `
   /* Fewer and gentler, not none: the fade aids comprehension, the travel does not. */
   .panel { transform: none; transition: opacity 120ms linear; }
 }
-${shadow('.panel', CARD)}
-${shadow('.dock[data-dragging] .panel', LIFTED)}
 
 header {
   display: flex; align-items: baseline; gap: 8px;
@@ -103,6 +95,7 @@ header {
   border-bottom: 1px solid var(--border);
   cursor: grab;
 }
+.dock[data-dragging] .panel { box-shadow: ${SHADOW_LIFTED}; }
 .dock[data-dragging] header { cursor: grabbing; }
 header .name {
   flex: 1; min-width: 0;
@@ -119,7 +112,7 @@ header .size {
 header .scale {
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
   margin-left: 4px;
-  color: ${themed(SEMANTIC.fg)};
+  color: ${TEXT.primary};
 }
 /* Padded well past its glyph so it is comfortably clickable, and outside the
    header's drag gesture. */
@@ -129,7 +122,7 @@ header .scale {
   font: inherit; font-size: ${TYPE.body}px; line-height: 1;
   color: var(--muted);
 }
-.close:hover { color: var(--fg); background: ${nest(1)}; }
+.close:hover { color: var(--fg); background: ${surface(1)}; }
 
 /* Each region is one step up Fluid's surface ladder. Depth is carried by the
    surface and its shadow — no borders, the same way the system's own nesting
@@ -141,11 +134,10 @@ header .scale {
      visibly staggered. The label shares the top number's line instead. */
   padding: 10px;
 }
-.region[data-level="1"] { background: ${nest(1)}; }
-.region[data-level="2"] { background: ${nest(2)}; }
-.region[data-level="3"] { background: ${nest(3)}; }
-.content { background: ${nest(4)}; }
-${shadow('.region, .content', NESTED)}
+.region[data-level="1"] { background: ${surface(1)}; }
+.region[data-level="2"] { background: ${surface(2)}; }
+.region[data-level="3"] { background: ${surface(3)}; }
+.content { background: ${surface(4)}; }
 
 /* The label and the top number sit on one line, and a label set 1px off the
    number it introduces is the kind of thing this tool exists to catch. Equal

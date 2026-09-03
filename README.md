@@ -90,6 +90,17 @@ export default function AlignDev() {
 > Guarding only `<AlignDev />` leaves the component statically imported and the
 > import reachable, so the whole tool ships to production.
 
+## The badge
+
+Top-right. It says the tool is on, counts what is locked, and carries the
+controls: `R X T B` for what is shown, `F` for holding the page still, then
+`C P` and undo. Each button is labelled with its own key, because it is not a
+replacement for the keyboard — it is how the keyboard gets learned. Clicking
+the word `Align` opens the full list below.
+
+It steps down out of the way when the rulers are up, rather than covering the
+ticks they exist to show.
+
 ## Keys
 
 | | |
@@ -107,6 +118,7 @@ export default function AlignDev() {
 | `L` | pin that guide, so it cannot be moved or deleted |
 | `Ctrl/Cmd + Z` | bring back the guides you just deleted |
 | `T` | type and token readout for the locked element |
+| `F` | freeze the page so a moving thing can be measured |
 | `X` | x-ray: outline every element on the page |
 | `P` | pick a colour from anywhere on screen |
 | `C` | copy the numbers in the panel |

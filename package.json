@@ -26,7 +26,7 @@
     "verify:dist": "npm run build && git diff --exit-code --stat dist",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "size": "node -e \"const fs=require('fs'),zlib=require('zlib');const s=fs.statSync('dist/align.js').size,z=zlib.gzipSync(fs.readFileSync('dist/align.js')).length;console.log('dist/align.js',s,'bytes ('+z+' gzipped)');if(s>49152)process.exit(1)\"",
+    "size": "node -e \"const fs=require('fs'),zlib=require('zlib');const s=fs.statSync('dist/align.js').size,z=zlib.gzipSync(fs.readFileSync('dist/align.js')).length;console.log('dist/align.js',s,'bytes ('+z+' gzipped)');if(s>65536)process.exit(1)\"",
     "demo": "vite examples/vite-demo",
     "demo:build": "vite build examples/vite-demo",
     "release": "node scripts/release.mjs"

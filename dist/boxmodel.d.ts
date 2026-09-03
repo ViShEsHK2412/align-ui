@@ -18,6 +18,10 @@ export interface BoxModel {
     show(box: Box, gaps?: GapLine[]): void;
     /** Show or hide the type readout. */
     toggleType(): void;
+    /** Whether the type readout is showing, for the toolbar. */
+    showsType(): boolean;
+    /** Whether the panel is up at all, for the toolbar. */
+    isOpen(): boolean;
     /** The panel's numbers as text, for the clipboard. */
     asText(): string;
     /** Nothing is locked any more. */

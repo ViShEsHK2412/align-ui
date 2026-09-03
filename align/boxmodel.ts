@@ -29,6 +29,10 @@ export interface BoxModel {
   show(box: Box, gaps?: GapLine[]): void;
   /** Show or hide the type readout. */
   toggleType(): void;
+  /** Whether the type readout is showing, for the toolbar. */
+  showsType(): boolean;
+  /** Whether the panel is up at all, for the toolbar. */
+  isOpen(): boolean;
   /** The panel's numbers as text, for the clipboard. */
   asText(): string;
   /** Nothing is locked any more. */
@@ -453,6 +457,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       // A frame first, so the browser paints the closed state before it moves.
       requestAnimationFrame(() => dock.setAttribute('data-open', ''));
     },
+    showsType: () => showType,
+    isOpen: () => !dismissed && current !== null,
+
     toggleType() {
       showType = !showType;
       if (current) this.show(current);

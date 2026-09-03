@@ -1,5 +1,7 @@
 import { fmt, guideAt, spreadLabels } from './measure';
-import { alpha, ink, prefersDark, TYPE, WEIGHT, whenFontReady, type Ink } from './theme';
+import {
+  alpha, ink, prefersDark, RULER, TYPE, WEIGHT, whenFontReady, type Ink,
+} from './theme';
 import type { Box, Guide, Segment } from './types';
 
 /**
@@ -28,7 +30,6 @@ const EDGE = 12;        // keep chips this far from the viewport edge
 /** How far back a measurement steps when you are asking about another one. */
 const FADED = 0.22;
 
-const RULER = 22;       // gutter thickness
 const MINOR = 10;       // unlabelled tick, px of page
 const MID = 50;         // half-height tick
 const MAJOR = 100;      // labelled tick

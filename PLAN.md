@@ -798,3 +798,14 @@ do I change it*, which is the whole of what needs saying back to an agent.
 - **Annotations: arrows, pen, text** — mesurer's direction, and right for
   mesurer, whose job is passing feedback to a person. A whole second UI.
 - **Screenshots** — only worth it if they are being sent somewhere.
+
+
+## Progress, after the toolbar
+
+Built and verified: freeze, x-ray, type readout, copy, undo, colour picker,
+colour tokens, similarCount, CSS rule and file, and the toolbar itself. Three
+of the five field-consensus corrections. The design system is rebased.
+
+Left: the layout grid, the pixel grid, canvas-true measuring, parent flex/grid
+diagnostics, and diffs. Two corrections wait on a camera zoom that does not
+exist yet.

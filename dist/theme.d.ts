@@ -66,6 +66,8 @@ export declare const HAIRLINE: string;
 export declare const SHADOW = "0 2px 8px rgb(0 0 0 / 0.2), 0 4px 16px rgb(0 0 0 / 0.1)";
 /** While dragging, it lifts. */
 export declare const SHADOW_LIFTED = "0 4px 12px rgb(0 0 0 / 0.24), 0 12px 32px rgb(0 0 0 / 0.16)";
+/** The ruler gutter's thickness, shared by what draws it and what dodges it. */
+export declare const RULER = 22;
 /** One row height, so the toolbar and the panel share a rhythm. */
 export declare const ROW = 36;
 /** Agentation's spacing: 2, 4, 8. Nothing between, nothing beyond. */

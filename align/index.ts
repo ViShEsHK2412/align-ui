@@ -1,6 +1,6 @@
 import { createBoxModel, type BoxModel } from './boxmodel';
 import { mergeConfig, type Config } from './config';
-import { createIndicator, type Indicator } from './indicator';
+import { createIndicator, type Indicator, type ToolName } from './indicator';
 import {
   boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
   snapCandidates, snapTo,
@@ -231,7 +231,45 @@ function render(cursor?: { x: number; y: number }) {
     lines,
     ...(cursor ? { cursor } : {}),
   });
-  indicator?.update(pinned.length);
+  indicator?.update(pinned.length, {
+    rulers,
+    xray,
+    freeze: isFrozen(),
+    type: boxmodel?.showsType() ?? false,
+    panel: boxmodel?.isOpen() ?? false,
+  });
+}
+
+/**
+ * What a toolbar button does. Every one of these has a key too, and both paths
+ * end here so the two can never drift apart.
+ */
+function copyReading(): void {
+  // The numbers are this tool's output; retyping them was the only way out.
+  const text = boxmodel?.asText() ?? '';
+  if (text) navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
+}
+
+function undoRemoval(): void {
+  // One level, covering both Del and Shift+Del. Not a history: it exists
+  // because Shift+Del can wipe an afternoon of guides in one keystroke.
+  if (!lastRemoved || lastRemoved.length === 0) return;
+  setGuides([...guides, ...lastRemoved.map((g) => ({ ...g, id: nextGuideId++ }))]);
+  lastRemoved = null;
+}
+
+function onTool(name: ToolName): void {
+  switch (name) {
+    case 'rulers': rulers = !rulers; saveFlag('rulers', rulers); break;
+    case 'xray': xray = !xray; setXray(xray); break;
+    case 'freeze': setFrozen(!isFrozen()); break;
+    case 'type': boxmodel?.toggleType(); break;
+    case 'panel': boxmodel?.toggle(); break;
+    case 'copy': copyReading(); break;
+    case 'pick': void picker?.open(); break;
+    case 'undo': undoRemoval(); break;
+  }
+  render();
 }
 
 /** The keyboard needs to know where the pointer is to drop a guide there. */
@@ -426,9 +464,11 @@ function activate() {
   loadFont();
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
-  indicator = createIndicator(overlay.root);
+  indicator = createIndicator(overlay.root, onTool);
   picker = createPicker(overlay.root);
-  indicator.update(0);
+  indicator.update(0, {
+    rulers, xray, freeze: isFrozen(), type: false, panel: false,
+  });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('mouseup', onMouseUp, { capture: true });
@@ -530,8 +570,7 @@ function onKey(e: KeyboardEvent) {
   } else if (overlay && e.key.toLowerCase() === 'c') {
     // The numbers are this tool's output; retyping them was the only way out.
     e.preventDefault();
-    const text = boxmodel?.asText() ?? '';
-    if (text) navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
+    copyReading();
   } else if (overlay && e.key.toLowerCase() === 'l') {
     // Pin the guide the keyboard is pointing at: still selectable, still
     // measuring, but no longer draggable or deletable by accident.
@@ -546,8 +585,7 @@ function onKey(e: KeyboardEvent) {
     // exists because Shift+Del can wipe an afternoon's guides in one keystroke.
     if (!lastRemoved || lastRemoved.length === 0) return;
     e.preventDefault();
-    setGuides([...guides, ...lastRemoved.map((g) => ({ ...g, id: nextGuideId++ }))]);
-    lastRemoved = null;
+    undoRemoval();
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();

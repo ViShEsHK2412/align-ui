@@ -3,12 +3,22 @@
  * of keys — the only discoverable place for them, since a hotkey-driven tool
  * has nowhere else to put its own instructions.
  */
+/** What the toolbar's toggles should currently look like. */
+export interface ToolState {
+    rulers: boolean;
+    xray: boolean;
+    freeze: boolean;
+    type: boolean;
+    panel: boolean;
+}
+/** A control does one of these when pressed; index.ts owns what they mean. */
+export type ToolName = 'rulers' | 'xray' | 'freeze' | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
 export interface Indicator {
-    update(locked: number): void;
+    update(locked: number, state: ToolState): void;
     /** True if it was open — lets Escape dismiss the topmost layer first. */
     closeHelp(): boolean;
     destroy(): void;
 }
 /** Kept next to the handlers they describe, so they can't drift apart. */
 export declare const KEYS: [string, string][];
-export declare function createIndicator(root: ShadowRoot): Indicator;
+export declare function createIndicator(root: ShadowRoot, onTool: (name: ToolName) => void): Indicator;

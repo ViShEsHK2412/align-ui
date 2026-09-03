@@ -105,6 +105,11 @@ export default function AlignDev() {
 | `V` / `H` | vertical / horizontal guide at the cursor |
 | arrows | nudge the last guide you touched by 1px; `Shift` for 10 |
 | `L` | pin that guide, so it cannot be moved or deleted |
+| `Ctrl/Cmd + Z` | bring back the guides you just deleted |
+| `T` | type and token readout for the locked element |
+| `X` | x-ray: outline every element on the page |
+| `P` | pick a colour from anywhere on screen |
+| `C` | copy the numbers in the panel |
 | `Ctrl/Cmd` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
@@ -209,8 +214,11 @@ align/
   boxmodel.ts   the draggable box model panel
   indicator.ts  the badge and its key list
   measure.ts    geometry, hit-testing, computed styles
-  inspect.ts    design tokens, gap provenance
+  inspect.ts    type, design tokens, gap provenance
+  colour.ts     hex / rgb / hsl / oklch conversion
+  picker.ts     the eyedropper card
   store.ts      what survives a reload
+  xray.ts       the one thing that writes to the page
   theme.ts      OKLCH tokens, type scale, font loading
   types.ts      Box, Segment, Bands, Quad
   config.ts     ignore selector, hotkey, panel / ruler / guide keys

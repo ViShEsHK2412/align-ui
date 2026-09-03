@@ -97,15 +97,33 @@ section > p { margin: 0 0 16px; color: #8b93a7; font-size: 13px; }
   row-gap: var(--space-3);
 }
 
-/* 5 · a token redefined further down the tree ─────────────────────────────── */
+/* 5 · type, on and off the scale ──────────────────────────────────────────── */
+.type-on {
+  font-size: var(--text-body);
+  line-height: var(--line-body);
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.type-off {
+  font-size: 15px;              /* not on the scale */
+  line-height: 22px;            /* not on the scale */
+  letter-spacing: 0.5px;
+  font-weight: 400;
+}
+.type-unitless {
+  font-size: var(--text-lg);
+  line-height: 1.4;             /* resolves to 28 — which IS on the scale */
+}
+
+/* 6 · a token redefined further down the tree ─────────────────────────────── */
 .rescope { --space-4: 20px; }
 .rescope .card { padding: var(--space-4); }
 
-/* 6 · not siblings: a gap the tool must refuse to attribute ───────────────── */
+/* 7 · not siblings: a gap the tool must refuse to attribute ───────────────── */
 .left-col, .right-col { display: inline-block; vertical-align: top; }
 .right-col { margin-left: 60px; }
 
-/* 7 · distinctive edges and centres, for snapping ─────────────────────────── */
+/* 8 · distinctive edges and centres, for snapping ─────────────────────────── */
 .snap-row { display: flex; gap: var(--space-8); margin-top: var(--space-4); }
 .snap-row .card { width: 200px; }
 

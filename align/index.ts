@@ -8,6 +8,8 @@ import {
 import { mountOverlay, type Overlay } from './overlay';
 import { loadFont, unloadFont } from './theme';
 import { describeGap, gapFactOf } from './inspect';
+import { createPicker, type Picker } from './picker';
+import { setXray } from './xray';
 import { loadFlag, loadGuides, saveFlag, saveGuides } from './store';
 import type { GapLine } from './boxmodel';
 import type { Box, Guide, Segment } from './types';
@@ -28,6 +30,9 @@ let cfg: Config;
 let overlay: Overlay | null = null;
 let boxmodel: BoxModel | null = null;
 let indicator: Indicator | null = null;
+let picker: Picker | null = null;
+/** X-ray is the one thing that writes to the page, so it is tracked here. */
+let xray = false;
 let hover: Box | null = null;
 let pinned: Box[] = [];
 let watching = 0;
@@ -47,6 +52,8 @@ let restored = false;
  * this gives the keyboard reach to the thing you just clicked.
  */
 let activeGuideId: number | null = null;
+/** The last guides deleted, for one level of undo. */
+let lastRemoved: Guide[] | null = null;
 
 function activeGuide(): Guide | null {
   return guides.find((g) => g.id === activeGuideId) ?? null;
@@ -117,6 +124,7 @@ function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
 
 function removeGuide(g: Guide) {
   if (g.pinned) return;              // pinned guides are not deletable either
+  lastRemoved = [g];
   setGuides(guides.filter((o) => o.id !== g.id));
   if (hoverGuide?.id === g.id) hoverGuide = null;
   if (dragging?.id === g.id) dragging = null;
@@ -418,6 +426,7 @@ function activate() {
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
   indicator = createIndicator(overlay.root);
+  picker = createPicker(overlay.root);
   indicator.update(0);
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
@@ -444,6 +453,10 @@ function deactivate() {
   cancelAnimationFrame(watching);
   watching = 0;
   indicator?.destroy();
+  picker?.destroy();
+  picker = null;
+  // Never leave the page outlined because the tool was closed while x-ray was on.
+  if (xray) { xray = false; setXray(false); }
   indicator = null;
   boxmodel?.destroy();
   boxmodel = null;
@@ -472,6 +485,7 @@ function onKey(e: KeyboardEvent) {
     if (e.shiftKey) {
       // Clearing the lot has to forget the one under the cursor too, or the
       // overlay keeps drawing a position chip for a guide that is gone.
+      lastRemoved = guides.filter((g) => !g.pinned);
       setGuides(guides.filter((g) => g.pinned));
       hoverGuide = null;
       dragging = null;
@@ -495,6 +509,21 @@ function onKey(e: KeyboardEvent) {
     g.caught = '';
     setGuides([...guides]);
     render();
+  } else if (overlay && e.key.toLowerCase() === 'x') {
+    e.preventDefault();
+    xray = !xray;
+    setXray(xray);
+  } else if (overlay && e.key.toLowerCase() === 'p') {
+    e.preventDefault();
+    void picker?.open();
+  } else if (overlay && e.key.toLowerCase() === 't') {
+    e.preventDefault();
+    boxmodel?.toggleType();
+  } else if (overlay && e.key.toLowerCase() === 'c') {
+    // The numbers are this tool's output; retyping them was the only way out.
+    e.preventDefault();
+    const text = boxmodel?.asText() ?? '';
+    if (text) navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
   } else if (overlay && e.key.toLowerCase() === 'l') {
     // Pin the guide the keyboard is pointing at: still selectable, still
     // measuring, but no longer draggable or deletable by accident.
@@ -503,6 +532,14 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     g.pinned = !g.pinned;
     setGuides([...guides]);
+    render();
+  } else if (overlay && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    // One level, covering both Del and Shift+Del. Not a command history: this
+    // exists because Shift+Del can wipe an afternoon's guides in one keystroke.
+    if (!lastRemoved || lastRemoved.length === 0) return;
+    e.preventDefault();
+    setGuides([...guides, ...lastRemoved.map((g) => ({ ...g, id: nextGuideId++ }))]);
+    lastRemoved = null;
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();
@@ -517,6 +554,7 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape' && overlay) {
     // Escape dismisses the topmost thing first: help, then the locks, then the
     // tool itself.
+    if (picker?.close()) return;
     if (indicator?.closeHelp()) return;
     if (pinned.length) { pinned = []; boxmodel?.hide(); render(); }
     else deactivate();

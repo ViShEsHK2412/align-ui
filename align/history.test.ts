@@ -60,6 +60,20 @@ describe('createHistory', () => {
     expect(h.pop()).toEqual([2]);
   });
 
+  it('shows what pop would return without taking it', () => {
+    const h = createHistory<number>();
+    h.push([1], '', 0);
+    h.push([2], '', 5000);
+    expect(h.peek()).toEqual([2]);
+    expect(h.depth()).toBe(2);
+    expect(h.pop()).toEqual([2]);
+    expect(h.peek()).toEqual([1]);
+  });
+
+  it('peeks null on an empty stack', () => {
+    expect(createHistory<number>().peek()).toBeNull();
+  });
+
   it('clears', () => {
     const h = createHistory<number>();
     h.push([1], '', 0);

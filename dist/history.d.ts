@@ -19,6 +19,8 @@ export interface History<T> {
     push(state: T[], tag: string, now?: number): void;
     /** The state to go back to, or null when there is nothing left. */
     pop(): T[] | null;
+    /** What `pop` would return, without taking it. */
+    peek(): T[] | null;
     depth(): number;
     clear(): void;
 }

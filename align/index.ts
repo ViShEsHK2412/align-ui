@@ -302,7 +302,21 @@ function copyReading(): void {
   else say(false);
 }
 
+/** Two guide lists that would draw identically. Order is stable, so index-wise. */
+function sameGuides(a: Guide[], b: Guide[]): boolean {
+  return a.length === b.length && a.every((g, i) => {
+    const o = b[i]!;
+    return g.id === o.id && g.axis === o.axis && g.at === o.at
+      && g.locked === o.locked && g.pinned === o.pinned;
+  });
+}
+
 function undo(): void {
+  // Skip anything that would restore what is already on screen. Guarding the
+  // call sites catches the no-ops we know about; this catches the rest, and it
+  // cannot skip a real entry -- an entry identical to the present is one whose
+  // restoration you could not see.
+  while (history.depth() > 0 && sameGuides(history.peek()!, guides)) history.pop();
   const before = history.pop();
   if (!before) return;
   setGuides(before);
@@ -625,7 +639,13 @@ function onKey(e: KeyboardEvent) {
     if (e.shiftKey) {
       // Clearing the lot has to forget the one under the cursor too, or the
       // overlay keeps drawing a position chip for a guide that is gone.
-      record();
+      //
+      // Only if there is something to clear. A wipe with nothing deletable --
+      // no guides, or every one of them pinned -- used to record an undo entry
+      // anyway, so five of them meant five presses of Ctrl+Z that did nothing
+      // before the sixth did something. That is the exact failure undo exists
+      // to avoid.
+      if (guides.some((g) => !g.pinned)) record();
       setGuides(guides.filter((g) => g.pinned));
       hoverGuide = null;
       dragging = null;

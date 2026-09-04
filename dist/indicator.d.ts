@@ -21,6 +21,4 @@ export interface Indicator {
     closeHelp(): boolean;
     destroy(): void;
 }
-/** Kept next to the handlers they describe, so they can't drift apart. */
-export declare const KEYS: [string, string][];
 export declare function createIndicator(root: ShadowRoot, onTool: (name: ToolName) => void): Indicator;

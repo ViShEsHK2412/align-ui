@@ -1,6 +1,7 @@
 import {
-  GROUND, HAIRLINE, RULER, SHADOW, surface, TEXT, TYPE, WEIGHT,
+  GROUND, HAIRLINE, ROW, RULER, SHADOW, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
+import { icon, type IconName } from './icons';
 
 /**
  * The badge, top-right, saying the tool is running. Clicking it opens the list
@@ -30,33 +31,38 @@ export interface Indicator {
   destroy(): void;
 }
 
-/** Kept next to the handlers they describe, so they can't drift apart. */
-export const KEYS: [string, string][] = [
-  ['Ctrl/Cmd + Shift + A', 'turn align on or off'],
-  ['Hover', 'measure what is under the cursor'],
-  ['Click', 'lock an element'],
-  ['Right-click', 'add to, or drop from, the locked set'],
-  ['Drag the panel header', 'move the box model'],
-  ['B', 'hide or bring back the box model'],
-  ['R', 'rulers down the top and left edges'],
-  ['Drag from a rule', 'pull out a guide; drag it back to remove'],
-  ['V', 'vertical guide at the cursor'],
-  ['H', 'horizontal guide at the cursor'],
-  ['Hover a guide', 'distance from it to every locked element'],
-  ['Click a guide', 'keep those distances up; click again to release'],
-  ['Arrows', 'nudge the last guide you touched; Shift for 10px'],
-  ['L', 'pin that guide so it cannot be moved or deleted'],
-  ['Ctrl/Cmd + Z', 'undo the last change — a run of nudges counts as one'],
-  ['T', 'type and token readout for the locked element'],
-  ['F', 'freeze the page so a moving thing can be measured'],
-  ['G', 'your column grid, if one is configured'],
-  ['K', 'a ten-pixel texture to read against'],
-  ['X', 'x-ray: outline every element on the page'],
-  ['P', 'pick a colour from anywhere on screen'],
-  ['C', 'copy the numbers in the panel'],
-  ['Ctrl/Cmd while placing', 'ignore snapping'],
-  ['Del', 'remove the guide under the cursor; Shift+Del for all'],
-  ['Esc', 'clear the locks, then close'],
+/**
+ * The rows that have no button of their own: gestures, and the guide keys.
+ *
+ * Grouped, because an undifferentiated list of twenty-five keys is a wall. The
+ * tools are not listed here — they are generated from TOOLS below, so the
+ * button, its tooltip and this list cannot drift apart.
+ */
+const GESTURES: { title: string; rows: [string, string][] }[] = [
+  {
+    title: 'Pointing at things',
+    rows: [
+      ['Ctrl/Cmd + Shift + A', 'turn align on or off'],
+      ['Hover', 'measure whatever is under the cursor'],
+      ['Click', 'lock an element, so it keeps measuring after the pointer leaves'],
+      ['Right-click', 'add another to the locked set, or drop one from it. Two locked also gets you a diff'],
+      ['Drag the panel header', 'move the box model out of your way'],
+      ['Esc', 'clear the locks, then close the tool'],
+    ],
+  },
+  {
+    title: 'Guides',
+    rows: [
+      ['Drag from a rule', 'pull out a guide; drag it back into the rule to throw it away'],
+      ['V  /  H', 'drop a vertical or horizontal guide at the cursor'],
+      ['Hover a guide', 'its distance to every locked element'],
+      ['Click a guide', 'keep those distances up; click again to release'],
+      ['Arrows', 'nudge the guide you last touched. Shift for 10px'],
+      ['L', 'pin a guide, so it cannot be moved or deleted by accident'],
+      ['Ctrl/Cmd while placing', 'ignore snapping'],
+      ['Del', 'remove the guide under the cursor. Shift+Del for all of them'],
+    ],
+  },
 ];
 
 /**
@@ -65,7 +71,10 @@ export const KEYS: [string, string][] = [
  * changes. Height is the line box plus the padding either side.
  */
 const INSET = 16;
-const FLAG_H = TYPE.tag + 12;
+/* A row of icon buttons, not of text: the height comes from the buttons plus
+   the padding either side, which lands on the ROW the panel already uses. */
+const BTN = 24;
+const FLAG_H = ROW;
 const STEP = 8;
 
 const CSS = `
@@ -73,7 +82,7 @@ const CSS = `
   position: fixed; top: ${INSET}px; right: ${INSET}px;
   display: flex; align-items: center; gap: 8px;
   transition: top 160ms cubic-bezier(0.19, 1, 0.22, 1);
-  padding: 6px 10px; border-radius: 0;
+  padding: ${(ROW - BTN) / 2}px 10px; border-radius: 0;
   pointer-events: auto; user-select: none; cursor: pointer;
   font-family: ${TYPE.stack};
   font-variant-numeric: tabular-nums;
@@ -103,7 +112,7 @@ const CSS = `
   background: ${HAIRLINE};
 }
 .tool {
-  width: 20px; height: 20px;
+  width: ${BTN}px; height: ${BTN}px;
   display: grid; place-items: center;
   padding: 0; border: 0; border-radius: 0;
   background: none; cursor: pointer;
@@ -121,7 +130,7 @@ const CSS = `
 .flag .count:empty { display: none; }
 
 .help {
-  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 292px;
+  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 368px;
   /* Fifteen rows outgrow a short window, and a list you cannot reach the end
      of is worse than one you have to scroll. */
   max-height: calc(100vh - ${INSET * 2 + FLAG_H + STEP}px); overflow-y: auto;
@@ -142,12 +151,29 @@ const CSS = `
    of the text it labels — right on one-line rows by luck, wrong on every row
    that wraps. Aligning on the baseline is right on both. */
 .help dl {
-  display: grid; grid-template-columns: auto 1fr;
+  display: grid; grid-template-columns: 16px auto 1fr;
   /* Baseline alignment already buys each wrapped row 4px of separation, so
      the gap stays where it was rather than pushing the list off the screen. */
   align-items: baseline; gap: 6px 10px; margin: 0;
 }
 .help dt { justify-self: start; }
+/* The icon column: present for the rows that have a button, blank for the rows
+   that are gestures. Blank rather than absent, so the keys stay in one column
+   down the whole list instead of stepping in and out. */
+.help .glyph {
+  justify-self: center;
+  /* Not centred: a wrapped description makes the row tall, and an icon
+     floating halfway down it reads as belonging to the line it is level with
+     rather than to the row it is in. Level with the first line. */
+  align-self: start; margin-top: 1px;
+  color: ${TEXT.tertiary}; line-height: 0;
+}
+.help h4 {
+  grid-column: 1 / -1; margin: 10px 0 2px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.semibold};
+  color: ${TEXT.tertiary};
+}
+.help h4:first-child { margin-top: 0; }
 .help kbd {
   display: inline-block; padding: 3px 5px;
   font: inherit; font-weight: ${WEIGHT.medium};
@@ -165,21 +191,42 @@ const CSS = `
  * changes the page, and things that happen once — so this is a layers bar, not
  * a palette.
  *
- * Each button is labelled with its own key. It is not a replacement for the
- * keyboard, it is how the keyboard gets learned: press the button for a week
- * and you will have the key for good.
+ * Each row carries a name, a sentence saying what the control actually does,
+ * and its key. The button shows only the icon; the tooltip and the key list
+ * show all three, which is how the keyboard gets learned — there is nowhere
+ * else for a hotkey-driven tool to teach its own hotkeys.
  */
-const TOOLS: { name: ToolName; label: string; title: string; toggle: boolean }[] = [
-  { name: 'rulers', label: 'R', title: 'rulers down the top and left edges', toggle: true },
-  { name: 'xray', label: 'X', title: 'outline every element on the page', toggle: true },
-  { name: 'grid', label: 'G', title: 'your column grid, if one is configured', toggle: true },
-  { name: 'pixels', label: 'K', title: 'a ten-pixel texture to read against', toggle: true },
-  { name: 'type', label: 'T', title: 'type and token readout', toggle: true },
-  { name: 'panel', label: 'B', title: 'the box model panel', toggle: true },
-  { name: 'freeze', label: 'F', title: 'hold the page still', toggle: true },
-  { name: 'copy', label: 'C', title: 'copy the numbers in the panel', toggle: false },
-  { name: 'pick', label: 'P', title: 'pick a colour from anywhere on screen', toggle: false },
-  { name: 'undo', label: '\u21ba', title: 'undo the last change to the guides', toggle: false },
+interface Tool {
+  name: ToolName;
+  /** What it is called, in the tooltip and the key list. */
+  label: string;
+  /** What it does. A sentence, not the label said again. */
+  what: string;
+  key: string;
+  toggle: boolean;
+}
+
+const TOOLS: Tool[] = [
+  { name: 'rulers', label: 'Rulers', key: 'R', toggle: true,
+    what: 'a scale down the top and left edges, in page pixels — and the gutters you drag guides out of' },
+  { name: 'xray', label: 'X-ray', key: 'X', toggle: true,
+    what: 'outline every element at once, to see the boxes a layout is really made of' },
+  { name: 'grid', label: 'Column grid', key: 'G', toggle: true,
+    what: 'the grid your design is built on, columns filled and gutters left empty. Needs one configured' },
+  { name: 'pixels', label: 'Pixel grid', key: 'K', toggle: true,
+    what: 'a ten-pixel lattice over the page, to read an offset off without measuring it' },
+  { name: 'type', label: 'Type', key: 'T', toggle: true,
+    what: 'add size, weight, line height and tracking to the panel, each checked against your scale' },
+  { name: 'panel', label: 'Box model', key: 'B', toggle: true,
+    what: 'the readout itself — margins, borders, padding, what places the element, what styles it' },
+  { name: 'freeze', label: 'Freeze', key: 'F', toggle: true,
+    what: 'hold every animation and transition where it stands, so a moving thing can be measured' },
+  { name: 'copy', label: 'Copy', key: 'C', toggle: false,
+    what: 'put everything in the panel on the clipboard as text' },
+  { name: 'pick', label: 'Colour', key: 'P', toggle: false,
+    what: 'sample a colour from anywhere on screen and match it against your palette' },
+  { name: 'undo', label: 'Undo', key: 'Ctrl/Cmd + Z', toggle: false,
+    what: 'step back through the guides — a whole run of nudges counts as one' },
 ];
 
 export function createIndicator(
@@ -212,8 +259,12 @@ export function createIndicator(
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tool';
-    b.textContent = t.label;
-    b.title = `${t.title}  \u00b7  ${t.name === 'undo' ? 'Ctrl/Cmd+Z' : t.label}`;
+    b.appendChild(icon(t.name as IconName));
+    // The icon carries no words, so the name has to reach a screen reader some
+    // other way — and the tooltip has to say more than the name again.
+    b.setAttribute('aria-label', t.label);
+    b.title = `${t.label}  ·  ${t.key}
+${t.what}`;
     if (!t.toggle) b.setAttribute('data-once', '');
     b.addEventListener('click', (e) => {
       e.stopPropagation();            // the flag itself opens the key list
@@ -228,14 +279,34 @@ export function createIndicator(
   const help = document.createElement('div');
   help.className = 'help';
   const dl = document.createElement('dl');
-  for (const [key, what] of KEYS) {
+
+  function heading(text: string) {
+    const h = document.createElement('h4');
+    h.textContent = text;
+    dl.appendChild(h);
+  }
+
+  /** One row: the icon if it has one, the key, and what it does. */
+  function row(key: string, what: string, name?: IconName) {
+    const glyph = document.createElement('span');
+    glyph.className = 'glyph';
+    if (name) glyph.appendChild(icon(name, 14));
     const dt = document.createElement('dt');
     const kbd = document.createElement('kbd');
     kbd.textContent = key;
     dt.appendChild(kbd);
     const dd = document.createElement('dd');
     dd.textContent = what;
-    dl.append(dt, dd);
+    dl.append(glyph, dt, dd);
+  }
+
+  // The tools first, because that is what the bar above shows and this is the
+  // only place the icons are ever named.
+  heading('The bar, left to right');
+  for (const t of TOOLS) row(t.key, `${t.label} — ${t.what}`, t.name as IconName);
+  for (const group of GESTURES) {
+    heading(group.title);
+    for (const [key, what] of group.rows) row(key, what);
   }
   help.appendChild(dl);
 

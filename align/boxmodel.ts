@@ -152,12 +152,21 @@ header .scale {
 /* Each region is one step up Fluid's surface ladder. Depth is carried by the
    surface and its shadow — no borders, the same way the system's own nesting
    example reads. Generous, even insets so each surface has room to breathe. */
+/*
+ * Spacing here is 4 / 8 / 12, and that is a correction rather than a
+ * preference. It was 5, 6, 10 and 14 — values picked one at a time, none of
+ * which relate to each other. Four levels of nesting multiply that: every
+ * region spent 20px of padding and every row 10px of gap plus 44px of edge
+ * columns, so the innermost cell — the content size, the one number you opened
+ * the panel to read — was squeezed to 83px and ellipsised, while each zero
+ * beside it got a full cell. The same values on a scale give it back about 40%.
+ */
 .region {
   border-radius: 0;
   /* Symmetric. An extra-tall top to clear the label offset each box's centre
      from its parent's, and nesting compounded it until the side numbers were
      visibly staggered. The label shares the top number's line instead. */
-  padding: 10px;
+  padding: 8px;
 }
 .region[data-level="1"] { background: ${surface(1)}; }
 .region[data-level="2"] { background: ${surface(2)}; }
@@ -185,17 +194,17 @@ header .scale {
   white-space: nowrap; color: var(--fg);
 }
 .edge[data-zero] { color: var(--muted); font-weight: ${WEIGHT.regular}; }
-.row { display: flex; align-items: center; gap: 5px; margin: 6px 0; }
-.row > .edge { flex: 0 0 22px; }
+.row { display: flex; align-items: center; gap: 4px; margin: 4px 0; }
+.row > .edge { flex: 0 0 20px; }
 .row > .fill { flex: 1 1 auto; min-width: 0; }
 
 /* Type and tokens sit under the box, in the same muted register as the band
    labels — they annotate the measurement rather than competing with it. */
 .readout {
-  margin-top: 10px; padding-top: 10px;
+  margin-top: 8px; padding-top: 8px;
   border-top: 1px solid var(--border);
 }
-.readout-tag { position: static; margin-bottom: 5px; }
+.readout-tag { position: static; margin-bottom: 4px; }
 /* One grid for the whole section rather than one per row, so every key in a
    section shares a column and the column sizes to the longest key in it. A
    fixed 62px was right until a diff started printing 'background-color', which
@@ -210,7 +219,7 @@ header .scale {
 .readout-key { color: var(--muted); white-space: nowrap; }
 .readout-value { color: var(--fg); overflow-wrap: anywhere; }
 .content {
-  border-radius: 0; padding: 14px 8px;
+  border-radius: 0; padding: 12px 8px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--fg);
@@ -305,6 +314,9 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
 
   addEventListener('resize', place);
   let current: Box | null = null;
+  /** The rest of the last reading, so a re-render can reproduce all of it. */
+  let currentGaps: GapLine[] = [];
+  let currentAgainst: Box | undefined;
 
   // ── Rendering ─────────────────────────────────────────────────────────────
   function edge(n: number): HTMLElement {
@@ -344,6 +356,8 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
 
   return {
     show(box, gaps = [], against) {
+      currentGaps = gaps;
+      currentAgainst = against;
       const b = bandsOf(box.el);
       const [bt, br, bb, bl] = b.border;
       const [pt, pr, pb, pl] = b.padding;
@@ -430,8 +444,12 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         if (rows.length > shown.length) {
           shown.push(['', `and ${rows.length - shown.length} more`]);
         }
+        // Two elements with the same selector are the common case here — that
+        // is what "these two should match" usually means — and "differs from
+        // div.card" then reads as differing from itself.
+        const from = against.label === box.label ? 'the one locked before' : against.label;
         parts.push(readout(
-          `differs from ${against.label}`,
+          `differs from ${from}`,
           shown.length ? shown : [['', 'nothing in the properties it compares']],
         ));
       }
@@ -506,7 +524,10 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
 
     toggleType() {
       showType = !showType;
-      if (current) this.show(current);
+      // Everything the last render was given, not just the box: re-rendering
+      // from the box alone silently dropped the gaps and the diff, so pressing
+      // T made two sections you had asked for disappear.
+      if (current) this.show(current, currentGaps, currentAgainst);
     },
 
     asText() {

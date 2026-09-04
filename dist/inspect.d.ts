@@ -58,8 +58,16 @@ export declare function matchTokens(value: number, tokens: Token[]): string[];
 export declare function distinctValues(nums: number[]): number[];
 /**
  * One line summarising which of an element's numbers are on the token scale.
- * A number with no match is the interesting one, so it is named rather than
- * dropped.
+ *
+ * Matches first, then a count of what did not match. It used to print every
+ * number with an em dash beside the ones that missed, which on a typical
+ * element meant a line like `128.671875 — · 64 — · 1 — · 12 --space-3`: four
+ * entries, three of them saying nothing, and the one real finding last. The
+ * dashes were meant to make a miss visible and instead buried the hit.
+ *
+ * Numbers are formatted the way every other number in the tool is. Printing
+ * `128.671875` next to a panel that says `128.67` everywhere else is a
+ * different answer to the same question.
  */
 export declare function tokenSummary(values: number[], tokens: Token[]): string;
 /** Where a measured gap between two siblings actually came from. */

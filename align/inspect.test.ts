@@ -85,8 +85,25 @@ describe('tokenSummary', () => {
     expect(tokenSummary([16, 24], SCALE)).toBe('16 --gap-md --space-4  ·  24 --space-6');
   });
 
-  it('marks a value with no token, which is the one worth seeing', () => {
-    expect(tokenSummary([13], SCALE)).toBe('13 —');
+  it('counts the misses after the hits rather than listing them', () => {
+    // A dash beside every miss buried the one hit under three of them.
+    expect(tokenSummary([16, 13], SCALE))
+      .toBe('16 --gap-md --space-4  ·  1 more, not on the scale');
+    expect(tokenSummary([16, 13, 17, 19], SCALE))
+      .toBe('16 --gap-md --space-4  ·  3 more, not on the scale');
+  });
+
+  it('says so plainly when nothing matched', () => {
+    expect(tokenSummary([13], SCALE)).toBe('its one number is not on the scale');
+    expect(tokenSummary([13, 17], SCALE)).toBe('none of its 2 numbers are on the scale');
+  });
+
+  it('formats numbers the way the rest of the tool does', () => {
+    // Not 128.671875 in a panel that says 128.67 everywhere else.
+    expect(tokenSummary([16.004], [...SCALE, t('--odd', '16.004px')]))
+      .toBe('16 --gap-md --odd --space-4');
+    expect(tokenSummary([128.671875, 8], SCALE))
+      .toBe('8 --radius --space-2  ·  1 more, not on the scale');
   });
 
   it('says nothing at all on a page with no tokens', () => {

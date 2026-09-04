@@ -1,4 +1,5 @@
 import { createBoxModel, type BoxModel } from './boxmodel';
+import { createHistory } from './history';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import {
@@ -55,8 +56,33 @@ let restored = false;
  * this gives the keyboard reach to the thing you just clicked.
  */
 let activeGuideId: number | null = null;
-/** The last guides deleted, for one level of undo. */
-let lastRemoved: Guide[] | null = null;
+/**
+ * Undo, over every change to the guides rather than only deletions.
+ *
+ * It began as one slot holding the last thing deleted, because Shift+Del can
+ * wipe an afternoon's work in one keystroke. But a guide nudged eight pixels
+ * off its snap is lost just as thoroughly as a deleted one, and there was no
+ * way back from it at all.
+ */
+const history = createHistory<Guide>();
+
+/**
+ * The guide list as it stands, safe to keep. Guides are mutated in place while
+ * dragging and nudging, so a snapshot has to copy each one — holding the array
+ * alone would leave history pointing at objects that keep changing under it.
+ */
+function snapshot(): Guide[] {
+  return guides.map((g) => ({ ...g }));
+}
+
+/**
+ * Record where we are before changing it. An empty tag is a one-off; a tag
+ * shared with the change before it continues that gesture instead of starting
+ * a new one.
+ */
+function record(tag = ''): void {
+  history.push(snapshot(), tag);
+}
 
 function activeGuide(): Guide | null {
   return guides.find((g) => g.id === activeGuideId) ?? null;
@@ -120,14 +146,20 @@ function placeGuide(g: Guide, x: number, y: number, free: boolean) {
 
 function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
   const g: Guide = { id: nextGuideId++, axis, at: 0, locked: false, caught: '', pinned: false };
+  record();
   placeGuide(g, x, y, free);
   setGuides([...guides, g]);
+  // A guide you just put down is the one the keyboard should be holding.
+  // Without this a guide dropped with V or H could not be nudged at all until
+  // it had been clicked, which is a strange thing to have to do to something
+  // you placed a moment ago.
+  activeGuideId = g.id;
   return g;
 }
 
 function removeGuide(g: Guide) {
   if (g.pinned) return;              // pinned guides are not deletable either
-  lastRemoved = [g];
+  record();
   setGuides(guides.filter((o) => o.id !== g.id));
   if (hoverGuide?.id === g.id) hoverGuide = null;
   if (dragging?.id === g.id) dragging = null;
@@ -264,12 +296,17 @@ function copyReading(): void {
   if (text) navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
 }
 
-function undoRemoval(): void {
-  // One level, covering both Del and Shift+Del. Not a history: it exists
-  // because Shift+Del can wipe an afternoon of guides in one keystroke.
-  if (!lastRemoved || lastRemoved.length === 0) return;
-  setGuides([...guides, ...lastRemoved.map((g) => ({ ...g, id: nextGuideId++ }))]);
-  lastRemoved = null;
+function undo(): void {
+  const before = history.pop();
+  if (!before) return;
+  setGuides(before);
+  // Whatever the pointer and the keyboard were holding may no longer exist, or
+  // may have come back at a different place. Let go of all of it rather than
+  // keep a reference into a list that has been replaced.
+  hoverGuide = null;
+  dragging = null;
+  grabFrom = null;
+  if (!before.some((g) => g.id === activeGuideId)) activeGuideId = null;
 }
 
 function onTool(name: ToolName): void {
@@ -283,7 +320,7 @@ function onTool(name: ToolName): void {
     case 'panel': boxmodel?.toggle(); break;
     case 'copy': copyReading(); break;
     case 'pick': void picker?.open(); break;
-    case 'undo': undoRemoval(); break;
+    case 'undo': undo(); break;
   }
   render();
 }
@@ -350,6 +387,9 @@ function onMouseDown(e: MouseEvent) {
   const grabbed = guideUnder(guides, e.clientX, e.clientY);
   if (grabbed) {
     swallow(e);
+    // One entry for the whole press, whether it turns out to be a drag or the
+    // click that toggles the lock. The moves in between record nothing.
+    record();
     activeGuideId = grabbed.id;
     // A pinned guide still takes focus and still clicks, it just cannot travel.
     dragging = grabbed;
@@ -543,7 +583,7 @@ function onKey(e: KeyboardEvent) {
     if (e.shiftKey) {
       // Clearing the lot has to forget the one under the cursor too, or the
       // overlay keeps drawing a position chip for a guide that is gone.
-      lastRemoved = guides.filter((g) => !g.pinned);
+      record();
       setGuides(guides.filter((g) => g.pinned));
       hoverGuide = null;
       dragging = null;
@@ -561,6 +601,9 @@ function onKey(e: KeyboardEvent) {
     if (!g || g.axis !== wants) return;
     e.preventDefault();
     if (g.pinned) return;
+    // A held arrow key is one gesture however many times it repeats, so the
+    // whole run shares a tag and collapses to a single step.
+    record(`nudge:${g.id}`);
     const step = e.shiftKey ? 10 : 1;
     g.at += (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -step : step;
     // Nudged by hand, so whatever it had snapped to is no longer what it is on.
@@ -601,15 +644,14 @@ function onKey(e: KeyboardEvent) {
     const g = activeGuide();
     if (!g) return;
     e.preventDefault();
+    record();
     g.pinned = !g.pinned;
     setGuides([...guides]);
     render();
   } else if (overlay && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-    // One level, covering both Del and Shift+Del. Not a command history: this
-    // exists because Shift+Del can wipe an afternoon's guides in one keystroke.
-    if (!lastRemoved || lastRemoved.length === 0) return;
+    if (history.depth() === 0) return;
     e.preventDefault();
-    undoRemoval();
+    undo();
     render();
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();

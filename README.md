@@ -116,7 +116,7 @@ ticks they exist to show.
 | `V` / `H` | vertical / horizontal guide at the cursor |
 | arrows | nudge the last guide you touched by 1px; `Shift` for 10 |
 | `L` | pin that guide, so it cannot be moved or deleted |
-| `Ctrl/Cmd + Z` | bring back the guides you just deleted |
+| `Ctrl/Cmd + Z` | undo the last change to the guides — a nudge, a drag, a delete. A held arrow key undoes as one step, not thirty |
 | `T` | type and token readout for the locked element |
 | `F` | freeze the page so a moving thing can be measured |
 | `X` | x-ray: outline every element on the page |

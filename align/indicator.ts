@@ -46,7 +46,7 @@ export const KEYS: [string, string][] = [
   ['Click a guide', 'keep those distances up; click again to release'],
   ['Arrows', 'nudge the last guide you touched; Shift for 10px'],
   ['L', 'pin that guide so it cannot be moved or deleted'],
-  ['Ctrl/Cmd + Z', 'bring back the guides you just deleted'],
+  ['Ctrl/Cmd + Z', 'undo the last change — a run of nudges counts as one'],
   ['T', 'type and token readout for the locked element'],
   ['F', 'freeze the page so a moving thing can be measured'],
   ['G', 'your column grid, if one is configured'],
@@ -179,7 +179,7 @@ const TOOLS: { name: ToolName; label: string; title: string; toggle: boolean }[]
   { name: 'freeze', label: 'F', title: 'hold the page still', toggle: true },
   { name: 'copy', label: 'C', title: 'copy the numbers in the panel', toggle: false },
   { name: 'pick', label: 'P', title: 'pick a colour from anywhere on screen', toggle: false },
-  { name: 'undo', label: '\u21ba', title: 'bring back the guides you just deleted', toggle: false },
+  { name: 'undo', label: '\u21ba', title: 'undo the last change to the guides', toggle: false },
 ];
 
 export function createIndicator(

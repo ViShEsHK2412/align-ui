@@ -43,6 +43,8 @@ body {
 main { width: 940px; max-width: 100%; margin: 0 auto; padding: 0 var(--space-6) 120px; }
 
 section { padding: var(--space-8) 0; border-bottom: 1px solid var(--line); }
+/* The bar is sticky, so anything scrolled to has to clear it. */
+section, h2, h3, .card { scroll-margin-top: 72px; }
 h2 { font-size: 17px; margin: 0 0 var(--space-2); }
 h3 { font-size: 14px; margin: var(--space-6) 0 var(--space-2); color: var(--dim); }
 p { margin: 0 0 var(--space-4); max-width: 68ch; color: var(--dim); }
@@ -76,6 +78,16 @@ code { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--in
 .g-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 .g-sub > .nest { display: grid; grid-template-columns: subgrid; grid-column: span 3; gap: var(--space-4); }
 .g-rtl { direction: rtl; display: grid; grid-template-columns: 80px 160px; gap: var(--space-4); }
+/* Columns run down the page here and rows run right to left, which is the case
+   that reports no cell at all if the axes are mapped by guessing. */
+.g-vertical {
+  writing-mode: vertical-rl;
+  display: grid;
+  grid-template-columns: 70px 70px;
+  grid-template-rows: 120px 120px;
+  gap: var(--space-4);
+  height: 176px;
+}
 
 /* 3 · flex shapes --------------------------------------------------------- */
 .f-wrap { display: flex; flex-wrap: wrap; gap: var(--space-3); width: 320px; }
@@ -88,8 +100,8 @@ code { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--in
 .f-grow .card { width: auto; }
 
 /* 4 · out of flow --------------------------------------------------------- */
-.oof { position: relative; height: 200px; border: 1px dashed var(--line); }
-.oof .abs { position: absolute; left: 40px; top: 30px; }
+.oof { position: relative; height: 220px; border: 1px dashed var(--line); }
+.oof .abs { position: absolute; left: 200px; top: 30px; }
 .oof .fixed-like { position: absolute; right: 24px; bottom: 24px; }
 .oof .floated { float: left; margin-right: var(--space-6); }
 .sticky-box { position: sticky; top: 60px; }

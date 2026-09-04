@@ -568,13 +568,28 @@ export function offsetAlong(
  * Returns null when there is no parent to report on.
  */
 export function parentLayoutOf(el: Element): LayoutFact | null {
-  const parent = el.parentElement;
+  // `display: contents` generates no box, so such a parent lays nothing out —
+  // the child is placed by the nearest ancestor that does. Reporting the
+  // literal parent here answers "laid out by contents", which is true and
+  // useless: it names the one element in the chain that is not doing it.
+  let parent = el.parentElement;
+  let skipped = 0;
+  while (parent && getComputedStyle(parent).display === 'contents') {
+    parent = parent.parentElement;
+    skipped += 1;
+  }
   if (!parent) return null;
 
   const pcs = getComputedStyle(parent);
   const cs = getComputedStyle(el);
   const display = pcs.display;
   const rows: LayoutRow[] = [];
+  if (skipped > 0) {
+    rows.push({
+      label: 'through',
+      value: skipped === 1 ? 'a display: contents parent' : `${skipped} display: contents parents`,
+    });
+  }
 
   // An out-of-flow child is not laid out by its parent at all, and reporting
   // the parent's flex settings would be actively misleading.

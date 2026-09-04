@@ -90,11 +90,21 @@
       <h3>right to left</h3>
       <div class="g-rtl"><div class="card" style="width:auto">first</div><div class="card" style="width:auto">second</div></div>
 
+      <h3>vertical writing mode — columns run down, rows run right to left</h3>
+      <div class="g-vertical">
+        <div class="card" style="width:auto;height:auto">v1</div>
+        <div class="card" style="width:auto;height:auto">v2</div>
+        <div class="card" style="width:auto;height:auto">v3</div>
+        <div class="card" style="width:auto;height:auto">v4</div>
+      </div>
+
       <table class="expect">
         <tr><th>fr tracks</th><td>3 tracks, in px</td><td class="note">what the fractions became, not "1fr 2fr 1fr"</td></tr>
-        <tr><th>implicit row</th><td>row omitted for 4</td><td class="note">the template lists one row; the second is implicit and unlisted</td></tr>
+        <tr><th>implicit row</th><td>rows: 2 · 60 64</td><td class="note">the computed template includes the implicit row, so the tool can see it and says so</td></tr>
         <tr><th>subgrid child</th><td>no columns row</td><td class="note">the computed template is <code>subgrid</code>, not lengths</td></tr>
-        <tr><th>rtl</th><td>column 1 is on the right</td><td class="note">track order is writing order, and the offset is measured from the content edge</td></tr>
+        <tr><th>rtl</th><td>column 1 is on the right</td><td class="note">track order is writing order, and the offset runs from the far edge back</td></tr>
+        <tr><th>vertical, v1</th><td>column 1, row 1</td><td class="note">top-right: columns run down, rows lean left</td></tr>
+        <tr><th>vertical, v4</th><td>column 2, row 2</td><td class="note">and getting the axes wrong reports no cell at all, not a near miss</td></tr>
       </table>
     </section>
 
@@ -121,7 +131,7 @@
 
       <table class="expect">
         <tr><th>row-reverse</th><td>direction row-reverse</td><td class="note">and the gap is still measured between the boxes as drawn</td></tr>
-        <tr><th>space-between</th><td>gap 0 · rest from layout</td><td class="note">never a bare 0, which would read as a bug</td></tr>
+        <tr><th>space-between</th><td>justify space-between, gap 0</td><td class="note">the CSS gap really is 0; the row above it says where the space came from. Locking both also gets <i>gap 0 · rest from layout</i> under <b>gaps</b>, which is the part that would otherwise read as a bug</td></tr>
         <tr><th>flex-grow</th><td>this child flex: 2 1 0px</td><td class="note">only shown because it differs from the default</td></tr>
       </table>
     </section>
@@ -137,6 +147,7 @@
         <div class="card floated">float</div>
         <div class="card abs">absolute</div>
         <div class="card fixed-like">pinned bottom-right</div>
+        <div class="card sticky-box" style="margin-left: 300px">sticky</div>
       </div>
 
       <div class="row" style="margin-top: 24px; align-items: flex-start">
@@ -216,7 +227,7 @@
       </div>
       <table class="expect">
         <tr><th>a cell</th><td>laid out by table-row</td><td class="note">not flex, not grid, and it says so</td></tr>
-        <tr><th>contents child</th><td>reports the parent it has</td><td class="note">that parent generates no box of its own</td></tr>
+        <tr><th>contents child</th><td>through a display: contents parent</td><td class="note">and then the flex row that actually places it. Naming the contents parent would name the one element in the chain that is not doing it</td></tr>
       </table>
     </section>
 

@@ -130,6 +130,22 @@ ticks they exist to show.
 
 Clicking the **Align** badge, top-right, shows this list in the page.
 
+## The demo pages
+
+`npm run demo` serves three:
+
+| | |
+|---|---|
+| `index.html` | a plain page, for checking the basics |
+| `tokens.html` | tokens and provenance — where a gap came from, which numbers are on the scale |
+| `stress.html` | the hard cases, each section stating what the right answer is |
+
+`stress.html` is the one to reach for when changing anything: scaled subtrees,
+every shape a grid and a flex row come in, out-of-flow children, scroll
+containers, four kinds of moving thing, open and closed shadow roots, tables,
+vertical writing modes, and 1500 elements to keep hover honest about what it
+costs.
+
 **Rulers** run along the top and left edges in *page* coordinates, counting from
 the top-left of the document rather than the viewport, so the numbers keep
 meaning something as you scroll. Ticks step 10 / 50 / 100 px and the cursor is

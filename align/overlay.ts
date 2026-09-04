@@ -356,9 +356,21 @@ export function mountOverlay(): Overlay {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // Both are references to measure against, so both go under everything.
-    if (state.pixels) pixelGrid();
-    if (state.grid) grid(state.grid);
+    // Both are references to measure against, so both go under everything —
+    // and both stay out of the ruler gutters, which are chrome. The gutter
+    // background is deliberately a little translucent, so without this the
+    // texture shows straight through it and competes with the tick labels.
+    if (state.pixels || state.grid) {
+      ctx.save();
+      if (state.rulers) {
+        ctx.beginPath();
+        ctx.rect(RULER, RULER, innerWidth, innerHeight);
+        ctx.clip();
+      }
+      if (state.pixels) pixelGrid();
+      if (state.grid) grid(state.grid);
+      ctx.restore();
+    }
 
     for (const box of state.pinned) outline(box, c.accent);
     if (state.hover) {

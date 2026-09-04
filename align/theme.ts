@@ -108,6 +108,13 @@ export const TEXT = {
   primary: film(0.9),
   secondary: film(0.6),
   tertiary: film(0.46, 0.55),
+  /**
+   * A control that cannot do anything right now. Deliberately below the
+   * contrast floor the other three clear, which is allowed and is the point:
+   * WCAG exempts disabled controls, and the whole job of this value is to look
+   * unavailable rather than merely quiet.
+   */
+  disabled: film(0.22, 0.26),
 } as const;
 
 /** A hairline of the same film, for rules between sections. */

@@ -19,6 +19,9 @@ export interface ToolState {
   freeze: boolean;
   type: boolean;
   panel: boolean;
+  /** Whether the two one-shots have anything to act on right now. */
+  canCopy: boolean;
+  canUndo: boolean;
 }
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
@@ -417,6 +420,11 @@ ${t.what}`;
         // attribute rather than setting it, which reads as a flickering button.
         buttons.get(t.name)?.toggleAttribute('data-on', state[t.name as keyof ToolState] === true);
       }
+      // The two one-shots go dead when there is nothing for them to act on.
+      const copy = buttons.get('copy');
+      if (copy) copy.disabled = !state.canCopy;
+      const undo = buttons.get('undo');
+      if (undo) undo.disabled = !state.canUndo;
     },
     closeHelp() {
       const wasOpen = help.hasAttribute('data-open');

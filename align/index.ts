@@ -282,6 +282,9 @@ function render(cursor?: { x: number; y: number }) {
     pixels,
     freeze: isFrozen(),
     type: boxmodel?.showsType() ?? false,
+    // Copy reads the panel, which needs something locked; undo needs a history.
+    canCopy: pinned.length > 0,
+    canUndo: history.depth() > 0,
     panel: boxmodel?.isOpen() ?? false,
   });
 }
@@ -580,6 +583,7 @@ function activate() {
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
+    canCopy: false, canUndo: false,
   });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });

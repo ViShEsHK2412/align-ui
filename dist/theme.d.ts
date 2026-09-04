@@ -63,6 +63,13 @@ export declare const TEXT: {
     readonly primary: string;
     readonly secondary: string;
     readonly tertiary: string;
+    /**
+     * A control that cannot do anything right now. Deliberately below the
+     * contrast floor the other three clear, which is allowed and is the point:
+     * WCAG exempts disabled controls, and the whole job of this value is to look
+     * unavailable rather than merely quiet.
+     */
+    readonly disabled: string;
 };
 /** A hairline of the same film, for rules between sections. */
 export declare const HAIRLINE: string;

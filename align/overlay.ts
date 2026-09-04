@@ -80,8 +80,11 @@ export function mountOverlay(): Overlay {
    * `light-dark()` inside to its light branch regardless — so setting it here
    * is what makes the panels follow the page rather than the machine.
    */
+  let isDark: boolean | null = null;
   function applyScheme() {
     const dark = pageIsDark();
+    if (dark === isDark) return;       // nothing to repaint
+    isDark = dark;
     c = ink(dark);
     host.style.colorScheme = dark ? 'dark' : 'light';
     schedule();
@@ -91,6 +94,22 @@ export function mountOverlay(): Overlay {
   const scheme = matchMedia('(prefers-color-scheme: dark)');
   const onScheme = () => applyScheme();
   scheme.addEventListener('change', onScheme);
+
+  /**
+   * A page with its own dark-mode switch changes nothing the media query can
+   * see. What it does change, almost without exception, is an attribute on
+   * `<html>` or `<body>` — a class, a `data-theme`, an inline `color-scheme`.
+   * Watching those two elements costs nothing and covers the case; a theme
+   * swapped by exchanging stylesheets alone would still slip past, and that is
+   * rare enough to leave.
+   */
+  const themeWatch = new MutationObserver(() => applyScheme());
+  function watchTheme() {
+    themeWatch.disconnect();
+    themeWatch.observe(document.documentElement, { attributes: true });
+    if (document.body) themeWatch.observe(document.body, { attributes: true });
+  }
+  watchTheme();
 
   // Canvas measures text with whatever face is resolved at draw time, so redraw
   // once Inter arrives — otherwise chips stay sized for the fallback.
@@ -435,6 +454,7 @@ export function mountOverlay(): Overlay {
     destroy() {
       if (frame) cancelAnimationFrame(frame);
       scheme.removeEventListener('change', onScheme);
+      themeWatch.disconnect();
       host.remove();
     },
   };

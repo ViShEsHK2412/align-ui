@@ -197,6 +197,37 @@ export declare function parseTracks(value: string): number[];
  */
 export declare function trackIndex(tracks: number[], gap: number, offset: number): number;
 /**
+ * Which way a grid's columns and rows actually run.
+ *
+ * Grid tracks are laid along *logical* axes, and the physical direction of
+ * those axes is decided by `writing-mode` and `direction`. Columns run
+ * left-to-right on an ordinary page, right-to-left in Arabic or Hebrew, and
+ * top-to-bottom in vertical Japanese — where the rows are the ones running
+ * horizontally, right to left.
+ *
+ * Measuring a child's cell means measuring from the start of the axis, and
+ * getting this wrong does not produce a slightly-off answer: the offset comes
+ * out beyond the last track and the tool reports no column at all. Pure.
+ */
+export interface Axes {
+    /** The physical axis the columns run along. */
+    inline: 'x' | 'y';
+    /** True when the columns run backwards along it (right-to-left, or upward). */
+    inlineReversed: boolean;
+    /** True when the rows run backwards along the other axis. */
+    blockReversed: boolean;
+}
+export declare function axesOf(writingMode: string, direction: string): Axes;
+/**
+ * How far a child's leading edge sits from the start of an axis, in px.
+ *
+ * `start`/`end` are the parent's content-box edges on that axis, and `near`/
+ * `far` the child's. When the axis is reversed the measurement runs from the
+ * far end back, which is what makes a right-to-left grid answer with column 1
+ * on the right rather than with nothing at all. Pure.
+ */
+export declare function offsetAlong(start: number, end: number, near: number, far: number, reversed: boolean): number;
+/**
  * How this element's parent places it.
  *
  * A box model tells you an element's own numbers. It does not tell you why the

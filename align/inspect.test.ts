@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSelector, describeGap, distinctValues, firstFamily, gapDistribution,
   looksLikeColour, matchTokens, parseTracks, shortFile, tokenSummary,
-  diffStyles, trackIndex, weightName, type Token,
+  axesOf, diffStyles, offsetAlong, trackIndex, weightName, type Token,
 } from './inspect';
 
 const t = (name: string, value: string): Token =>
@@ -283,5 +283,49 @@ describe('diffStyles', () => {
 
   it('ignores properties outside the curated set', () => {
     expect(diffStyles({ zoom: '1' }, { zoom: '2' })).toEqual([]);
+  });
+});
+
+describe('axesOf', () => {
+  it('runs columns across and rows down on an ordinary page', () => {
+    expect(axesOf('horizontal-tb', 'ltr'))
+      .toEqual({ inline: 'x', inlineReversed: false, blockReversed: false });
+  });
+
+  it('runs columns right to left in a right-to-left document', () => {
+    expect(axesOf('horizontal-tb', 'rtl'))
+      .toEqual({ inline: 'x', inlineReversed: true, blockReversed: false });
+  });
+
+  it('runs columns down the page in vertical Japanese, rows leaning left', () => {
+    expect(axesOf('vertical-rl', 'ltr'))
+      .toEqual({ inline: 'y', inlineReversed: false, blockReversed: true });
+  });
+
+  it('keeps rows running rightward in vertical-lr', () => {
+    expect(axesOf('vertical-lr', 'ltr'))
+      .toEqual({ inline: 'y', inlineReversed: false, blockReversed: false });
+  });
+
+  it('knows sideways-lr is the one mode whose columns run upward', () => {
+    expect(axesOf('sideways-lr', 'ltr').inlineReversed).toBe(true);
+    expect(axesOf('sideways-rl', 'ltr').inlineReversed).toBe(false);
+  });
+});
+
+describe('offsetAlong', () => {
+  // A parent's content box from 100 to 500, child from 300 to 380.
+  it('measures from the near edge on a forward axis', () => {
+    expect(offsetAlong(100, 500, 300, 380, false)).toBe(200);
+  });
+
+  it('measures from the far edge back on a reversed axis', () => {
+    // The same child is 120 from the right-hand start of an rtl grid.
+    expect(offsetAlong(100, 500, 300, 380, true)).toBe(120);
+  });
+
+  it('puts a child at the start of either axis at zero', () => {
+    expect(offsetAlong(100, 500, 100, 180, false)).toBe(0);
+    expect(offsetAlong(100, 500, 420, 500, true)).toBe(0);
   });
 });

@@ -831,5 +831,25 @@ Three things came out of building them that were not in the plan.
   scrollbar takes width from what the browser centres in, and half a scrollbar
   is exactly enough to make a correct layout look wrong.
 
-Two corrections still wait on a camera zoom that does not exist yet: d3-style
-ruler ticks, and coalescing a run of nudges into one undo.
+### The last two field-consensus corrections, settled
+
+**Nudge coalescing: done, and it needed undo built first.** Undo was one slot
+holding the last deletion. It is now a stack of snapshots over every change to
+the guides, and a run of nudges on one guide collapses to a single entry.
+Building it turned up a real bug: a guide dropped with `V` or `H` never became
+the keyboard's guide, so it could not be nudged at all until it had been
+clicked.
+
+**d3 ruler ticks: decided against, not deferred.** The algorithm picks the
+nicest of `1, 2, 5 × 10ⁿ` that keeps labels about 56 screen px apart. Ours draws
+page pixels at 1:1, and at 1:1 that algorithm returns exactly the 10 / 50 / 100
+already hard-coded — so implementing it would add a function, three constants
+of derivation, and change nothing on screen. Browser zoom does not rescue it
+either: zoom changes how big a CSS pixel is physically, not how many CSS pixels
+apart the ticks are, so the labels never crowd.
+
+It would only earn its place behind a camera zoom, and this tool should not have
+one. A camera means magnifying the page, which means either `zoom` (which
+changes layout, so you would be measuring something other than the page) or a
+transform on the root (which mutates the page the tool promises to leave
+alone). The browser already does this natively and better. Closed.

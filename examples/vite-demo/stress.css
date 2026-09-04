@@ -1,0 +1,136 @@
+/*
+ * The hard cases, laid out so each one can be pointed at.
+ *
+ * Every section here exists because some part of the tool has to make a
+ * decision it could get wrong. The page is deliberately hostile: transformed
+ * subtrees, shadow roots, tables, writing modes, things that move, things that
+ * are not there. Where a section has a right answer it is written next to it.
+ */
+
+:root {
+  color-scheme: dark;
+  --ink: #cbd3e1;
+  --dim: #8c95a8;
+  --line: #2b3341;
+  --panel: #1b2029;
+  --accent: #6ea8fe;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #0f1115;
+  color: var(--ink);
+  font: 14px/1.6 "Inter", system-ui, sans-serif;
+}
+
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  background: #171a21; border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.bar a { color: var(--accent); }
+.bar b { font-weight: 600; }
+
+main { width: 940px; max-width: 100%; margin: 0 auto; padding: 0 var(--space-6) 120px; }
+
+section { padding: var(--space-8) 0; border-bottom: 1px solid var(--line); }
+h2 { font-size: 17px; margin: 0 0 var(--space-2); }
+h3 { font-size: 14px; margin: var(--space-6) 0 var(--space-2); color: var(--dim); }
+p { margin: 0 0 var(--space-4); max-width: 68ch; color: var(--dim); }
+code { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); }
+
+/* Every expectation table on the page reads the same way. */
+.expect { border-collapse: collapse; margin-top: var(--space-4); font-size: 12px; }
+.expect th { text-align: left; font-weight: 600; color: var(--accent); padding: 3px 16px 3px 0; white-space: nowrap; }
+.expect td { padding: 3px 16px 3px 0; }
+.expect .note { color: var(--dim); }
+
+.card {
+  width: 120px; height: 64px;
+  display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--line);
+  font-size: 12px;
+}
+.row { display: flex; gap: var(--space-6); }
+
+/* 1 · scaled subtrees ----------------------------------------------------- */
+.scaled { transform: scale(1.5); transform-origin: left top; width: 400px; height: 180px; }
+.scaled-inner { transform: scale(0.5); transform-origin: left top; }
+.rotated { transform: rotate(8deg); transform-origin: left top; }
+
+/* 2 · grid shapes --------------------------------------------------------- */
+.g-fr { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: var(--space-6); }
+.g-auto { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); }
+.g-implicit { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: 60px; gap: var(--space-2); }
+.g-dense { display: grid; grid-template-columns: repeat(4, 80px); grid-auto-flow: dense; gap: var(--space-2); }
+.g-dense .wide { grid-column: span 2; }
+.g-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.g-sub > .nest { display: grid; grid-template-columns: subgrid; grid-column: span 3; gap: var(--space-4); }
+.g-rtl { direction: rtl; display: grid; grid-template-columns: 80px 160px; gap: var(--space-4); }
+
+/* 3 · flex shapes --------------------------------------------------------- */
+.f-wrap { display: flex; flex-wrap: wrap; gap: var(--space-3); width: 320px; }
+.f-rev { display: flex; flex-direction: row-reverse; gap: var(--space-6); }
+.f-between { display: flex; justify-content: space-between; width: 480px; }
+.f-order { display: flex; gap: var(--space-4); }
+.f-order .last { order: -1; }
+.f-grow > .a { flex: 2 1 0; } .f-grow > .b { flex: 1 1 0; }
+.f-grow { display: flex; gap: var(--space-4); width: 400px; }
+.f-grow .card { width: auto; }
+
+/* 4 · out of flow --------------------------------------------------------- */
+.oof { position: relative; height: 200px; border: 1px dashed var(--line); }
+.oof .abs { position: absolute; left: 40px; top: 30px; }
+.oof .fixed-like { position: absolute; right: 24px; bottom: 24px; }
+.oof .floated { float: left; margin-right: var(--space-6); }
+.sticky-box { position: sticky; top: 60px; }
+
+/* 5 · overflow ------------------------------------------------------------ */
+.scroller { width: 400px; height: 140px; overflow: auto; border: 1px solid var(--line); padding: var(--space-3); }
+.scroller-inner { width: 700px; height: 300px; background: linear-gradient(135deg, #1b2029, #262d3a); }
+.clipped { width: 200px; height: 60px; overflow: hidden; border: 1px solid var(--line); }
+.clipped > div { width: 400px; height: 120px; background: var(--panel); }
+
+/* 6 · things that move ---------------------------------------------------- */
+@keyframes slide { from { transform: translateX(0); } to { transform: translateX(200px); } }
+@keyframes pulse { 50% { opacity: 0.25; } }
+.anim { animation: slide 3s ease-in-out infinite alternate; }
+.anim-op { animation: pulse 1.6s linear infinite; }
+.trans { transition: transform 2.5s linear; }
+.trans.go { transform: translateX(240px); }
+.skeleton {
+  width: 260px; height: 16px; border-radius: 0;
+  background: linear-gradient(90deg, #1b2029 25%, #2b3341 37%, #1b2029 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+/* 7 · type and tokens ----------------------------------------------------- */
+.type-on { font-size: 16px; line-height: 24px; letter-spacing: 0; }
+.type-off { font-size: 15px; line-height: 23px; letter-spacing: 0.3px; }
+.near-brand { color: #6ea8fe; }
+.off-brand { color: #6fa9fd; }
+
+/* 8 · tables and writing modes -------------------------------------------- */
+.tbl { border-collapse: separate; border-spacing: var(--space-3); }
+.tbl td { background: var(--panel); border: 1px solid var(--line); padding: var(--space-3); font-size: 12px; }
+.vertical { writing-mode: vertical-rl; height: 180px; }
+.contents-parent { display: contents; }
+
+/* 9 · pathological -------------------------------------------------------- */
+.tiny { width: 2px; height: 2px; background: var(--accent); }
+.zero { width: 0; height: 0; }
+.hidden-vis { visibility: hidden; }
+.swarm { display: flex; flex-wrap: wrap; gap: 1px; width: 100%; }
+.swarm > i { width: 6px; height: 6px; background: #232a36; display: block; }
+.deep { padding: 2px; border: 1px solid #232a36; }

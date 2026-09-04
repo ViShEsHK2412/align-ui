@@ -417,7 +417,11 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       // question behind most of these sessions is "these two should match and
       // they don't", and answering it by measuring each in turn and comparing
       // by eye is exactly the work that should not need a person.
-      if (against && against.el !== box.el) {
+      // `isConnected` because a locked element can be removed from the page
+      // between the removal and the next prune, and getComputedStyle on a
+      // detached node answers with empty strings for everything — which would
+      // render as ten rows of "something → nothing", all of it noise.
+      if (against && against.el !== box.el && against.el.isConnected) {
         const rows = diffOf(against.el, box.el)
           .map((d) => [d.prop, `${d.a || '—'} → ${d.b || '—'}`] as [string, string]);
         // Capped: two elements that differ in twenty ways are two different

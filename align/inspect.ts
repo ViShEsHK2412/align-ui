@@ -504,6 +504,60 @@ export function trackIndex(tracks: number[], gap: number, offset: number): numbe
 }
 
 /**
+ * Which way a grid's columns and rows actually run.
+ *
+ * Grid tracks are laid along *logical* axes, and the physical direction of
+ * those axes is decided by `writing-mode` and `direction`. Columns run
+ * left-to-right on an ordinary page, right-to-left in Arabic or Hebrew, and
+ * top-to-bottom in vertical Japanese — where the rows are the ones running
+ * horizontally, right to left.
+ *
+ * Measuring a child's cell means measuring from the start of the axis, and
+ * getting this wrong does not produce a slightly-off answer: the offset comes
+ * out beyond the last track and the tool reports no column at all. Pure.
+ */
+export interface Axes {
+  /** The physical axis the columns run along. */
+  inline: 'x' | 'y';
+  /** True when the columns run backwards along it (right-to-left, or upward). */
+  inlineReversed: boolean;
+  /** True when the rows run backwards along the other axis. */
+  blockReversed: boolean;
+}
+
+export function axesOf(writingMode: string, direction: string): Axes {
+  const rtl = direction === 'rtl';
+  const vertical = writingMode.startsWith('vertical') || writingMode.startsWith('sideways');
+  if (!vertical) {
+    // Columns across, rows down. `direction` flips the columns only.
+    return { inline: 'x', inlineReversed: rtl, blockReversed: false };
+  }
+  // Columns run down the page and rows run across it. `sideways-lr` is the one
+  // mode whose inline axis runs upward; every other vertical mode runs down.
+  const upward = writingMode === 'sideways-lr';
+  return {
+    inline: 'y',
+    inlineReversed: upward ? !rtl : rtl,
+    // vertical-rl and sideways-rl stack their rows leftward from the right edge.
+    blockReversed: writingMode === 'vertical-rl' || writingMode === 'sideways-rl',
+  };
+}
+
+/**
+ * How far a child's leading edge sits from the start of an axis, in px.
+ *
+ * `start`/`end` are the parent's content-box edges on that axis, and `near`/
+ * `far` the child's. When the axis is reversed the measurement runs from the
+ * far end back, which is what makes a right-to-left grid answer with column 1
+ * on the right rather than with nothing at all. Pure.
+ */
+export function offsetAlong(
+  start: number, end: number, near: number, far: number, reversed: boolean,
+): number {
+  return reversed ? end - far : near - start;
+}
+
+/**
  * How this element's parent places it.
  *
  * A box model tells you an element's own numbers. It does not tell you why the
@@ -572,10 +626,22 @@ export function parentLayoutOf(el: Element): LayoutFact | null {
   // to say, for almost every item on a real page.
   const pr = parent.getBoundingClientRect();
   const r = el.getBoundingClientRect();
-  const originX = pr.left + px(pcs.borderLeftWidth) + px(pcs.paddingLeft);
-  const originY = pr.top + px(pcs.borderTopWidth) + px(pcs.paddingTop);
-  const col = trackIndex(cols, px(pcs.columnGap === 'normal' ? '0' : pcs.columnGap), r.left - originX);
-  const row = trackIndex(rowTracks, px(pcs.rowGap === 'normal' ? '0' : pcs.rowGap), r.top - originY);
+  // The parent's content box, which is where track one begins.
+  const box = {
+    left: pr.left + px(pcs.borderLeftWidth) + px(pcs.paddingLeft),
+    right: pr.right - px(pcs.borderRightWidth) - px(pcs.paddingRight),
+    top: pr.top + px(pcs.borderTopWidth) + px(pcs.paddingTop),
+    bottom: pr.bottom - px(pcs.borderBottomWidth) - px(pcs.paddingBottom),
+  };
+  const ax = axesOf(pcs.writingMode, pcs.direction);
+  const along = (axis: 'x' | 'y', reversed: boolean) => (axis === 'x'
+    ? offsetAlong(box.left, box.right, r.left, r.right, reversed)
+    : offsetAlong(box.top, box.bottom, r.top, r.bottom, reversed));
+  const block = ax.inline === 'x' ? 'y' : 'x';
+  const colGapPx = px(pcs.columnGap === 'normal' ? '0' : pcs.columnGap);
+  const rowGapPx = px(pcs.rowGap === 'normal' ? '0' : pcs.rowGap);
+  const col = trackIndex(cols, colGapPx, along(ax.inline, ax.inlineReversed));
+  const row = trackIndex(rowTracks, rowGapPx, along(block, ax.blockReversed));
   const cell: string[] = [];
   if (col >= 0) cell.push(`column ${col + 1} of ${cols.length}`);
   if (row >= 0) cell.push(`row ${row + 1} of ${rowTracks.length}`);

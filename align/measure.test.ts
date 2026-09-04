@@ -568,3 +568,30 @@ describe('pixelGridStep', () => {
     expect(pixelGridStep(10, 0.8)).toBe(10);
   });
 });
+
+describe('gridColumns, awkward numbers', () => {
+  it('keeps fractional gutters exact rather than rounding them away', () => {
+    const cols = gridColumns({ columns: 3, gutter: 12.5, margin: 0, maxWidth: 0 }, 300);
+    const width = (300 - 25) / 3;
+    expect(cols.map((c) => c.width)).toEqual([width, width, width]);
+    expect(cols[1]!.left).toBeCloseTo(width + 12.5, 10);
+  });
+
+  it('handles a single column, which has no gutters at all', () => {
+    expect(gridColumns({ columns: 1, gutter: 24, margin: 16, maxWidth: 0 }, 500))
+      .toEqual([{ left: 16, width: 468 }]);
+  });
+
+  it('gives nothing when the margins alone exceed the width', () => {
+    expect(gridColumns({ columns: 3, gutter: 8, margin: 300, maxWidth: 0 }, 400)).toEqual([]);
+  });
+
+  it('gives nothing when the gutters alone exceed the content', () => {
+    expect(gridColumns({ columns: 4, gutter: 200, margin: 0, maxWidth: 0 }, 400)).toEqual([]);
+  });
+
+  it('clamps a max width larger than the window to the window', () => {
+    const [first] = gridColumns({ columns: 2, gutter: 0, margin: 0, maxWidth: 5000 }, 400);
+    expect(first).toEqual({ left: 0, width: 200 });
+  });
+});

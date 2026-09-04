@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Align — the hard cases</title>
+  <link rel="stylesheet" href="./stress.css">
+</head>
+<body>
+  <div class="bar">
+    <b>Align — the hard cases</b>
+    <span>Ctrl/Cmd+Shift+A</span>
+    <span>R rulers · G grid · K pixels · X x-ray · T type · F freeze · P colour · B panel</span>
+    <a href="./tokens.html">tokens &amp; provenance</a>
+    <a href="./index.html">simple page</a>
+  </div>
+
+  <main>
+    <section>
+      <h2>1 · Scaled subtrees</h2>
+      <p>
+        A canvas app zoomed to 150%. The gap below is 24 in the units these
+        elements live in and 36 on the screen. The panel and the canvas labels
+        must say 24; the lines must be drawn where the pixels actually are.
+        The nested block scales back down to 0.75 overall.
+      </p>
+
+      <div class="scaled">
+        <div class="row" style="gap: 24px">
+          <div class="card">a</div>
+          <div class="card">b</div>
+        </div>
+        <div class="scaled-inner" style="margin-top: 24px">
+          <div class="row" style="gap: 24px">
+            <div class="card">c</div>
+            <div class="card">d</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rotated" style="margin-top: 40px; width: 300px">
+        <div class="card">rotated 8°</div>
+      </div>
+
+      <table class="expect">
+        <tr><th>a → b</th><td>24</td><td class="note">36 on screen, at ×1.5</td></tr>
+        <tr><th>c → d</th><td>24</td><td class="note">27 on screen, at ×0.75</td></tr>
+        <tr><th>a → c</th><td>viewport px</td><td class="note">different scales, so the only honest answer is the screen</td></tr>
+        <tr><th>rotated</th><td>its bounding box</td><td class="note">a rect cannot describe a rotation, and the tool does not pretend</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>2 · Every shape a grid comes in</h2>
+      <p>
+        Lock a child of each and read <i>laid out by grid</i>. Fractions arrive
+        already resolved to pixels. Where the template cannot be resolved to
+        lengths the tool says nothing rather than guessing.
+      </p>
+
+      <h3>fr tracks</h3>
+      <div class="g-fr"><div class="card">1fr</div><div class="card">2fr</div><div class="card">1fr</div></div>
+
+      <h3>auto tracks</h3>
+      <div class="g-auto"><div class="card">auto</div><div class="card">1fr</div><div class="card">auto</div></div>
+
+      <h3>implicit row — the template declares one row, there are two</h3>
+      <div class="g-implicit">
+        <div class="card" style="width:auto">1</div><div class="card" style="width:auto">2</div>
+        <div class="card" style="width:auto">3</div><div class="card" style="width:auto">4</div>
+      </div>
+
+      <h3>dense packing</h3>
+      <div class="g-dense">
+        <div class="card wide" style="width:auto">wide</div>
+        <div class="card" style="width:auto">b</div>
+        <div class="card" style="width:auto">c</div>
+        <div class="card" style="width:auto">d</div>
+      </div>
+
+      <h3>subgrid</h3>
+      <div class="g-sub">
+        <div class="nest">
+          <div class="card" style="width:auto">s1</div>
+          <div class="card" style="width:auto">s2</div>
+          <div class="card" style="width:auto">s3</div>
+        </div>
+      </div>
+
+      <h3>right to left</h3>
+      <div class="g-rtl"><div class="card" style="width:auto">first</div><div class="card" style="width:auto">second</div></div>
+
+      <table class="expect">
+        <tr><th>fr tracks</th><td>3 tracks, in px</td><td class="note">what the fractions became, not "1fr 2fr 1fr"</td></tr>
+        <tr><th>implicit row</th><td>row omitted for 4</td><td class="note">the template lists one row; the second is implicit and unlisted</td></tr>
+        <tr><th>subgrid child</th><td>no columns row</td><td class="note">the computed template is <code>subgrid</code>, not lengths</td></tr>
+        <tr><th>rtl</th><td>column 1 is on the right</td><td class="note">track order is writing order, and the offset is measured from the content edge</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>3 · Every shape a flex row comes in</h2>
+
+      <h3>wrap</h3>
+      <div class="f-wrap">
+        <div class="card" style="width:90px">1</div><div class="card" style="width:90px">2</div>
+        <div class="card" style="width:90px">3</div><div class="card" style="width:90px">4</div>
+      </div>
+
+      <h3>row-reverse — "first" renders on the right</h3>
+      <div class="f-rev"><div class="card">first</div><div class="card">second</div></div>
+
+      <h3>space-between — no gap, no margins, 240 of space</h3>
+      <div class="f-between"><div class="card">g</div><div class="card">h</div></div>
+
+      <h3>order: -1 — "last" renders first</h3>
+      <div class="f-order"><div class="card">first</div><div class="card last">last</div></div>
+
+      <h3>flex-grow 2 : 1</h3>
+      <div class="f-grow"><div class="card a">2</div><div class="card b">1</div></div>
+
+      <table class="expect">
+        <tr><th>row-reverse</th><td>direction row-reverse</td><td class="note">and the gap is still measured between the boxes as drawn</td></tr>
+        <tr><th>space-between</th><td>gap 0 · rest from layout</td><td class="note">never a bare 0, which would read as a bug</td></tr>
+        <tr><th>flex-grow</th><td>this child flex: 2 1 0px</td><td class="note">only shown because it differs from the default</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>4 · Out of flow</h2>
+      <p>
+        None of these are placed by their parent, and reporting the parent's
+        <code>justify-content</code> for them would be worse than saying nothing.
+      </p>
+
+      <div class="oof">
+        <div class="card floated">float</div>
+        <div class="card abs">absolute</div>
+        <div class="card fixed-like">pinned bottom-right</div>
+      </div>
+
+      <div class="row" style="margin-top: 24px; align-items: flex-start">
+        <div class="card sticky-box">sticky</div>
+        <p style="margin:0">Scroll this section past the top bar — the sticky card stays,
+          and its guides must stay with it rather than freezing where they were drawn.</p>
+      </div>
+
+      <table class="expect">
+        <tr><th>absolute</th><td>placed by absolute, not by the parent</td><td class="note">and nothing else from the parent</td></tr>
+        <tr><th>float</th><td>placed by float: left</td><td class="note"></td></tr>
+        <tr><th>sticky</th><td>laid out by flow</td><td class="note">it is in flow; only its painting moves</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>5 · Overflow, clipping and scroll containers</h2>
+      <p>An element inside a scroller moves without the page scrolling. Guides drawn against it must follow.</p>
+      <div class="scroller"><div class="scroller-inner"></div></div>
+      <div class="clipped" style="margin-top: 24px"><div>clipped: 400 × 120 inside 200 × 60</div></div>
+      <table class="expect">
+        <tr><th>clipped child</th><td>400 × 120</td><td class="note">its box, not the part you can see</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>6 · Things that move</h2>
+      <p>
+        Press <b>F</b>. A CSS animation, a transition mid-flight, a WAAPI
+        animation and a shimmer all have to stop where they stand — not jump to
+        their end state, which is the value you did not ask for.
+      </p>
+      <div class="card anim">css animation</div>
+      <div class="card trans" style="margin-top: 16px">transition</div>
+      <div class="card" id="waapi" style="margin-top: 16px">WAAPI</div>
+      <div class="card anim-op" style="margin-top: 16px">opacity</div>
+      <div class="skeleton" style="margin-top: 16px"></div>
+      <p style="margin-top: 16px">
+        <button id="kick">run the transition</button>
+        <span class="note">then freeze it halfway</span>
+      </p>
+      <table class="expect">
+        <tr><th>frozen</th><td>stops in place</td><td class="note">every one of them, including the transition</td></tr>
+        <tr><th>unfrozen</th><td>carries on</td><td class="note">and nothing that was already finished replays</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>7 · Shadow roots</h2>
+      <p>
+        An open root can be descended into and measures its real inner nodes. A
+        closed one cannot be pierced by anything, and measures as the host — the
+        honest answer, not a guess.
+      </p>
+      <div class="row">
+        <stress-card label="open"></stress-card>
+        <stress-card label="closed" closed></stress-card>
+        <stress-slot><span class="card">slotted</span></stress-slot>
+      </div>
+      <table class="expect">
+        <tr><th>open</th><td>the inner pill</td><td class="note">hovering reaches inside</td></tr>
+        <tr><th>closed</th><td>the host element</td><td class="note">whatever is inside it</td></tr>
+        <tr><th>slotted</th><td>the light-DOM span</td><td class="note">it belongs to this document, not the shadow tree</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>8 · Tables, writing modes and display: contents</h2>
+      <table class="tbl">
+        <tr><td>r1c1</td><td>r1c2</td><td>r1c3</td></tr>
+        <tr><td>r2c1</td><td>r2c2</td><td>r2c3</td></tr>
+      </table>
+      <div class="vertical card" style="margin-top: 24px; width: auto">vertical-rl</div>
+      <div class="row" style="margin-top: 24px">
+        <div class="contents-parent"><div class="card">contents child</div></div>
+        <div class="card">sibling</div>
+      </div>
+      <table class="expect">
+        <tr><th>a cell</th><td>laid out by table-row</td><td class="note">not flex, not grid, and it says so</td></tr>
+        <tr><th>contents child</th><td>reports the parent it has</td><td class="note">that parent generates no box of its own</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>9 · Type, tokens and colours</h2>
+      <p class="type-on">On the scale: 16px on a 24px line.</p>
+      <p class="type-off">Beside it: 15px on a 23px line, 0.3px of tracking.</p>
+      <div class="row">
+        <div class="card near-brand">on brand</div>
+        <div class="card off-brand">one notch off</div>
+      </div>
+      <table class="expect">
+        <tr><th>on brand</th><td>#6ea8fe → --accent</td><td class="note">matched</td></tr>
+        <tr><th>off brand</th><td>#6fa9fd → nothing</td><td class="note">invisible by eye, named here</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>10 · Pathological</h2>
+      <p>Nothing here should be measurable, crash anything, or be reported as a finding.</p>
+      <div class="row" style="align-items: center">
+        <div class="tiny" title="2x2"></div>
+        <div class="zero" title="0x0"></div>
+        <div class="card hidden-vis">visibility: hidden</div>
+        <div class="card" style="display:none">display: none</div>
+        <div class="card" data-align-ignore>data-align-ignore</div>
+      </div>
+      <h3>1500 small elements — hover latency must not change</h3>
+      <div class="swarm" id="swarm"></div>
+      <h3>60 levels of nesting</h3>
+      <div id="deep"></div>
+      <table class="expect">
+        <tr><th>2 × 2</th><td>measurable</td><td class="note">small is not the same as absent</td></tr>
+        <tr><th>0 × 0, display:none</th><td>skipped</td><td class="note">there is nothing there to measure</td></tr>
+        <tr><th>data-align-ignore</th><td>walks up to its parent</td><td class="note"></td></tr>
+      </table>
+    </section>
+
+    <div style="padding: 40px 0; color: #6b7386">end of the hard cases</div>
+  </main>
+
+  <script type="module" src="./stress.ts"></script>
+</body>
+</html>

@@ -6,7 +6,8 @@ import {
 } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import {
-  GROUND, HAIRLINE, MOTION, SHADOW, SHADOW_LIFTED, surface, TEXT, TYPE, WEIGHT,
+  GROUND, HAIRLINE, MOTION, SHADOW, SHADOW_LIFTED, SPACE, surface, TEXT, TYPE,
+  WEIGHT,
 } from './theme';
 import type { Box, Quad } from './types';
 
@@ -172,7 +173,7 @@ header .scale {
   /* Symmetric. An extra-tall top to clear the label offset each box's centre
      from its parent's, and nesting compounded it until the side numbers were
      visibly staggered. The label shares the top number's line instead. */
-  padding: 8px;
+  padding: ${SPACE.base}px;
 }
 .region[data-level="1"] { background: ${surface(1)}; }
 .region[data-level="2"] { background: ${surface(2)}; }
@@ -200,7 +201,7 @@ header .scale {
   white-space: nowrap; color: var(--fg);
 }
 .edge[data-zero] { color: var(--muted); font-weight: ${WEIGHT.regular}; }
-.row { display: flex; align-items: center; gap: 4px; margin: 4px 0; }
+.row { display: flex; align-items: center; gap: ${SPACE.tight}px; margin: ${SPACE.tight}px 0; }
 .row > .edge { flex: 0 0 20px; }
 .row > .fill { flex: 1 1 auto; min-width: 0; }
 
@@ -208,10 +209,10 @@ header .scale {
    labels — they annotate the measurement rather than competing with it. */
 .readout {
   user-select: text;
-  margin-top: 8px; padding-top: 8px;
+  margin-top: ${SPACE.base}px; padding-top: ${SPACE.base}px;
   border-top: 1px solid var(--border);
 }
-.readout-tag { position: static; margin-bottom: 4px; }
+.readout-tag { position: static; margin-bottom: ${SPACE.tight}px; }
 /* One grid for the whole section rather than one per row, so every key in a
    section shares a column and the column sizes to the longest key in it. A
    fixed 62px was right until a diff started printing 'background-color', which
@@ -219,7 +220,7 @@ header .scale {
    other sections already had. */
 .readout-rows {
   display: grid; grid-template-columns: minmax(62px, max-content) 1fr;
-  gap: 0 8px; align-items: baseline;
+  gap: 0 ${SPACE.base}px; align-items: baseline;
   font-size: ${TYPE.tag}px; line-height: 1.5;
 }
 .readout-row { display: contents; }
@@ -237,7 +238,7 @@ header .scale {
   text-wrap: pretty;
 }
 .content {
-  border-radius: 0; padding: 12px 8px;
+  border-radius: 0; padding: ${SPACE.roomy}px ${SPACE.base}px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--fg);

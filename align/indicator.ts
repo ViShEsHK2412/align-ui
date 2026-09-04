@@ -1,5 +1,6 @@
 import {
-  GROUND, HAIRLINE, MOTION, ROW, RULER, SHADOW, surface, TEXT, TYPE, WEIGHT,
+  GROUND, HAIRLINE, MOTION, ROW, RULER, SHADOW, SPACE, surface, TEXT, TYPE,
+  WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
 
@@ -70,12 +71,12 @@ const GESTURES: { title: string; rows: [string, string][] }[] = [
  * the same numbers instead of a hardcoded offset that drifts when either
  * changes. Height is the line box plus the padding either side.
  */
-const INSET = 16;
+const INSET = SPACE.edge;
 /* A row of icon buttons, not of text: the height comes from the buttons plus
    the padding either side, which lands on the ROW the panel already uses. */
 const BTN = 24;
 const FLAG_H = ROW;
-const STEP = 8;
+const STEP = SPACE.base;
 
 const CSS = `
 .flag {
@@ -145,8 +146,8 @@ const CSS = `
   /* Fifteen rows outgrow a short window, and a list you cannot reach the end
      of is worse than one you have to scroll. */
   max-height: calc(100vh - ${INSET * 2 + FLAG_H + STEP}px); overflow-y: auto;
-  padding: 10px; border-radius: 0;
-  pointer-events: auto; user-select: none;
+  padding: ${SPACE.base}px; border-radius: 0;
+  user-select: none;
   font-family: ${TYPE.stack};
   font-synthesis: none;
   font-size: ${TYPE.tag}px; line-height: 1.4;
@@ -154,9 +155,30 @@ const CSS = `
   color: ${TEXT.primary};
   background: ${GROUND};
   box-shadow: ${SHADOW};
-  display: none;
+  /*
+   * It grows out of the badge that opens it, rather than appearing whole.
+   * transform-origin at the top right is the badge's corner, so the list and
+   * the thing you pressed to get it stay visibly connected — the one place in
+   * this tool where something opens *from* somewhere.
+   *
+   * Visibility rather than display, because display cannot be transitioned;
+   * it is delayed out by the duration on close so the fade finishes first.
+   */
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: scale(0.98) translateY(-4px);
+  transform-origin: top right;
+  transition: opacity ${MOTION.ui}, transform ${MOTION.ui}, visibility 0s linear 160ms;
 }
-.help[data-open] { display: block; }
+.help[data-open] {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: none;
+  transition: opacity ${MOTION.ui}, transform ${MOTION.ui}, visibility 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The fade says it arrived; the travel and the scale are decoration. */
+  .help { transform: none; transition: opacity 120ms linear, visibility 0s linear 120ms; }
+  .help[data-open] { transition: opacity 120ms linear, visibility 0s; }
+}
 /* Baselines, not boxes. A key sits in a bordered chip and its description does
    not, so aligning the two boxes puts the key's text 4px below the first line
    of the text it labels — right on one-line rows by luck, wrong on every row
@@ -165,7 +187,7 @@ const CSS = `
   display: grid; grid-template-columns: 16px auto 1fr;
   /* Baseline alignment already buys each wrapped row 4px of separation, so
      the gap stays where it was rather than pushing the list off the screen. */
-  align-items: baseline; gap: 6px 10px; margin: 0;
+  align-items: baseline; gap: ${SPACE.tight}px ${SPACE.base}px; margin: 0;
 }
 .help dt { justify-self: start; }
 /* The icon column: present for the rows that have a button, blank for the rows

@@ -127,17 +127,42 @@ export const RULER = 22;
 /** One row height, so the toolbar and the panel share a rhythm. */
 export const ROW = 36;
 
-/** Agentation's spacing: 2, 4, 8. Nothing between, nothing beyond. */
-export const SPACE = [2, 4, 8] as const;
+/**
+ * The spacing scale, and the one thing in this file that has to be obeyed
+ * rather than admired.
+ *
+ * It said 2, 4, 8 — Agentation's — and nothing imported it, while the box model
+ * quietly ran on 5, 6, 10 and 14. That is not a cosmetic difference: four
+ * levels of nesting multiplied those ad-hoc values until the content size, the
+ * number you open the panel to read, was squeezed to 83px and ellipsised. A
+ * scale that is declared and not used cannot prevent that; a scale that is used
+ * cannot allow it.
+ *
+ * Named, because `SPACE[2]` at a call site says nothing.
+ */
+export const SPACE = {
+  /** Between a label and the thing it labels. */
+  tight: 4,
+  /** The default gap, and every region's padding. */
+  base: 8,
+  /** Inside a cell that has to look like a box of its own. */
+  roomy: 12,
+  /** Between a panel and the edge of the window. */
+  edge: 16,
+} as const;
 
 /**
- * Motion, from Agentation's toolbar. The expand curve is expo-out, which lands
- * a width change without the tail an ease-out leaves; the entrance overshoots
- * a little, which is the only place in the tool anything does.
+ * Motion.
+ *
+ * Agentation's set had two more: `expand`, a 400ms expo-out for a width
+ * change, and `enter`, a 500ms entrance that overshoots. Both are gone, and
+ * not for lack of somewhere to put them. Nothing here changes width. And an
+ * overshoot is what you give motion that carried momentum into it — a flick,
+ * a throw; every surface in this tool is opened by a click, which carries
+ * none, so the overshoot would be decoration on the two things that appear
+ * most often. Inheriting a system means inheriting its reasoning, not its list.
  */
 export const MOTION = {
-  expand: '400ms cubic-bezier(0.19, 1, 0.22, 1)',
-  enter: '500ms cubic-bezier(0.34, 1.2, 0.64, 1)',
   /** Slow in, faster out: an exit is not a reversed entrance. */
   exit: '160ms cubic-bezier(0.3, 0, 1, 1)',
   /**

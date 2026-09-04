@@ -65,7 +65,12 @@ const CSS = `
   position: fixed; left: ${MARGIN}px; top: 0; width: 340px;
   /* An opacity:0 element still receives pointer events, and a closed panel
      parked over the page would silently swallow every hit test underneath. */
-  pointer-events: none; user-select: none;
+  pointer-events: none;
+  /* Not the whole panel: only the header is a drag surface, and making the
+     numbers unselectable means the one thing you might want to paste into a
+     stylesheet cannot be picked up by hand. Copy covers the whole reading; a
+     selection covers the one value you actually wanted. */
+  user-select: none;
   font-family: ${TYPE.stack};
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
@@ -201,6 +206,7 @@ header .scale {
 /* Type and tokens sit under the box, in the same muted register as the band
    labels — they annotate the measurement rather than competing with it. */
 .readout {
+  user-select: text;
   margin-top: 8px; padding-top: 8px;
   border-top: 1px solid var(--border);
 }
@@ -217,7 +223,18 @@ header .scale {
 }
 .readout-row { display: contents; }
 .readout-key { color: var(--muted); white-space: nowrap; }
-.readout-value { color: var(--fg); overflow-wrap: anywhere; }
+/* A row is a label and a reading, and only one of them is data. The label can
+   sit at the 11px floor; the reading cannot — the theme's own rule is that
+   anything you read a number from is 12px or larger, and half this panel's
+   numbers live in these rows. Baseline alignment on the row already handles
+   the two sizes meeting on one line. */
+.readout-value {
+  color: var(--fg); overflow-wrap: anywhere;
+  font-size: ${TYPE.body}px;
+  /* Several of these wrap — a diff value, a rule file, a token list — and a
+     lone short word on the last line reads as a mistake. */
+  text-wrap: pretty;
+}
 .content {
   border-radius: 0; padding: 12px 8px;
   text-align: center; font-weight: ${WEIGHT.medium}; line-height: 1;
@@ -409,6 +426,10 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       const content = document.createElement('div');
       content.className = 'content';
       content.textContent = `${fmt(w - bl - br - pl - pr)} × ${fmt(h - bt - bb - pt - pb)}`;
+      // It ellipsises rather than pushing the box wider, so the full value has
+      // to stay reachable. Truncation that loses the number would be the tool
+      // failing at its own job.
+      content.title = content.textContent;
 
       const parts: HTMLElement[] = [
         header,

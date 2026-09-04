@@ -180,7 +180,8 @@ const CSS = `
   border: 1px solid ${HAIRLINE};
   background: ${surface(2)};
 }
-.help dd { margin: 0; color: ${TEXT.secondary}; }
+/* These run to three lines, and a one-word last line reads as a mistake. */
+.help dd { margin: 0; color: ${TEXT.secondary}; text-wrap: pretty; }
 `;
 
 /**

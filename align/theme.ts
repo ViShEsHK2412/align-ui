@@ -58,12 +58,20 @@ export function themed(p: { light: string; dark: string }): string {
 export const GROUND = themed(pair('#fafafa', '#1a1a1a'));
 
 /**
- * A film of the opposite colour at `a` alpha. Black on light, white on dark —
- * one number, both themes, and it composites over whatever it is nested in, so
- * depth accumulates naturally the deeper a region sits.
+ * A film of the opposite colour: black on light, white on dark.
+ *
+ * It takes an alpha per theme, and that is a correction. One number for both
+ * was the original idea and it is wrong for contrast, measurably: the same 0.4
+ * film reads 3.81:1 as white over `#1a1a1a` and only 2.83:1 as black over
+ * `#fafafa`. Low-alpha white gains contrast against a dark ground faster than
+ * low-alpha black loses it against a light one, so a single number cannot hit
+ * a target in both. The light film has to be heavier to say the same thing.
+ *
+ * Only the text roles below need two numbers; the surface ladder is background,
+ * where the difference is a matter of appearance rather than legibility.
  */
-function film(a: number): string {
-  return themed(pair(`rgb(0 0 0 / ${a})`, `rgb(255 255 255 / ${a})`));
+function film(dark: number, light: number = dark): string {
+  return themed(pair(`rgb(0 0 0 / ${light})`, `rgb(255 255 255 / ${dark})`));
 }
 
 /**
@@ -82,10 +90,24 @@ export function surface(level: number): string {
  * numbers, a type readout and a token line has more than two things to say,
  * and dialkit's system is explicit that three is where it settles.
  */
+/*
+ * Measured, not chosen. Each pair is the lightest film that still clears
+ * 4.5:1 against its own ground, computed rather than eyeballed:
+ *
+ *            dark over #1a1a1a      light over #fafafa
+ *   primary   0.90 -> 14.22:1        0.90 -> 16.84:1
+ *   secondary 0.60 ->  6.93:1        0.60 ->  5.67:1
+ *   tertiary  0.46 ->  4.61:1        0.55 ->  4.71:1
+ *
+ * Tertiary was 0.4 in both, which is 3.81:1 dark and 2.83:1 light. The light
+ * value failed even the 3:1 that a graphic needs when it is the only thing
+ * identifying a control -- and since the toolbar buttons became icons, that is
+ * exactly what they are.
+ */
 export const TEXT = {
   primary: film(0.9),
   secondary: film(0.6),
-  tertiary: film(0.4),
+  tertiary: film(0.46, 0.55),
 } as const;
 
 /** A hairline of the same film, for rules between sections. */

@@ -146,8 +146,20 @@ function placeGuide(g: Guide, x: number, y: number, free: boolean) {
 
 function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
   const g: Guide = { id: nextGuideId++, axis, at: 0, locked: false, caught: '', pinned: false };
-  record();
   placeGuide(g, x, y, free);
+
+  // Guides snap to other guides, so asking for one anywhere within the snap
+  // tolerance of an existing one lands exactly on top of it. Two guides in the
+  // same place are indistinguishable, and deleting one then looks like the
+  // delete did nothing. You asked for a guide here and there is one: hand the
+  // keyboard that one rather than stacking a second behind it.
+  const twin = guides.find((o) => o.axis === g.axis && Math.abs(o.at - g.at) < 0.5);
+  if (twin) {
+    activeGuideId = twin.id;
+    return twin;
+  }
+
+  record();
   setGuides([...guides, g]);
   // A guide you just put down is the one the keyboard should be holding.
   // Without this a guide dropped with V or H could not be nudged at all until

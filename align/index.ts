@@ -499,8 +499,34 @@ function watch() {
   pinned = next;
   hover = nextHover;
   const last = pinned[pinned.length - 1];
-  if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
+  // The canvas has to be redrawn on every scroll frame; the panel almost never
+  // does. Nothing it shows depends on where the page is scrolled to — sizes,
+  // bands, tokens, rules and the gaps between locked boxes are all unchanged by
+  // a scroll — and rebuilding it anyway costs a CSSOM walk, a custom-property
+  // enumeration and a diff every frame, for identical output.
+  const sig = panelSignature();
+  if (sig !== panelSig) {
+    panelSig = sig;
+    if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
+  }
   render();
+}
+
+/**
+ * What the panel is showing, as a string, so an unchanged reading can be left
+ * alone. Sizes and *relative* positions, never absolute ones: a scroll moves
+ * every box by the same amount and changes nothing you can read.
+ */
+let panelSig = '';
+function panelSignature(): string {
+  const first = pinned[0];
+  if (!first) return '';
+  return pinned
+    .map((b) => [
+      b.label, Math.round(b.width * 100), Math.round(b.height * 100),
+      Math.round((b.left - first.left) * 100), Math.round((b.top - first.top) * 100),
+    ].join(','))
+    .join(';');
 }
 
 /** The canvas has to be refitted on resize; the boxes are handled by watch(). */

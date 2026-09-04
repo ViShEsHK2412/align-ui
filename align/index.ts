@@ -315,6 +315,16 @@ function undo(): void {
   if (!before.some((g) => g.id === activeGuideId)) activeGuideId = null;
 }
 
+/**
+ * Every tool, from either direction.
+ *
+ * The keyboard and the buttons must come through here, and for a while some
+ * keys did not: they toggled the thing and skipped the render, so the toolbar
+ * went on showing the old state. On x-ray and the panel you could not tell,
+ * because the page itself changed and answered the question. On T there is
+ * nothing else to look at, so pressing it did nothing observable whatsoever
+ * and the feature read as broken.
+ */
 function onTool(name: ToolName): void {
   switch (name) {
     case 'rulers': rulers = !rulers; saveFlag('rulers', rulers); break;
@@ -654,22 +664,25 @@ function onKey(e: KeyboardEvent) {
     // Hold the page still. Everything worth measuring that moves — a hover, a
     // dropdown mid-open, a skeleton — is unmeasurable until this exists.
     e.preventDefault();
-    setFrozen(!isFrozen());
-    render();
+    onTool('freeze');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'x') {
     e.preventDefault();
-    xray = !xray;
-    setXray(xray);
+    onTool('xray');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'p') {
     e.preventDefault();
-    void picker?.open();
+    onTool('pick');
+    return;
   } else if (overlay && e.key.toLowerCase() === 't') {
     e.preventDefault();
-    boxmodel?.toggleType();
+    onTool('type');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'c') {
     // The numbers are this tool's output; retyping them was the only way out.
     e.preventDefault();
-    copyReading();
+    onTool('copy');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'l') {
     // Pin the guide the keyboard is pointing at: still selectable, still
     // measuring, but no longer draggable or deletable by accident.
@@ -683,18 +696,18 @@ function onKey(e: KeyboardEvent) {
   } else if (overlay && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
     if (history.depth() === 0) return;
     e.preventDefault();
-    undo();
-    render();
+    onTool('undo');
+    return;
   } else if (overlay && e.key.toLowerCase() === cfg.rulerKey) {
     e.preventDefault();
-    rulers = !rulers;
-    saveFlag('rulers', rulers);
-    render();
+    onTool('rulers');
+    return;
   } else if (overlay && e.key.toLowerCase() === cfg.panelKey) {
     // A plain letter is safe here: while the tool is on it swallows clicks, so
     // nothing on the page can hold focus and receive the keystroke instead.
     e.preventDefault();
-    boxmodel?.toggle();
+    onTool('panel');
+    return;
   } else if (e.key === 'Escape' && overlay) {
     // Escape dismisses the topmost thing first: help, then the locks, then the
     // tool itself.

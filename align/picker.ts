@@ -25,7 +25,8 @@ interface EyeDropperCtor {
 const CSS = `
 .picker {
   /* Under the badge, from the badge's own numbers. */
-  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 200px;
+  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px;
+  width: min(200px, calc(100vw - ${INSET * 2 + SPACE.base * 2}px));
   padding: ${SPACE.base}px; border-radius: 0;
   user-select: none;
   font-family: ${TYPE.stack};

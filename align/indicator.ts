@@ -166,7 +166,13 @@ const CSS = `
 .flag .count:empty { display: none; }
 
 .help {
-  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 368px;
+  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px;
+  /* 368 plus two insets is 400, so this was the first thing to hang off the
+     left edge of a phone-width window. */
+  /* The padding is in the subtraction because these boxes are content-box:
+     without it the clamp lets the panel sit flush against the far edge with
+     no inset at all, which reads as broken rather than as tight. */
+  width: min(368px, calc(100vw - ${INSET * 2 + SPACE.base * 2}px));
   /* Fifteen rows outgrow a short window, and a list you cannot reach the end
      of is worse than one you have to scroll. */
   max-height: calc(100vh - ${INSET * 2 + FLAG_H + STEP}px); overflow-y: auto;

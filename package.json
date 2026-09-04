@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "description": "A dev-only measuring tool that runs inside your own project.",
+  "keywords": [
+    "devtool",
+    "measure",
+    "ruler",
+    "guides",
+    "alignment",
+    "css",
+    "overlay",
+    "design-system",
+    "vite-plugin"
+  ],
+  "license": "MIT",
+  "author": "Vishesh Kathuria",
   "type": "module",
   "exports": {
     ".": {
@@ -41,5 +54,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ViShEsHK2412/align-ui.git"
+  },
+  "homepage": "https://github.com/ViShEsHK2412/align-ui#readme",
+  "bugs": {
+    "url": "https://github.com/ViShEsHK2412/align-ui/issues"
   }
 }

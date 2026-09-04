@@ -8,3 +8,12 @@ examples/**/dist/
 examples/next-app/AGENTS.md
 examples/next-app/CLAUDE.md
 examples/next-app/next-env.d.ts
+
+# Working notes, kept locally rather than published. The spec and the plan are
+# how this got built, not how it is used; README.md is the only Markdown the
+# repo ships.
+PLAN.md
+SPEC.md
+ALIGN-PRD.md
+AGENTS.md
+CLAUDE.md

@@ -140,6 +140,16 @@ export const MOTION = {
   enter: '500ms cubic-bezier(0.34, 1.2, 0.64, 1)',
   /** Slow in, faster out: an exit is not a reversed entrance. */
   exit: '160ms cubic-bezier(0.3, 0, 1, 1)',
+  /**
+   * The tier Agentation does not have, because it does not need it.
+   *
+   * `enter` overshoots over half a second, which is right for a toolbar that
+   * unfolds once. The box model appears on every single lock, dozens of times
+   * a minute, and at that frequency an overshoot stops reading as character
+   * and starts reading as lag. Critically damped, and inside Apple's 0.3-0.4s
+   * response band for something you touch directly.
+   */
+  ui: '160ms cubic-bezier(0.2, 0, 0, 1)',
 } as const;
 
 /**

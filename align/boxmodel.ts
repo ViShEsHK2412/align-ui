@@ -6,7 +6,7 @@ import {
 } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
 import {
-  GROUND, HAIRLINE, SHADOW, SHADOW_LIFTED, surface, TEXT, TYPE, WEIGHT,
+  GROUND, HAIRLINE, MOTION, SHADOW, SHADOW_LIFTED, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
 import type { Box, Quad } from './types';
 
@@ -99,16 +99,17 @@ const CSS = `
   opacity: 0;
   transform: translateY(4px) scale(0.98);
   transform-origin: bottom left;
-  transition: opacity 120ms cubic-bezier(0.2, 0, 0, 1),
-              transform 120ms cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 120ms cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity ${MOTION.exit}, transform ${MOTION.exit},
+              box-shadow ${MOTION.exit};
 }
 .dock[data-open] .panel {
   pointer-events: auto;
   opacity: 1;
   transform: none;
-  /* Slow in, faster out — the exit above is one tier quicker. */
-  transition-duration: 160ms;
+  /* Slow in, faster out. Both come from the tokens now: the panel had been
+     carrying hard-coded curves from the design system the theme replaced. */
+  transition: opacity ${MOTION.ui}, transform ${MOTION.ui},
+              box-shadow ${MOTION.ui};
 }
 @media (prefers-reduced-motion: reduce) {
   /* Fewer and gentler, not none: the fade aids comprehension, the travel does not. */

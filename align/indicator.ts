@@ -1,5 +1,5 @@
 import {
-  GROUND, HAIRLINE, ROW, RULER, SHADOW, surface, TEXT, TYPE, WEIGHT,
+  GROUND, HAIRLINE, MOTION, ROW, RULER, SHADOW, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
 
@@ -81,7 +81,7 @@ const CSS = `
 .flag {
   position: fixed; top: ${INSET}px; right: ${INSET}px;
   display: flex; align-items: center; gap: 8px;
-  transition: top 160ms cubic-bezier(0.19, 1, 0.22, 1);
+  transition: top ${MOTION.ui};
   padding: ${(ROW - BTN) / 2}px 10px; border-radius: 0;
   pointer-events: auto; user-select: none; cursor: pointer;
   font-family: ${TYPE.stack};
@@ -96,7 +96,9 @@ const CSS = `
 }
 /* Scoped to .flag: this stylesheet shares a shadow root with the box model,
    which has a .name of its own — an unscoped rule restyled its header too. */
-.flag .name { letter-spacing: -0.02em; }
+/* No negative tracking: it is 11px, and tightening is what large text wants.
+   Small text reads better at zero or a hair positive. */
+.flag .name { letter-spacing: 0; }
 /* The rulers draw a gutter along the top edge, and the badge sits in it. Step
    down out of the way rather than covering the ticks the rulers exist to show. */
 .flag[data-rulers] { top: ${INSET + RULER}px; }
@@ -120,11 +122,20 @@ const CSS = `
   color: ${TEXT.tertiary};
 }
 .tool:hover { background: ${surface(2)}; color: ${TEXT.primary}; }
+/* On the press, not on the release. Waiting for the click to acknowledge a
+   button is the difference between a control that answers and one that lags,
+   and it costs one rule. */
+.tool:active { background: ${surface(4)}; color: ${TEXT.primary}; }
 .tool:focus-visible { outline: 1px solid ${TEXT.primary}; outline-offset: -1px; }
 /* On is the film, not a colour: the three hues each already mean something on
    the canvas, and a fourth here would say nothing. */
 .tool[data-on] { background: ${surface(4)}; color: ${TEXT.primary}; }
-.tool[data-once]:active { background: ${surface(4)}; }
+
+/* The badge steps down out of the ruler gutter, and that step is decoration:
+   under reduced motion it should simply be in the right place. */
+@media (prefers-reduced-motion: reduce) {
+  .flag { transition: none; }
+}
 /* With nothing locked the count is empty but still a flex item, so the gap
    before it padded the right side and the pill sat lopsided. */
 .flag .count:empty { display: none; }

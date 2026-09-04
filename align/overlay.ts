@@ -19,6 +19,8 @@ export interface OverlayState {
   lines: Segment[];
   cursor: { x: number; y: number } | null;
   rulers: boolean;
+  /** Everything drawn, held back for a moment. State is untouched. */
+  hidden: boolean;
   /** The design grid to check against, or null for none. */
   grid: GridSpec | null;
   /** Whether to lay the pixel texture under everything. */
@@ -66,7 +68,7 @@ export function mountOverlay(): Overlay {
   const ctx = canvas.getContext('2d')!;
 
   const state: OverlayState = {
-    hover: null, pinned: [], lines: [], cursor: null, rulers: false,
+    hover: null, pinned: [], lines: [], cursor: null, rulers: false, hidden: false,
     grid: null, pixels: false,
     guides: [], liveGuide: null, activeGuide: null,
   };
@@ -355,6 +357,9 @@ export function mountOverlay(): Overlay {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
+    // Cleared and nothing else. The state behind it is untouched, so letting
+    // go of the key puts every line and every lock back exactly as it was.
+    if (state.hidden) return;
 
     // Both are references to measure against, so both go under everything —
     // and both stay out of the ruler gutters, which are chrome. The gutter

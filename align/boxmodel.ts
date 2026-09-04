@@ -39,6 +39,11 @@ export interface BoxModel {
   asText(): string;
   /** Nothing is locked any more. */
   hide(): void;
+  /**
+   * Out of sight for a moment, without forgetting it was open. Distinct from
+   * `hide`, which is what happens when the last lock goes.
+   */
+  setHidden(hidden: boolean): void;
   /** The user asked for it back, or asked it to go away. */
   toggle(): void;
   destroy(): void;
@@ -108,6 +113,9 @@ const CSS = `
   transition: opacity ${MOTION.exit}, transform ${MOTION.exit},
               box-shadow ${MOTION.exit};
 }
+/* Held out of the way. Not display:none, so reopening does not replay the
+   entrance animation for something that was already there. */
+.dock[data-away] { visibility: hidden; pointer-events: none; }
 .dock[data-open] .panel {
   pointer-events: auto;
   opacity: 1;
@@ -577,6 +585,8 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
     },
 
     hide() { current = null; dock.removeAttribute('data-open'); },
+
+    setHidden(hidden) { dock.toggleAttribute('data-away', hidden); },
     toggle() {
       if (!current) return;              // nothing locked, nothing to show
       dismissed = !dismissed;

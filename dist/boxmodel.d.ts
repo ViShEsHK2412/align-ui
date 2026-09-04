@@ -26,6 +26,11 @@ export interface BoxModel {
     asText(): string;
     /** Nothing is locked any more. */
     hide(): void;
+    /**
+     * Out of sight for a moment, without forgetting it was open. Distinct from
+     * `hide`, which is what happens when the last lock goes.
+     */
+    setHidden(hidden: boolean): void;
     /** The user asked for it back, or asked it to go away. */
     toggle(): void;
     destroy(): void;

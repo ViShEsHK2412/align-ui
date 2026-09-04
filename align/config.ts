@@ -18,6 +18,17 @@ export interface Config {
    * reflex cannot carry meaning.
    */
   guideKeys: { vertical: string; horizontal: string };
+  /**
+   * Which way the tool's own surfaces read.
+   *
+   * `auto` works out whether the page is dark from an explicit `color-scheme`,
+   * then from the background it actually paints, and only falls back to the
+   * machine's preference when the page says nothing. That is right almost
+   * always, and it can be fooled: a mid-grey ground sits near the threshold,
+   * and a transparent body over a full-page image tells it nothing true. This
+   * is the way out when it guesses wrong.
+   */
+  theme: 'auto' | 'light' | 'dark';
 }
 
 export const DEFAULTS: Config = {
@@ -27,6 +38,7 @@ export const DEFAULTS: Config = {
   panelKey: 'b',
   rulerKey: 'r',
   guideKeys: { vertical: 'v', horizontal: 'h' },
+  theme: 'auto',
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {

@@ -7,7 +7,7 @@ import {
   snapCandidates, snapTo,
 } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
-import { loadFont, unloadFont } from './theme';
+import { forceTheme, loadFont, unloadFont } from './theme';
 import { describeGap, gapFactOf } from './inspect';
 import { createPicker, type Picker } from './picker';
 import { isFrozen, setFrozen } from './freeze';
@@ -56,6 +56,11 @@ let restored = false;
  * this gives the keyboard reach to the thing you just clicked.
  */
 let activeGuideId: number | null = null;
+/**
+ * Everything drawn, held back for a moment. Not persisted: a tool that reopens
+ * showing nothing looks broken, which is the same argument the modes make.
+ */
+let hidden = false;
 /**
  * Undo, over every change to the guides rather than only deletions.
  *
@@ -279,6 +284,7 @@ function render(cursor?: { x: number; y: number }) {
     hover,
     pinned,
     rulers,
+    hidden,
     grid: grid && cfg.grid ? cfg.grid : null,
     pixels,
     guides,
@@ -294,6 +300,7 @@ function render(cursor?: { x: number; y: number }) {
     pixels,
     freeze: isFrozen(),
     type: boxmodel?.showsType() ?? false,
+    hide: hidden,
     // Copy reads the panel, which needs something locked; undo needs a history.
     canCopy: pinned.length > 0,
     canUndo: history.depth() > 0,
@@ -363,6 +370,11 @@ function onTool(name: ToolName): void {
     case 'freeze': setFrozen(!isFrozen()); break;
     case 'type': boxmodel?.toggleType(); break;
     case 'panel': boxmodel?.toggle(); break;
+    case 'hide':
+      hidden = !hidden;
+      boxmodel?.setHidden(hidden);
+      if (hidden) picker?.close();
+      break;
     case 'copy': copyReading(); break;
     case 'pick': void picker?.open(); break;
     case 'undo': undo(); break;
@@ -595,7 +607,7 @@ function activate() {
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
-    canCopy: false, canUndo: false,
+    hide: false, canCopy: false, canUndo: false,
   });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
@@ -722,6 +734,12 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     onTool('pixels');
     return;
+  } else if (overlay && e.key === '\\') {
+    // Figma hides its UI on the same key. Nothing is torn down: the locks, the
+    // guides and the layers are all still there behind it.
+    e.preventDefault();
+    onTool('hide');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'f') {
     // Hold the page still. Everything worth measuring that moves — a hover, a
     // dropdown mid-open, a skeleton — is unmeasurable until this exists.
@@ -786,6 +804,7 @@ export function initAlign(partial: Partial<Config> = {}): void {
   window.__align = true;
 
   cfg = mergeConfig(partial);
+  forceTheme(cfg.theme);
 
   // Until the first toggle this listener is the tool's entire footprint.
   // Capture phase so an app-level shortcut handler cannot swallow the hotkey.

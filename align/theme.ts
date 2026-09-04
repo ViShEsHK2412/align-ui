@@ -277,7 +277,19 @@ export function ink(dark: boolean): Ink {
  *     overlay has to contrast against.
  *  3. The media query, when the page is transparent and says nothing.
  */
+/**
+ * An explicit answer, when the caller has one. Set from the config at init, so
+ * `pageIsDark` stays a plain function the overlay can call every time it needs
+ * to re-check rather than a value someone has to remember to pass along.
+ */
+let forced: 'light' | 'dark' | null = null;
+
+export function forceTheme(theme: 'auto' | 'light' | 'dark'): void {
+  forced = theme === 'auto' ? null : theme;
+}
+
 export function pageIsDark(): boolean {
+  if (forced) return forced === 'dark';
   const root = document.documentElement;
   const declared = getComputedStyle(root).colorScheme;
   if (/dark/.test(declared) && !/light/.test(declared)) return true;

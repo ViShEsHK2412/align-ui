@@ -126,6 +126,7 @@ the ticks they exist to show.
 | `L` | pin that guide, so it cannot be moved or deleted |
 | `Ctrl/Cmd + Z` | undo the last change to the guides: a nudge, a drag, a delete. A held arrow key undoes as one step, not thirty |
 | `T` | type and token readout for the locked element |
+| `\` | hide everything drawn, for a look at the page underneath. Locks, guides and layers all survive it |
 | `F` | freeze the page so a moving thing can be measured |
 | `X` | x-ray: outline every element on the page |
 | `G` | the design grid, when one is configured |
@@ -266,6 +267,11 @@ initAlign({
   panelKey: 'b',
   rulerKey: 'r',
   guideKeys: { vertical: 'v', horizontal: 'h' },
+
+  // 'auto' reads the page: an explicit color-scheme, then the background it
+  // actually paints, and the machine's preference only if the page says
+  // nothing. Right almost always, and a way out when it guesses wrong.
+  theme: 'auto',
 
   // The grid the design is built on, for `G`. There is no default: twelve
   // columns at 24 means nothing without knowing whose system it is, and a
@@ -424,7 +430,12 @@ root, so an icon package would be a build dependency for ten glyphs and an icon
 font a request into someone else's page.
 
 The snapping tolerance, the nudge steps and the `Ctrl` bypass follow what
-tldraw, Excalidraw, Penpot and Figma converge on.
+tldraw, Excalidraw, Penpot and Figma converge on. `\` hides the overlay
+because that is the key Figma uses to hide its own UI.
+
+Reading [ruler-mode](https://github.com/timothymaarv/ruler-mode) is what turned
+up the missing guard on typing, and the case for a hide toggle that keeps your
+state rather than tearing the tool down.
 
 ## License
 

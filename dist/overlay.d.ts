@@ -15,6 +15,8 @@ export interface OverlayState {
         y: number;
     } | null;
     rulers: boolean;
+    /** Everything drawn, held back for a moment. State is untouched. */
+    hidden: boolean;
     /** The design grid to check against, or null for none. */
     grid: GridSpec | null;
     /** Whether to lay the pixel texture under everything. */

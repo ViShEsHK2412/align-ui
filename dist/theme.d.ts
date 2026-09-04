@@ -175,25 +175,7 @@ export type Ink = {
 };
 /** Resolve every pair for the viewer's current theme. */
 export declare function ink(dark: boolean): Ink;
-/**
- * Is the page we are drawing over dark?
- *
- * Not the same question as `prefers-color-scheme`, and asking that one instead
- * is a mistake worth spelling out: a page is free to be dark on a machine set
- * to light, and plenty are — a docs site with its own toggle, a product whose
- * brand is dark, a demo that simply hard-codes it. Trust the media query and
- * you draw light-theme ink on a dark page, where a 14% black hairline is
- * invisible and every reading you came for is unreadable.
- *
- * Three sources, strongest first:
- *
- *  1. An explicit `color-scheme` on the root. A page that says `dark` has
- *     stated its intent, and the browser has already believed it.
- *  2. The background actually painted behind the page — body's if it has one,
- *     otherwise the root's. This is what the eye sees, so it is what the
- *     overlay has to contrast against.
- *  3. The media query, when the page is transparent and says nothing.
- */
+export declare function forceTheme(theme: 'auto' | 'light' | 'dark'): void;
 export declare function pageIsDark(): boolean;
 /** `oklch(...)` → `oklch(... / alpha)`, so alphas stay in the same colour space. */
 export declare function alpha(color: string, a: number): string;

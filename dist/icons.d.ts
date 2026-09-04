@@ -54,6 +54,8 @@ export declare const ICONS: {
     readonly copy: readonly [Shape, Shape];
     /** pipette — the eyedropper, which is what every tool calls a colour picker. */
     readonly pick: readonly [Shape, Shape, Shape];
+    /** eye-off — everything drawn, out of the way for a moment. */
+    readonly hide: readonly [Shape, Shape, Shape, Shape];
     /** undo-2 — an arrow turning back on itself. */
     readonly undo: readonly [Shape, Shape];
     /**

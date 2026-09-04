@@ -12,12 +12,13 @@ export interface ToolState {
     freeze: boolean;
     type: boolean;
     panel: boolean;
+    hide: boolean;
     /** Whether the two one-shots have anything to act on right now. */
     canCopy: boolean;
     canUndo: boolean;
 }
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo';
 export interface Indicator {
     update(locked: number, state: ToolState): void;
     /**

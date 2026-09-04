@@ -19,6 +19,7 @@ export interface ToolState {
   freeze: boolean;
   type: boolean;
   panel: boolean;
+  hide: boolean;
   /** Whether the two one-shots have anything to act on right now. */
   canCopy: boolean;
   canUndo: boolean;
@@ -26,7 +27,7 @@ export interface ToolState {
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
 export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
-  | 'type' | 'panel' | 'copy' | 'pick' | 'undo';
+  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo';
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
@@ -286,6 +287,8 @@ const TOOLS: Tool[] = [
     what: 'add size, weight, line height and tracking to the panel, each checked against your scale' },
   { name: 'panel', label: 'Box model', key: 'B', toggle: true,
     what: 'the readout itself — margins, borders, padding, what places the element, what styles it' },
+  { name: 'hide', label: 'Hide', key: '\\', toggle: true,
+    what: 'everything drawn, out of the way for a moment. Your locks, guides and layers all survive it' },
   { name: 'freeze', label: 'Freeze', key: 'F', toggle: true,
     what: 'hold every animation and transition where it stands, so a moving thing can be measured' },
   { name: 'copy', label: 'Copy', key: 'C', toggle: false,
@@ -412,8 +415,12 @@ ${t.what}`;
 
     update(locked, state) {
       count.textContent = locked > 0 ? `${locked} locked` : '';
-      flag.toggleAttribute('data-rulers', state.rulers);
-      help.toggleAttribute('data-rulers', state.rulers);
+      // Step down for the gutter only while there is a gutter. Hidden means
+      // nothing is drawn, so dodging a ruler that is not there just moves the
+      // badge for no reason.
+      const gutter = state.rulers && !state.hide;
+      flag.toggleAttribute('data-rulers', gutter);
+      help.toggleAttribute('data-rulers', gutter);
       for (const t of TOOLS) {
         if (!t.toggle) continue;
         // Explicitly a boolean: toggleAttribute with undefined flips the

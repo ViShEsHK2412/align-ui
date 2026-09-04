@@ -136,6 +136,11 @@ the ticks they exist to show.
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
 | `Esc` | close the key list, then the locks, then the tool |
 
+Single-letter keys are ignored while you are typing in an input, a textarea or
+anything `contenteditable`, so the tool never eats a keystroke meant for the
+page. The activation hotkey is deliberately outside that rule: you can always
+switch the tool off.
+
 ---
 
 ## What it measures

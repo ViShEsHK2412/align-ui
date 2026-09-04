@@ -640,10 +640,36 @@ function deactivate() {
   hoverGuide = null;
 }
 
+/**
+ * Is this keystroke going somewhere the user is typing?
+ *
+ * Every shortcut here is a bare letter, and the argument for that was that the
+ * tool swallows clicks while it is on, so nothing on the page can be holding
+ * focus. That is wrong in the ordinary case: focus set before the tool was
+ * turned on survives being turned on, and Tab moves it freely afterwards. Type
+ * into a field with the tool running and `r` toggled the rulers instead of
+ * typing an r, because we call preventDefault on it.
+ *
+ * `composedPath()[0]` rather than `target`, because an event from inside an
+ * open shadow root is retargeted to the host and the real input would be
+ * invisible to a plain check.
+ */
+function typing(e: KeyboardEvent): boolean {
+  const el = (e.composedPath?.()[0] ?? e.target) as HTMLElement | null;
+  if (!el || typeof el !== 'object' || !('tagName' in el)) return false;
+  if (el.isContentEditable) return true;
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT';
+}
+
 function onKey(e: KeyboardEvent) {
   if (matchesHotkey(e)) {
     e.preventDefault();
     overlay ? deactivate() : activate();
+  } else if (typing(e)) {
+    // Everything below is either a bare letter or a combination a text field
+    // already owns, so while someone is typing the tool has nothing to say.
+    // The hotkey above is deliberately outside this: you must always be able
+    // to switch the tool off.
   } else if (overlay && cursorAt && (e.key.toLowerCase() === cfg.guideKeys.vertical
                                   || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
     e.preventDefault();

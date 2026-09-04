@@ -56,6 +56,16 @@ export declare const ICONS: {
     readonly pick: readonly [Shape, Shape, Shape];
     /** undo-2 — an arrow turning back on itself. */
     readonly undo: readonly [Shape, Shape];
+    /**
+     * check and x — not controls, answers.
+     *
+     * A one-shot button can say it was pressed and still leave you wondering
+     * whether anything happened. These take the button's place for a moment to
+     * report the outcome, which for a clipboard write is the only way to know:
+     * the write is silent, and so is its refusal.
+     */
+    readonly check: readonly [Shape];
+    readonly cross: readonly [Shape, Shape];
 };
 export type IconName = keyof typeof ICONS;
 /**

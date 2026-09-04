@@ -293,7 +293,13 @@ function render(cursor?: { x: number; y: number }) {
 function copyReading(): void {
   // The numbers are this tool's output; retyping them was the only way out.
   const text = boxmodel?.asText() ?? '';
-  if (text) navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
+  // Nothing locked is not a failure, but it is not a copy either, and a button
+  // that reports success for having done nothing is worse than a silent one.
+  if (!text) return;
+  const say = (ok: boolean) => indicator?.acknowledge('copy', ok);
+  const write = navigator.clipboard?.writeText(text);
+  if (write) write.then(() => say(true), () => say(false));
+  else say(false);
 }
 
 function undo(): void {

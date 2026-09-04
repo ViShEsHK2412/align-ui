@@ -82,6 +82,17 @@ export const ICONS = {
   ],
   /** undo-2 — an arrow turning back on itself. */
   undo: [p('M9 14 4 9l5-5'), p('M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11')],
+
+  /**
+   * check and x — not controls, answers.
+   *
+   * A one-shot button can say it was pressed and still leave you wondering
+   * whether anything happened. These take the button's place for a moment to
+   * report the outcome, which for a clipboard write is the only way to know:
+   * the write is silent, and so is its refusal.
+   */
+  check: [p('M20 6 9 17l-5-5')],
+  cross: [p('M18 6 6 18'), p('m6 6 12 12')],
 } as const;
 
 export type IconName = keyof typeof ICONS;

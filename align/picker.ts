@@ -1,5 +1,6 @@
 import { formats } from './colour';
-import { GROUND, HAIRLINE, SHADOW, surface, TEXT, TYPE } from './theme';
+import { FLAG_H, INSET, STEP } from './indicator';
+import { GROUND, HAIRLINE, MOTION, SHADOW, SPACE, surface, TEXT, TYPE } from './theme';
 
 /**
  * The colour picker: sample a pixel, then read it in four formats.
@@ -23,9 +24,10 @@ interface EyeDropperCtor {
 
 const CSS = `
 .picker {
-  position: fixed; top: 46px; right: 16px; width: 200px;
-  padding: 10px; border-radius: 0;
-  pointer-events: auto; user-select: none;
+  /* Under the badge, from the badge's own numbers. */
+  position: fixed; top: ${INSET + FLAG_H + STEP}px; right: ${INSET}px; width: 200px;
+  padding: ${SPACE.base}px; border-radius: 0;
+  user-select: none;
   font-family: ${TYPE.stack};
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
@@ -34,9 +36,31 @@ const CSS = `
   color: ${TEXT.primary};
   background: ${GROUND};
   box-shadow: ${SHADOW};
-  display: none;
+  /*
+   * It comes from the button that opened it. The card is parked directly under
+   * the toolbar and the colour button is at its right end, so an origin in the
+   * top right corner is that button — the card grows out of the control you
+   * pressed rather than arriving from nowhere.
+   *
+   * Visibility rather than display, which cannot be transitioned; delayed out
+   * by the duration on close so the fade finishes before it stops existing.
+   * The same treatment the key list gets, because it is the same shape.
+   */
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: scale(0.98) translateY(-4px);
+  transform-origin: top right;
+  transition: opacity ${MOTION.ui}, transform ${MOTION.ui}, visibility 0s linear 160ms;
 }
-.picker[data-open] { display: block; }
+.picker[data-open] {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: none;
+  transition: opacity ${MOTION.ui}, transform ${MOTION.ui}, visibility 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The fade says it arrived; the travel and the scale are decoration. */
+  .picker { transform: none; transition: opacity 120ms linear, visibility 0s linear 120ms; }
+  .picker[data-open] { transition: opacity 120ms linear, visibility 0s; }
+}
 .picker .swatch {
   height: 40px; margin-bottom: 8px;
   border: 1px solid ${HAIRLINE};

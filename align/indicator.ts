@@ -27,6 +27,12 @@ export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
+  /**
+   * Report the outcome of a one-shot control. A clipboard write is silent and
+   * so is its refusal, so a button that only says it was pressed leaves you
+   * with no way to know whether anything happened.
+   */
+  acknowledge(name: ToolName, ok: boolean): void;
   /** True if it was open — lets Escape dismiss the topmost layer first. */
   closeHelp(): boolean;
   destroy(): void;
@@ -71,12 +77,24 @@ const GESTURES: { title: string; rows: [string, string][] }[] = [
  * the same numbers instead of a hardcoded offset that drifts when either
  * changes. Height is the line box plus the padding either side.
  */
-const INSET = SPACE.edge;
+/**
+ * Exported because the colour picker parks under this badge, and a second copy
+ * of these numbers is how it came to be 10px out of date: the bar grew from a
+ * row of letters to a row of icon buttons and the picker went on positioning
+ * itself against the old height, overlapping it.
+ */
+export const INSET = SPACE.edge;
 /* A row of icon buttons, not of text: the height comes from the buttons plus
    the padding either side, which lands on the ROW the panel already uses. */
 const BTN = 24;
-const FLAG_H = ROW;
-const STEP = SPACE.base;
+/**
+ * How long an answer stays up. Long enough to be read after you have looked
+ * back at the page, short enough that it is gone before you next reach for the
+ * button.
+ */
+const ACK_MS = 900;
+export const FLAG_H = ROW;
+export const STEP = SPACE.base;
 
 const CSS = `
 .flag {
@@ -122,6 +140,12 @@ const CSS = `
   font: inherit; font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
   color: ${TEXT.tertiary};
 }
+/* Both glyphs occupy the same cell so one can cross-fade into the other; a
+   swap would jump, and the point is to be noticed without being a movement. */
+.tool > svg { grid-area: 1 / 1; transition: opacity ${MOTION.ui}; }
+.tool > .ack { opacity: 0; }
+.tool[data-ack] > .ack { opacity: 1; }
+.tool[data-ack] > .glyph { opacity: 0; }
 .tool:hover { background: ${surface(2)}; color: ${TEXT.primary}; }
 /* On the press, not on the release. Waiting for the click to acknowledge a
    button is the difference between a control that answers and one that lags,
@@ -282,6 +306,7 @@ export function createIndicator(
   // Freeze sits alone between the switches and the one-shots: it is the only
   // control that changes the page rather than the overlay.
   const buttons = new Map<ToolName, HTMLButtonElement>();
+  const acks = new Map<ToolName, ReturnType<typeof setTimeout>>();
   const tools = document.createElement('div');
   tools.className = 'tools';
   for (const t of TOOLS) {
@@ -293,7 +318,9 @@ export function createIndicator(
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tool';
-    b.appendChild(icon(t.name as IconName));
+    const glyph = icon(t.name as IconName);
+    glyph.classList.add('glyph');
+    b.appendChild(glyph);
     // The icon carries no words, so the name has to reach a screen reader some
     // other way — and the tooltip has to say more than the name again.
     b.setAttribute('aria-label', t.label);
@@ -352,6 +379,28 @@ ${t.what}`;
   root.append(flag, help);
 
   return {
+    acknowledge(name, ok) {
+      const b = buttons.get(name);
+      if (!b) return;
+      clearTimeout(acks.get(name));
+      // Rebuilt each time rather than kept around: an answer that is not being
+      // shown should not be in the DOM waiting to be mistaken for one.
+      b.querySelector('.ack')?.remove();
+      // The glyph carries the meaning and nothing is tinted. Red on this
+      // canvas already means "a measurement", and one colour gets one job.
+      const mark = icon(ok ? 'check' : 'cross');
+      mark.classList.add('ack');
+      b.appendChild(mark);
+      // A frame before flipping the attribute, so the transition has a
+      // starting value to run from instead of appearing already finished.
+      requestAnimationFrame(() => b.setAttribute('data-ack', ok ? 'yes' : 'no'));
+      acks.set(name, setTimeout(() => {
+        b.removeAttribute('data-ack');
+        // Long enough for the fade back to finish before the node goes.
+        setTimeout(() => b.querySelector('.ack')?.remove(), 200);
+      }, ACK_MS));
+    },
+
     update(locked, state) {
       count.textContent = locked > 0 ? `${locked} locked` : '';
       flag.toggleAttribute('data-rulers', state.rulers);
@@ -368,6 +417,7 @@ ${t.what}`;
       help.removeAttribute('data-open');
       return wasOpen;
     },
-    destroy() { flag.remove(); help.remove(); style.remove(); },
+    destroy() {
+      for (const t of acks.values()) clearTimeout(t); flag.remove(); help.remove(); style.remove(); },
   };
 }

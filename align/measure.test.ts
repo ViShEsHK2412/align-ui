@@ -3,6 +3,7 @@ import {
   chain, chainPairs, fmt, gridColumns, insetSegments, pixelGridStep, sharedScale,
   snapCandidates, snapTo, gapSegments, guideGapSegments, scaleFromTransform,
   spreadLabels, type LabelBox,
+  guideSegments,
 } from './measure';
 import type { Box } from './types';
 
@@ -593,5 +594,34 @@ describe('gridColumns, awkward numbers', () => {
   it('clamps a max width larger than the window to the window', () => {
     const [first] = gridColumns({ columns: 2, gutter: 0, margin: 0, maxWidth: 5000 }, 400);
     expect(first).toEqual({ left: 0, width: 200 });
+  });
+});
+
+describe('guideSegments under a scaled ancestor', () => {
+  it('reports the distance in layout units, not viewport pixels', () => {
+    // A canvas at 50%: the element renders 100px wide but is 200px in CSS, and
+    // a guide 50 viewport px to its left is 100 layout px away.
+    const b = box(200, 0, 100, 40, 0.5);
+    const [seg] = guideSegments(b, [{ axis: 'x', pos: 150 }]);
+    expect(seg?.label).toBe('100');
+  });
+
+  it('is unchanged when nothing is scaled', () => {
+    const b = box(200, 0, 100, 40, 1);
+    const [seg] = guideSegments(b, [{ axis: 'x', pos: 150 }]);
+    expect(seg?.label).toBe('50');
+  });
+
+  it('divides the vertical axis by the vertical scale', () => {
+    const b = box(0, 200, 100, 40, 0.5);
+    const [seg] = guideSegments(b, [{ axis: 'y', pos: 100 }]);
+    expect(seg?.label).toBe('200');
+  });
+
+  it('still draws the line in viewport space, so it lands on the guide', () => {
+    const b = box(200, 0, 100, 40, 0.5);
+    const [seg] = guideSegments(b, [{ axis: 'x', pos: 150 }]);
+    // 150 -> 200 on screen, whatever the label says.
+    expect([seg?.x1, seg?.x2]).toEqual([150, 200]);
   });
 });

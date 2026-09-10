@@ -324,6 +324,19 @@ export function snapCandidates(
  * Pure: guide positions come in already converted to viewport space.
  */
 export function guideSegments(box: Box, at: { axis: 'x' | 'y'; pos: number }[]): Segment[] {
+  /*
+   * The label is divided by the box's own scale, and that division was missing.
+   *
+   * The line is drawn in viewport space, because that is where both the guide
+   * and the element are on screen. The NUMBER is not a viewport distance: it is
+   * how far this element sits from that guide in the units you would type into
+   * a stylesheet. Inside a canvas at 81% zoom the two differ by 19%, and the
+   * whole point of the reading is that you can act on it.
+   *
+   * The element supplies the scale because the element is the thing being
+   * measured. A guide has no scale of its own — it is a viewport ruler — which
+   * is why `guideGapSegments` below cannot do this and does not try.
+   */
   const out: Segment[] = [];
   for (const axis of ['x', 'y'] as const) {
     const near = at
@@ -342,12 +355,12 @@ export function guideSegments(box: Box, at: { axis: 'x' | 'y'; pos: number }[]):
       const y = box.top + box.height / 2;
       const from = near.pos < box.left ? near.pos : box.right;
       const to = near.pos < box.left ? box.left : near.pos;
-      out.push({ x1: from, y1: y, x2: to, y2: y, label: fmt(near.gap), axis: 'x' });
+      out.push({ x1: from, y1: y, x2: to, y2: y, label: fmt(near.gap / box.scale.x), axis: 'x' });
     } else {
       const x = box.left + box.width / 2;
       const from = near.pos < box.top ? near.pos : box.bottom;
       const to = near.pos < box.top ? box.top : near.pos;
-      out.push({ x1: x, y1: from, x2: x, y2: to, label: fmt(near.gap), axis: 'y' });
+      out.push({ x1: x, y1: from, x2: x, y2: to, label: fmt(near.gap / box.scale.y), axis: 'y' });
     }
   }
   return out;

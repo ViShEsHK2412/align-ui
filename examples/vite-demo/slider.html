@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slider — the hard cases</title>
+    <style>
+      /*
+       * The page is deliberately plain. The control brings its own look from
+       * the tool's tokens, and anything styled here would be competing with
+       * the thing under test.
+       */
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        /* The readout is fixed to the bottom, so the last case needs room to
+           scroll clear of it. 112px of panel plus a gap. */
+        padding: 32px 24px 150px;
+        background: #111;
+        color: rgb(255 255 255 / 0.9);
+        font: 14px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main { max-width: 860px; margin: 0 auto; }
+      h1 { font-size: 20px; margin: 0 0 6px; }
+      .lede { color: rgb(255 255 255 / 0.6); margin: 0 0 32px; max-width: 62ch; }
+      .case { margin: 0 0 40px; }
+      h2 {
+        font-size: 13px; font-weight: 600; margin: 0 0 8px;
+        color: rgb(255 255 255 / 0.9);
+      }
+      p { margin: 0 0 6px; max-width: 70ch; }
+      .do { color: rgb(255 255 255 / 0.9); }
+      .do::before { content: 'Try  '; color: rgb(255 255 255 / 0.4); }
+      .expect { color: rgb(255 255 255 / 0.6); margin-bottom: 12px; }
+      .expect::before { content: 'Expect  '; color: rgb(255 255 255 / 0.4); }
+      .stage { width: 360px; }
+      /* Room for the scaled and rotated stages to sit in without overlapping. */
+      #scaled .stage, #scaled-up .stage, #rotated .stage { margin-bottom: 24px; }
+      .panel {
+        /* Fixed rather than sticky: sticky leaves it in flow at the end of the
+           document, where it floats over whatever case you are reading on the
+           way down. Fixed plus the body padding above means it never covers
+           anything you cannot scroll clear of. */
+        position: fixed; left: 0; right: 0; bottom: 0;
+        padding: 12px 14px;
+        background: #1a1a1a;
+        box-shadow: 0 -8px 24px rgb(0 0 0 / 0.4);
+      }
+      .panel h2 { margin-bottom: 8px; }
+      pre {
+        margin: 0; max-height: 140px; overflow: auto;
+        font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: rgb(255 255 255 / 0.6);
+        font-variant-numeric: tabular-nums;
+      }
+      .meta {
+        display: flex; gap: 16px; align-items: center;
+        margin-top: 8px; padding-top: 8px;
+        border-top: 1px solid rgb(255 255 255 / 0.12);
+        font-variant-numeric: tabular-nums;
+        color: rgb(255 255 255 / 0.6);
+      }
+      button {
+        font: inherit; font-size: 12px;
+        padding: 4px 10px; border: 0; border-radius: 0;
+        background: rgb(255 255 255 / 0.1);
+        color: rgb(255 255 255 / 0.9);
+        cursor: pointer;
+      }
+      button:hover { background: rgb(255 255 255 / 0.16); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Slider — the hard cases</h1>
+      <p class="lede">
+        Every section states what to do and what should happen. If what happens
+        is different, that is a bug and the page has already named it. Nothing
+        here is styled by the page: the control brings its own look from the
+        tool's tokens, so what you see is what it looks like in the panel.
+      </p>
+
+      <div id="cases"></div>
+
+      <section class="case">
+        <h2>16 · Two hundred of them</h2>
+        <p class="do">
+          Scroll the list fast, then drag one while scrolling. Watch the frame
+          time at the bottom of the page.
+        </p>
+        <p class="expect">
+          Only the one being dragged should be doing any work. Nothing animates
+          at rest, so the worst frame while scrolling should stay near 16ms.
+          Reset the worst-frame counter before each attempt.
+        </p>
+        <div id="bulk"></div>
+      </section>
+
+      <section class="case">
+        <h2>17 · Reduced motion</h2>
+        <p class="do">
+          Turn on your system's reduce-motion setting and reload, then click a
+          slider rather than dragging it.
+        </p>
+        <p class="expect">
+          The click jumps instead of springing, and dragging past the end no
+          longer stretches the track. Both are decoration: the value has already
+          changed either way. Dragging and keyboard stepping were never animated,
+          so they look identical.
+        </p>
+      </section>
+    </main>
+
+    <div class="panel">
+      <h2>What the control reported</h2>
+      <pre id="log">Nothing touched yet.</pre>
+      <div class="meta">
+        <span id="fps">measuring…</span>
+        <button id="reset-worst" type="button">Reset worst frame</button>
+        <span>One drag should produce many changes and exactly one commit.</span>
+      </div>
+    </div>
+
+    <script type="module" src="./slider.ts"></script>
+  </body>
+</html>

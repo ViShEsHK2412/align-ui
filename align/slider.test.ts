@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  clickTarget, decimalsForStep, DEAD_ZONE, hashMarkPercents, MAX_STRETCH,
+  clickTarget, decimalsForStep, DEAD_ZONE, displayDecimals, hashMarkPercents, MAX_STRETCH,
   percentOf, roundValue, rubberStretch, sliderKeyValue, snapToDecile,
   springSettled, springStep, SNAP_SPRING, valueAt,
 } from './slider';
@@ -232,5 +232,33 @@ describe('the spring', () => {
     for (let i = 0; i < 200; i++) ({ x, v } = springStep(x, v, 100, 1 / 30, SNAP_SPRING));
     expect(Number.isFinite(x)).toBe(true);
     expect(x).toBeCloseTo(100, 0);
+  });
+});
+
+describe('displayDecimals', () => {
+  it('uses the step when the value sits on the grid', () => {
+    expect(displayDecimals(16, 1, 0, 100)).toBe(0);
+    expect(displayDecimals(0.3, 0.1, 0, 1)).toBe(1);
+  });
+
+  it('shows a value that is off the grid at its own precision', () => {
+    // A font-size read from a stylesheet does not have to be a whole number.
+    // Rendering 15.5 as "16" would claim a value the element does not have.
+    expect(displayDecimals(15.5, 1, 0, 100)).toBe(1);
+    expect(displayDecimals(0.25, 1, 0, 100)).toBe(2);
+  });
+
+  it('caps the precision so a float artefact cannot fill the row', () => {
+    expect(displayDecimals(0.1234567891234, 1, 0, 100)).toBe(4);
+  });
+
+  it('never shows fewer decimals than the step needs', () => {
+    expect(displayDecimals(0.125, 0.01, 0, 1)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('handles a meaningless step without lying about the value', () => {
+    // step 0 means no grid, so nothing is ever "off" it — but 0.5 must still
+    // read as 0.5 and not as 1.
+    expect(displayDecimals(0.5, 0, 0, 1)).toBe(1);
   });
 });

@@ -155,6 +155,26 @@ export function hashMarkPercents(min: number, max: number, step: number): number
   return Array.from({ length: 9 }, (_, i) => (i + 1) * 10);
 }
 
+/**
+ * How many decimals to *show*, which is not always what the step needs.
+ *
+ * A value seeded from a stylesheet does not have to sit on the step. A
+ * `font-size` of 15.5px with a step of 1 rounds to no decimals, and `toFixed(0)`
+ * would render it "16" while the control still held 15.5 — the readout claiming
+ * a value the element does not have, which is the one thing this tool must
+ * never do. So an off-grid value is shown at its own precision, and the first
+ * arrow press pulls it onto the grid where the step's precision takes over.
+ */
+export function displayDecimals(value: number, step: number, min = 0, max = 0): number {
+  const forStep = decimalsForStep(step, min, max);
+  const own = Math.max(forStep, Math.min(4, decimalsForStep(value)));
+  // No usable grid means nothing can be on it, and `roundValue` passes the
+  // value straight through — so asking whether it is on the grid answers yes
+  // for every value and the step's precision would win by accident.
+  if (!Number.isFinite(step) || step <= 0) return own;
+  return roundValue(value, step, min, max) === value ? forStep : own;
+}
+
 /** What a click lands on: a step when they are countable, a tenth when they are not. */
 export function clickTarget(raw: number, min: number, max: number, step: number): number {
   const steps = (max - min) / step;
@@ -348,7 +368,6 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
   const min = options.min ?? 0;
   const max = options.max ?? 1;
   const step = options.step ?? 0.01;
-  const decimals = decimalsForStep(step, min, max);
 
   let value = options.value;
 
@@ -420,6 +439,9 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
   }
 
   function showValue(): void {
+    // Recomputed rather than fixed at construction: a value can start off the
+    // step grid and land on it, and the precision has to follow it.
+    const decimals = displayDecimals(value, step, min, max);
     valueEl.textContent = options.unit
       ? `${value.toFixed(decimals)}${options.unit}`
       : value.toFixed(decimals);
@@ -434,7 +456,28 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
     velocity = 0;
   }
 
+  /**
+   * Motion is opt-in, so a click jumps rather than springs when the viewer has
+   * asked for less of it. The spring is decoration here: the value has already
+   * changed and the fill has already moved, so removing the travel costs
+   * nothing but the flourish. Dragging and keyboard stepping never animated in
+   * the first place, so neither is affected.
+   *
+   * Read per call rather than cached, because the setting can change while the
+   * page is open and nothing here is expensive enough to be worth a listener.
+   */
+  function reduced(): boolean {
+    return typeof matchMedia === 'function'
+      && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   function animateTo(target: number, spring = SNAP_SPRING): void {
+    if (reduced()) {
+      stopAnimation();
+      shown = target;
+      paint();
+      return;
+    }
     animTarget = target;
     lastT = performance.now();
     if (raf) return;
@@ -482,6 +525,14 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
 
   function applyStretch(px: number): void {
     stretch = px;
+    // Cleared rather than set to zero. `calc(100% + 0px)` renders identically
+    // and is still an inline width the element did not have before, which
+    // outlives the gesture and overrides whatever the caller sized it with.
+    if (px === 0) {
+      el.style.width = '';
+      el.style.transform = '';
+      return;
+    }
     // Widening the track and sliding it back keeps the far edge pinned, so the
     // stretch reads as the track giving rather than the whole row moving.
     el.style.width = `calc(100% + ${Math.abs(px)}px)`;
@@ -490,6 +541,12 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
 
   function releaseStretch(): void {
     if (stretch === 0) return;
+    if (reduced()) {
+      applyStretch(0);
+      el.style.width = '';
+      el.style.transform = '';
+      return;
+    }
     let v = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -529,7 +586,14 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
   const onPointerDown = (e: PointerEvent) => {
     if (input || e.button !== 0) return;
     e.preventDefault();
-    el.setPointerCapture(e.pointerId);
+    /*
+     * Capture is an optimisation, not a requirement — the gesture works from
+     * the events the element already gets. It throws for a pointer that is no
+     * longer down, which a synthetic event or a press the browser has already
+     * released will both produce, and letting that abort the handler leaves a
+     * gesture that never recorded its starting point and can never end.
+     */
+    try { el.setPointerCapture(e.pointerId); } catch { /* already gone */ }
     downAt = { x: e.clientX, y: e.clientY };
     isClick = true;
     rect = el.getBoundingClientRect();
@@ -547,7 +611,10 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
     }
     if (isClick || !rect) return;
 
-    if (e.clientX < rect.left) applyStretch(rubberStretch(rect.left - e.clientX, -1));
+    // The rubber band is pure feedback — the value is already clamped — so
+    // under reduced motion it simply does not happen.
+    if (reduced()) { /* no stretch */ }
+    else if (e.clientX < rect.left) applyStretch(rubberStretch(rect.left - e.clientX, -1));
     else if (e.clientX > rect.right) applyStretch(rubberStretch(e.clientX - rect.right, 1));
     else if (stretch !== 0) applyStretch(0);
 
@@ -599,7 +666,7 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
     input.className = 'sl-input';
     input.type = 'text';
     input.setAttribute('aria-label', `${options.label} value`);
-    input.value = value.toFixed(decimals);
+    input.value = value.toFixed(displayDecimals(value, step, min, max));
     valueEl.style.display = 'none';
     el.appendChild(input);
     input.focus();

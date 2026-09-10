@@ -74,6 +74,15 @@ export declare const ICONS: {
      * pencil is the only glyph everyone already reads that way.
      */
     readonly edit: readonly [Shape, Shape];
+    /**
+     * arrow-up, arrow-down and link. Reordering and linking are controls, and a
+     * control drawn as a text character is the thing this icon set exists to
+     * stop: an arrow glyph inherits the font's own weight and baseline and sits
+     * a pixel off from every real icon beside it.
+     */
+    readonly arrowUp: readonly [Shape, Shape];
+    readonly arrowDown: readonly [Shape, Shape];
+    readonly link: readonly [Shape, Shape];
     readonly check: readonly [Shape];
     readonly cross: readonly [Shape, Shape];
 };

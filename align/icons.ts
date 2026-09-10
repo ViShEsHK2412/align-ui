@@ -110,6 +110,19 @@ export const ICONS = {
     p('m15 5 4 4'),
   ],
 
+  /**
+   * arrow-up, arrow-down and link. Reordering and linking are controls, and a
+   * control drawn as a text character is the thing this icon set exists to
+   * stop: an arrow glyph inherits the font's own weight and baseline and sits
+   * a pixel off from every real icon beside it.
+   */
+  arrowUp: [p('m5 12 7-7 7 7'), p('M12 19V5')],
+  arrowDown: [p('M12 5v14'), p('m19 12-7 7-7-7')],
+  link: [
+    p('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'),
+    p('M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
+  ],
+
   check: [p('M20 6 9 17l-5-5')],
   cross: [p('M18 6 6 18'), p('m6 6 12 12')],
 } as const;

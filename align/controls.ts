@@ -202,6 +202,34 @@ const CSS = `
 }
 .edit-dock[data-open] { display: flex; }
 
+/*
+ * The panel is summoned by a keystroke you meant, so it arrives rather than
+ * appears. 160ms on the UI curve, an 8px rise and a fade: enough to say where
+ * it came from, short enough that arming twice in a row never feels slow.
+ *
+ * @starting-style animates the first frame after display changes, with no
+ * keyframes to restart and nothing to clean up.
+ */
+@starting-style {
+  .edit-dock[data-open] { opacity: 0; translate: 0 8px; }
+}
+.edit-dock {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity ${MOTION.ui}, translate ${MOTION.ui}, display ${MOTION.ui} allow-discrete;
+}
+
+/* The bar that says the tool wrote this row. Worth a fade: it is the panel
+   admitting to something, and it should be noticed without being a movement. */
+.edit-row::before { transition: opacity ${MOTION.ui}; }
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-dock { transition: opacity ${MOTION.ui}; translate: none; }
+  @starting-style { .edit-dock[data-open] { translate: none; } }
+  .edit-opt:active, .edit-mini:active, .edit-add:active,
+  .edit-action:active, .edit-revert:active { scale: 1; }
+}
+
 .edit-head {
   display: flex; align-items: center; gap: ${SPACE.base}px;
   flex: none;
@@ -282,16 +310,20 @@ const CSS = `
    value of these is seeing the alternatives. */
 .edit-choice { display: flex; flex-wrap: wrap; gap: 2px; }
 .edit-opt {
-  padding: 5px 7px; border: 0; border-radius: 0;
+  /* 24px is WCAG's AA floor and these were 21 by a padding accident. */
+  min-height: 24px;
+  padding: 5px 8px; border: 0; border-radius: 0;
   background: ${surface(2)}; color: ${TEXT.secondary};
   font: inherit; font-size: ${TYPE.tag}px; cursor: pointer;
   transition: background ${MOTION.ui}, color ${MOTION.ui};
 }
 .edit-opt:hover { background: ${surface(4)}; color: ${TEXT.primary}; }
+.edit-opt:active { scale: 0.96; }
+.edit-opt:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-opt[data-on] { background: ${TEXT.primary}; color: ${GROUND}; }
 
 .edit-swatch {
-  flex: none; width: 22px; height: 22px;
+  flex: none; width: 24px; height: 24px;
   padding: 0; border: 0; border-radius: 0;
   box-shadow: inset 0 0 0 1px ${HAIRLINE};
   cursor: pointer;
@@ -306,6 +338,12 @@ const CSS = `
 }
 .edit-hex:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
+.edit-row-name {
+  display: block;
+  margin: 0 0 2px 10px;
+  color: ${TEXT.secondary};
+  font-size: ${TYPE.tag}px;
+}
 .edit-sides { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 
 /* A shadow is a list, so its row is a block rather than a line. */
@@ -318,20 +356,28 @@ const CSS = `
 }
 .edit-layer-name {
   flex: 1; min-width: 0;
-  color: ${TEXT.tertiary};
+  /*
+   * Secondary, not tertiary. Tertiary is measured against the ground and
+   * clears 4.61:1 there; on this card it is a film over a film and falls to
+   * 4.20:1. The constraint is written down in theme.ts and this is the first
+   * place in the panel that actually meets it.
+   */
+  color: ${TEXT.secondary};
   font-size: ${TYPE.tag}px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.edit-layer-head .edit-swatch { width: 18px; height: 18px; }
+.edit-layer-head .edit-swatch { width: 24px; height: 24px; }
 .edit-mini {
   flex: none;
-  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
   padding: 0; border: 0; border-radius: 0;
   background: ${surface(3)}; color: ${TEXT.secondary};
   font: inherit; font-size: ${TYPE.tag}px; line-height: 1;
   cursor: pointer;
 }
 .edit-mini:hover:not(:disabled) { background: ${surface(5)}; color: ${TEXT.primary}; }
+.edit-mini:active:not(:disabled) { scale: 0.96; }
 .edit-mini:disabled { color: ${TEXT.disabled}; cursor: default; }
 .edit-mini:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-add {
@@ -341,6 +387,7 @@ const CSS = `
   font: inherit; font-size: ${TYPE.tag}px; cursor: pointer;
 }
 .edit-add:hover { background: ${surface(4)}; color: ${TEXT.primary}; }
+.edit-add:active { scale: 0.96; }
 .edit-add:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-sides > * { min-width: 0; }
 
@@ -355,7 +402,7 @@ const CSS = `
 .edit-linked:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
 .edit-revert {
-  width: 22px; height: 22px;
+  width: 24px; height: 24px;
   display: none; place-items: center;
   padding: 0; border: 0; border-radius: 0;
   background: none; color: ${TEXT.tertiary};
@@ -363,6 +410,7 @@ const CSS = `
 }
 .edit-row[data-touched] .edit-revert { display: grid; }
 .edit-revert:hover { color: ${TEXT.primary}; }
+.edit-revert:active { scale: 0.96; }
 .edit-revert:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
 .edit-more {
@@ -389,6 +437,7 @@ const CSS = `
   transition: background ${MOTION.ui};
 }
 .edit-action:hover { background: ${surface(5)}; }
+.edit-action:active:not(:disabled) { scale: 0.96; }
 .edit-action:disabled { color: ${TEXT.disabled}; cursor: default; background: ${surface(1)}; }
 .edit-action:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
@@ -414,6 +463,8 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
 
   const dock = document.createElement('div');
   dock.className = 'edit-dock';
+  dock.setAttribute('role', 'region');
+  dock.setAttribute('aria-label', 'Edit the locked element');
 
   const head = document.createElement('div');
   head.className = 'edit-head';
@@ -508,6 +559,11 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
   function buildChoice(spec: Spec): { el: HTMLElement; sync: () => void } {
     const wrap = document.createElement('div');
     wrap.className = 'edit-choice';
+    // One of these is chosen and the rest are not, which `aria-pressed` states
+    // and a data- attribute only draws. Without it the current value is
+    // visible and nowhere else.
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', spec.label);
     const buttons: HTMLButtonElement[] = [];
     for (const option of spec.options ?? []) {
       const b = document.createElement('button');
@@ -523,7 +579,11 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     }
     function sync(): void {
       const current = target ? readValue(target, spec.prop) : '';
-      for (const b of buttons) b.toggleAttribute('data-on', b.textContent === current);
+      for (const b of buttons) {
+        const on = b.textContent === current;
+        b.toggleAttribute('data-on', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
     }
     return { el: wrap, sync };
   }
@@ -626,7 +686,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         up.type = 'button';
         up.className = 'edit-mini';
         up.setAttribute('aria-label', `Move layer ${index + 1} up`);
-        up.textContent = '↑';
+        up.appendChild(icon('arrowUp', 12));
         up.disabled = index === 0;
         up.addEventListener('click', () => {
           layers = moveLayer(layers, index, index - 1);
@@ -638,7 +698,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         down.type = 'button';
         down.className = 'edit-mini';
         down.setAttribute('aria-label', `Move layer ${index + 1} down`);
-        down.textContent = '↓';
+        down.appendChild(icon('arrowDown', 12));
         down.disabled = index === layers.length - 1;
         down.addEventListener('click', () => {
           layers = moveLayer(layers, index, index + 1);
@@ -650,7 +710,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         remove.type = 'button';
         remove.className = 'edit-mini';
         remove.setAttribute('aria-label', `Remove layer ${index + 1}`);
-        remove.textContent = '×';
+        remove.appendChild(icon('cross', 12));
         remove.addEventListener('click', () => {
           layers = layers.filter((_, i) => i !== index);
           push();
@@ -767,11 +827,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       link.className = 'edit-linked';
       link.setAttribute('aria-label', `Link all four ${spec.label.toLowerCase()} values`);
       link.title = 'Change all four together';
-      link.appendChild(icon('copy', 13));
+      link.appendChild(icon('link', 13));
+      link.setAttribute('aria-pressed', 'false');
       link.addEventListener('click', () => {
         if (linked.has(spec.prop)) linked.delete(spec.prop);
         else linked.add(spec.prop);
-        link.toggleAttribute('data-on', linked.has(spec.prop));
+        const on = linked.has(spec.prop);
+        link.toggleAttribute('data-on', on);
+        link.setAttribute('aria-pressed', String(on));
       });
       field.append(grid, link);
     } else if (spec.kind === 'shadow') {
@@ -827,6 +890,22 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     if (spec.kind === 'shadow') line.classList.add('edit-line-block');
     const labelled = !spec.sides && (spec.kind === 'choice' || spec.kind === 'colour');
     if (labelled) line.appendChild(label);
+    /*
+     * A per-side group had no name at all, and that was the worst thing in the
+     * panel. Its four sliders say "top, right, bottom, left" and nothing said
+     * what of: the Box group rendered two identical two-by-two grids and there
+     * was no way to tell padding from margin. The name goes above the grid,
+     * where it covers all four without being repeated four times.
+     */
+    if (spec.sides || spec.kind === 'shadow') {
+      const above = document.createElement('span');
+      above.className = 'edit-row-name';
+      above.textContent = spec.label;
+      // Appended before the line, so the DOM order is the reading order.
+      // Reversing it in CSS instead put the name under its own grid and
+      // directly above the next one, where it named the wrong thing.
+      row.appendChild(above);
+    }
     line.append(field, revert);
     row.appendChild(line);
     return { spec, el: row, sliders, sync: () => { for (const s of syncs) s(); } };

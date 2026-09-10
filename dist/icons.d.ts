@@ -66,6 +66,14 @@ export declare const ICONS: {
      * report the outcome, which for a clipboard write is the only way to know:
      * the write is silent, and so is its refusal.
      */
+    /**
+     * pencil, the one control that writes to the page.
+     *
+     * Not `settings` or `sliders`, which is what a panel of controls looks like:
+     * the icon has to say *this changes your page*, not *this has knobs*. A
+     * pencil is the only glyph everyone already reads that way.
+     */
+    readonly edit: readonly [Shape, Shape];
     readonly check: readonly [Shape];
     readonly cross: readonly [Shape, Shape];
 };

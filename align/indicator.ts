@@ -20,6 +20,12 @@ export interface ToolState {
   type: boolean;
   panel: boolean;
   hide: boolean;
+  /**
+   * Whether edit mode is armed. Its own field rather than one more toggle,
+   * because it is the only one that can change the page and the toolbar has to
+   * say so louder than it says anything else.
+   */
+  edit: boolean;
   /** Whether the two one-shots have anything to act on right now. */
   canCopy: boolean;
   canUndo: boolean;
@@ -27,7 +33,7 @@ export interface ToolState {
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
 export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
-  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo';
+  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit';
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
@@ -159,6 +165,18 @@ const CSS = `
 /* On is the film, not a colour: the three hues each already mean something on
    the canvas, and a fourth here would say nothing. */
 .tool[data-on] { background: ${surface(4)}; color: ${TEXT.primary}; }
+/*
+ * Armed reads differently from on, deliberately. Every other toggle draws
+ * something over the page; this one lets the page be rewritten, and a tool that
+ * can do that while looking exactly like one that cannot is the problem the
+ * arming design exists to avoid. It inverts rather than taking a hue: red
+ * already means a measurement here, and a second meaning for it would cost
+ * more than the emphasis is worth.
+ */
+.tool[data-tool='edit'][data-on] {
+  background: ${TEXT.primary};
+  color: ${GROUND};
+}
 
 /* The badge steps down out of the ruler gutter, and that step is decoration:
    under reduced motion it should simply be in the right place. */
@@ -295,6 +313,8 @@ const TOOLS: Tool[] = [
     what: 'put everything in the panel on the clipboard as text' },
   { name: 'pick', label: 'Colour', key: 'P', toggle: false,
     what: 'sample a colour from anywhere on screen and match it against your palette' },
+  { name: 'edit', label: 'Edit', key: 'E', toggle: true,
+    what: 'let the panel change the page. Off until you say so, shown while it is on, and everything goes back when you turn it off' },
   { name: 'undo', label: 'Undo', key: 'Ctrl/Cmd + Z', toggle: false,
     what: 'step back through the guides — a whole run of nudges counts as one' },
 ];
@@ -315,8 +335,8 @@ export function createIndicator(
   const count = document.createElement('span');
   count.className = 'count';
 
-  // Freeze sits alone between the switches and the one-shots: it is the only
-  // control that changes the page rather than the overlay.
+  // Freeze and edit sit between the switches and the one-shots: they are the
+  // two controls that change the page rather than the overlay.
   const buttons = new Map<ToolName, HTMLButtonElement>();
   const acks = new Map<ToolName, ReturnType<typeof setTimeout>>();
   const tools = document.createElement('div');
@@ -330,6 +350,9 @@ export function createIndicator(
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tool';
+    // Named on the element so a single control can be styled apart from the
+    // rest without a second class or a lookup.
+    b.dataset['tool'] = t.name;
     const glyph = icon(t.name as IconName);
     glyph.classList.add('glyph');
     b.appendChild(glyph);

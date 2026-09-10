@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edit mode — the contract</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        /* A small scale, so the token matching has something real to match
+           against. These are the values the checks below look for by name. */
+        --space-4: 16px;
+        --space-6: 24px;
+        --brand: #0d99ff;
+      }
+      body {
+        margin: 0;
+        padding: 32px 24px 64px;
+        background: #111;
+        color: rgb(255 255 255 / 0.9);
+        font: 14px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main { max-width: 860px; margin: 0 auto; }
+      h1 { font-size: 20px; margin: 0 0 6px; }
+      h2 { font-size: 13px; font-weight: 600; margin: 32px 0 10px; }
+      .lede { color: rgb(255 255 255 / 0.6); margin: 0 0 8px; max-width: 66ch; }
+
+      /* The subject. Its padding comes from the stylesheet and nowhere else,
+         which is the whole point of the revert check. */
+      #subject {
+        padding-top: var(--space-6);
+        padding-left: var(--space-4);
+        color: var(--brand);
+        background: rgb(255 255 255 / 0.04);
+        margin: 12px 0;
+      }
+      /* And one that does carry its own inline style, so reverting has
+         something to give back rather than something to strip. */
+      #subject-inline {
+        padding-left: var(--space-4);
+        background: rgb(255 255 255 / 0.04);
+        margin: 12px 0;
+      }
+
+      #summary {
+        display: inline-block;
+        padding: 6px 10px;
+        font-weight: 600;
+        background: rgb(255 255 255 / 0.1);
+      }
+      #summary[data-pass='true'] { background: #0a6dc0; color: #fff; }
+      #summary[data-pass='false'] { background: #c33513; color: #fff; }
+
+      #clean { margin: 10px 0 0; color: rgb(255 255 255 / 0.6); }
+      #clean[data-pass='false'] { color: #e5533d; }
+
+      .check {
+        padding: 10px 0;
+        border-bottom: 1px solid rgb(255 255 255 / 0.12);
+      }
+      .head { display: flex; gap: 10px; align-items: baseline; }
+      .mark {
+        flex: none; width: 4ch;
+        font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .check[data-pass='true'] .mark { color: rgb(255 255 255 / 0.46); }
+      .check[data-pass='false'] .mark { color: #e5533d; }
+      .name { font-weight: 500; }
+      .detail {
+        margin-left: auto;
+        font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: rgb(255 255 255 / 0.46);
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+      .why {
+        margin: 4px 0 0 calc(4ch + 10px);
+        color: rgb(255 255 255 / 0.6);
+        max-width: 74ch;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Edit mode — the contract</h1>
+      <p class="lede">
+        The tool measures and leaves the page as it found it. Edit mode breaks
+        that promise on purpose, which is why it is off until armed, shown while
+        it is on, and puts everything back when it is turned off. These are the
+        parts of that promise that need a page which is really cascading, so
+        they run here rather than in the unit tests.
+      </p>
+      <p class="lede">
+        They run on load. Everything below should say pass, and the last line
+        should say the page is exactly as it started — because these checks
+        edited it a dozen times while you were reading this.
+      </p>
+
+      <p><span id="summary">running…</span></p>
+      <p id="clean"></p>
+
+      <h2>The subjects</h2>
+      <div id="subject">
+        Padding from the stylesheet only. Reverting has to give the stylesheet
+        back, not a pinned copy of its answer.
+      </div>
+      <div id="subject-inline" style="padding-top: 7px">
+        Padding of its own, inline. Reverting has to give that back rather than
+        strip it.
+      </div>
+
+      <h2>Checks</h2>
+      <div id="results"></div>
+
+      <h2>By hand</h2>
+      <p class="lede">
+        Press <strong>Ctrl/Cmd + Shift + A</strong> to open the tool, then
+        <strong>E</strong> to arm edit mode. The pencil inverts while it is
+        armed — that is the only control in the bar that can change your page,
+        and it is meant to look unlike the others. Press <strong>E</strong>
+        again to disarm; everything it wrote goes back.
+      </p>
+    </main>
+    <script type="module" src="./edit.ts"></script>
+  </body>
+</html>

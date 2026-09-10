@@ -98,6 +98,18 @@ export const ICONS = {
    * report the outcome, which for a clipboard write is the only way to know:
    * the write is silent, and so is its refusal.
    */
+  /**
+   * pencil, the one control that writes to the page.
+   *
+   * Not `settings` or `sliders`, which is what a panel of controls looks like:
+   * the icon has to say *this changes your page*, not *this has knobs*. A
+   * pencil is the only glyph everyone already reads that way.
+   */
+  edit: [
+    p('M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'),
+    p('m15 5 4 4'),
+  ],
+
   check: [p('M20 6 9 17l-5-5')],
   cross: [p('M18 6 6 18'), p('m6 6 12 12')],
 } as const;

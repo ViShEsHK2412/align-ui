@@ -13,12 +13,18 @@ export interface ToolState {
     type: boolean;
     panel: boolean;
     hide: boolean;
+    /**
+     * Whether edit mode is armed. Its own field rather than one more toggle,
+     * because it is the only one that can change the page and the toolbar has to
+     * say so louder than it says anything else.
+     */
+    edit: boolean;
     /** Whether the two one-shots have anything to act on right now. */
     canCopy: boolean;
     canUndo: boolean;
 }
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit';
 export interface Indicator {
     update(locked: number, state: ToolState): void;
     /**

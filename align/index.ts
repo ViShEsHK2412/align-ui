@@ -2,6 +2,7 @@ import { createBoxModel, type BoxModel } from './boxmodel';
 import { createHistory } from './history';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
+import { createEditor, type Editor } from './edit';
 import {
   boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
   snapCandidates, snapTo,
@@ -33,6 +34,15 @@ let overlay: Overlay | null = null;
 let boxmodel: BoxModel | null = null;
 let indicator: Indicator | null = null;
 let picker: Picker | null = null;
+/**
+ * The one thing here that outlives a session rather than a mount.
+ *
+ * Created once and never torn down, because it holds the record of what the
+ * tool changed. A `null`-until-mounted editor would lose that record on
+ * deactivate, which is the exact moment it is needed: `teardown` disarms, and
+ * disarming is what puts the page back.
+ */
+const editor: Editor = createEditor();
 /** X-ray is the one thing that writes to the page, so it is tracked here. */
 let xray = false;
 let grid = loadFlag('grid');
@@ -294,6 +304,7 @@ function render(cursor?: { x: number; y: number }) {
     ...(cursor ? { cursor } : {}),
   });
   indicator?.update(pinned.length, {
+    edit: editor.armed,
     rulers,
     xray,
     grid,
@@ -377,6 +388,21 @@ function onTool(name: ToolName): void {
       break;
     case 'copy': copyReading(); break;
     case 'pick': void picker?.open(); break;
+    /*
+     * Arming and disarming, and disarming puts everything back.
+     *
+     * The count goes to the button's own acknowledgement rather than a toast,
+     * because "12 changes reverted" is the answer to the question you asked by
+     * pressing it, and it has to arrive where you were looking.
+     */
+    case 'edit':
+      if (editor.armed) {
+        const reverted = editor.disarm();
+        indicator?.acknowledge('edit', reverted >= 0);
+      } else {
+        editor.arm();
+      }
+      break;
     case 'undo': undo(); break;
   }
   render();
@@ -607,7 +633,7 @@ function activate() {
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
-    hide: false, canCopy: false, canUndo: false,
+    hide: false, edit: false, canCopy: false, canUndo: false,
   });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
@@ -639,6 +665,13 @@ function deactivate() {
   // Never leave the page outlined because the tool was closed while x-ray was on.
   if (xray) { xray = false; setXray(false); }
   setFrozen(false);
+  /*
+   * And never leave it rewritten. Closing the tool is the strongest possible
+   * statement that you are done with it, so it is also where the promise to
+   * leave the page as it was found has to be kept: every edit goes back,
+   * whether or not you remembered to turn edit mode off first.
+   */
+  editor.disarm();
   indicator = null;
   boxmodel?.destroy();
   boxmodel = null;
@@ -739,6 +772,13 @@ function onKey(e: KeyboardEvent) {
     // guides and the layers are all still there behind it.
     e.preventDefault();
     onTool('hide');
+    return;
+  } else if (overlay && e.key.toLowerCase() === 'e') {
+    // Arming is a keystroke like everything else here, but it is the one that
+    // changes what the tool is allowed to do, so the toolbar's own state is
+    // what tells you it worked rather than the key doing it quietly.
+    e.preventDefault();
+    onTool('edit');
     return;
   } else if (overlay && e.key.toLowerCase() === 'f') {
     // Hold the page still. Everything worth measuring that moves — a hover, a

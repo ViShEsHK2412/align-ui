@@ -173,6 +173,79 @@ const CHECKS: Check[] = [
       return { pass: prompt === '', detail: prompt === '' ? 'empty, correctly' : prompt };
     },
   },
+  {
+    name: 'An element removed from the page still reverts cleanly',
+    why: 'A page can rerender under the tool. Reverting a node that is no longer in the document must not throw, and must not leave the ledger holding it.',
+    run() {
+      const editor = createEditor();
+      const ghost = document.createElement('div');
+      document.body.appendChild(ghost);
+      editor.arm();
+      editor.set(ghost, 'padding-top', '41px');
+      ghost.remove();
+      let threw = '';
+      try { editor.disarm(); } catch (error) { threw = String(error); }
+      return { pass: threw === '', detail: threw || 'reverted without throwing' };
+    },
+  },
+  {
+    name: 'Two elements are kept apart',
+    why: 'The ledger is keyed on the node. Two elements of the same kind must not share an entry, or reverting one would restore the other.',
+    run() {
+      const editor = createEditor();
+      editor.arm();
+      editor.set(target, 'padding-top', '41px');
+      editor.set(inline, 'padding-top', '55px');
+      editor.revert(target, 'padding-top');
+      const first = readValue(target, 'padding-top');
+      const second = readValue(inline, 'padding-top');
+      editor.disarm();
+      return {
+        pass: eq(first, '24px') && eq(second, '55px'),
+        detail: `${first} and ${second}`,
+      };
+    },
+  },
+  {
+    name: 'Reverting something never written is not an error',
+    why: 'The panel offers a revert on every row it has touched, and the row can be clicked twice.',
+    run() {
+      const editor = createEditor();
+      editor.arm();
+      let threw = '';
+      try {
+        editor.revert(target, 'padding-top');
+        editor.revert(target, 'padding-top');
+      } catch (error) { threw = String(error); }
+      const n = editor.disarm();
+      return { pass: threw === '' && n === 0, detail: threw || `${n} reverted` };
+    },
+  },
+  {
+    name: 'Arming twice does not lose the ledger',
+    why: 'The toolbar and the keyboard can both arm it, and a second arm must not read as a fresh start.',
+    run() {
+      const editor = createEditor();
+      editor.arm();
+      editor.set(target, 'padding-top', '41px');
+      editor.arm();
+      const n = editor.disarm();
+      const restored = readValue(target, 'padding-top');
+      return { pass: n === 1 && eq(restored, '24px'), detail: `${n} reverted, now ${restored}` };
+    },
+  },
+  {
+    name: 'A hundred writes revert to one original',
+    why: 'A slider drag writes on every pointer event. The original is recorded once, so a long drag costs one entry rather than a hundred.',
+    run() {
+      const editor = createEditor();
+      editor.arm();
+      for (let i = 0; i < 100; i++) editor.set(target, 'padding-top', `${i}px`);
+      const n = editor.disarm();
+      const restored = readValue(target, 'padding-top');
+      return { pass: n === 1 && eq(restored, '24px'), detail: `${n} entry, now ${restored}` };
+    },
+  },
 ];
 
 // ── Run them ────────────────────────────────────────────────────────────────

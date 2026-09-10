@@ -2,6 +2,7 @@ import { createBoxModel, type BoxModel } from './boxmodel';
 import { createHistory } from './history';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
+import { createControls, type Controls } from './controls';
 import { createEditor, type Editor } from './edit';
 import {
   boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
@@ -34,6 +35,7 @@ let overlay: Overlay | null = null;
 let boxmodel: BoxModel | null = null;
 let indicator: Indicator | null = null;
 let picker: Picker | null = null;
+let controls: Controls | null = null;
 /**
  * The one thing here that outlives a session rather than a mount.
  *
@@ -402,6 +404,10 @@ function onTool(name: ToolName): void {
       } else {
         editor.arm();
       }
+      controls?.setArmed(editor.armed);
+      // The box model is reading numbers the editor may just have put back, so
+      // it has to be told rather than left showing the state before the revert.
+      if (pinned.length) render();
       break;
     case 'undo': undo(); break;
   }
@@ -486,6 +492,7 @@ function onMouseDown(e: MouseEvent) {
   pinned = [onPage];
   hover = onPage;
   boxmodel?.show(onPage, gapFacts(), previousLock());
+  controls?.show(onPage.el);
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -510,6 +517,7 @@ function onContextMenu(e: MouseEvent) {
   hover = hit;
   const last = pinned[pinned.length - 1];
   if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
+  controls?.show(last?.el ?? null);
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -591,6 +599,7 @@ function watch() {
   if (sig !== panelSig) {
     panelSig = sig;
     if (last) boxmodel?.show(last, gapFacts(), previousLock()); else boxmodel?.hide();
+  controls?.show(last?.el ?? null);
   }
   render();
 }
@@ -630,6 +639,7 @@ function activate() {
   overlay = mountOverlay();
   boxmodel = createBoxModel(overlay.root);
   indicator = createIndicator(overlay.root, onTool);
+  controls = createControls(overlay.root, editor);
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
@@ -660,6 +670,8 @@ function deactivate() {
   cancelAnimationFrame(watching);
   watching = 0;
   indicator?.destroy();
+  controls?.destroy();
+  controls = null;
   picker?.destroy();
   picker = null;
   // Never leave the page outlined because the tool was closed while x-ray was on.
@@ -833,7 +845,7 @@ function onKey(e: KeyboardEvent) {
     // tool itself.
     if (picker?.close()) return;
     if (indicator?.closeHelp()) return;
-    if (pinned.length) { pinned = []; boxmodel?.hide(); render(); }
+    if (pinned.length) { pinned = []; boxmodel?.hide(); controls?.show(null); render(); }
     else deactivate();
   }
 }

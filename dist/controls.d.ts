@@ -20,7 +20,7 @@ import { type Editor } from './edit';
  *    The panel reports numbers read from the page, and once it can write, some
  *    of them are its own doing.
  */
-type Kind = 'length' | 'number' | 'colour' | 'choice';
+type Kind = 'length' | 'number' | 'colour' | 'choice' | 'shadow' | 'blur';
 interface Spec {
     /** The CSS property, or the shorthand a per-side group writes through. */
     prop: string;

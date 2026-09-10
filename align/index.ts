@@ -454,8 +454,27 @@ function onMouseUp(e: MouseEvent) {
 }
 
 /** Lock exactly this one, dropping whatever was locked before. */
+/**
+ * Did this event start inside the tool's own interface?
+ *
+ * `composedPath` is the reliable answer even through a closed shadow root: a
+ * listener outside it sees the path from the host upward, so the host is in
+ * the list exactly when the event came from within.
+ *
+ * The alternative — asking what is at those coordinates — is what was being
+ * done, and it is wrong for a panel. `hitTest` skips our own UI and then
+ * reports whatever is *underneath* it, so pressing a button in the edit panel
+ * locked the page element behind the panel and changed what you were editing
+ * mid-edit.
+ */
+function fromOurUI(e: Event): boolean {
+  const host = overlay?.root.host;
+  return host ? (e.composedPath?.() ?? []).includes(host) : false;
+}
+
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
+  if (fromOurUI(e)) return;
 
   // Our own panels sit over the page, and the box model's left edge overlaps
   // the left rule. hitTest returns null over our own UI, so bailing here keeps
@@ -507,6 +526,7 @@ function onMouseDown(e: MouseEvent) {
  * on to make room for it.
  */
 function onContextMenu(e: MouseEvent) {
+  if (fromOurUI(e)) return;
   const hit = hitTest(e.clientX, e.clientY, cfg);
   if (!hit) return;
   swallow(e);
@@ -527,11 +547,13 @@ function onContextMenu(e: MouseEvent) {
  * Chrome's modifier+click shortcuts fire. Both die here.
  */
 function onClick(e: MouseEvent) {
+  if (fromOurUI(e)) return;
   if (hitTest(e.clientX, e.clientY, cfg)) swallow(e);
 }
 
 /** Middle-click opens a new tab of its own accord. */
 function onAuxClick(e: MouseEvent) {
+  if (fromOurUI(e)) return;
   if (hitTest(e.clientX, e.clientY, cfg)) swallow(e);
 }
 

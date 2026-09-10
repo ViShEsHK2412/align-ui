@@ -4,6 +4,10 @@ import {
   GROUND, HAIRLINE, MOTION, ROW, SHADOW, SPACE, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
 import { icon } from './icons';
+import {
+  EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
+  parseBackdropBlur, parseShadows, type Shadow,
+} from './shadow';
 
 /**
  * The controls.
@@ -27,7 +31,7 @@ import { icon } from './icons';
  *    of them are its own doing.
  */
 
-type Kind = 'length' | 'number' | 'colour' | 'choice';
+type Kind = 'length' | 'number' | 'colour' | 'choice' | 'shadow' | 'blur';
 
 interface Spec {
   /** The CSS property, or the shorthand a per-side group writes through. */
@@ -111,6 +115,16 @@ export const GROUPS: readonly Group[] = [
     ],
   },
   {
+    name: 'Effects',
+    specs: [
+      { prop: 'box-shadow', label: 'Shadow', kind: 'shadow' },
+      {
+        prop: 'backdrop-filter', label: 'Backdrop blur', kind: 'blur',
+        min: 0, max: 40, step: 1, unit: 'px', more: true,
+      },
+    ],
+  },
+  {
     name: 'Layout',
     specs: [
       { prop: 'display', label: 'Display', kind: 'choice', options: ['block', 'flex', 'grid', 'inline-flex', 'inline-block', 'none'] },
@@ -172,6 +186,7 @@ const CSS = `
   left: ${SPACE.edge}px;
   width: ${PANEL_W}px;
   max-height: calc(100vh - ${SPACE.edge * 2}px);
+  overflow: hidden;
   display: none;
   flex-direction: column;
   pointer-events: auto;
@@ -211,6 +226,14 @@ const CSS = `
  * elements that had enough properties to scroll.
  */
 .edit-body {
+  /*
+   * A flex item's min-height is auto, so it refuses to shrink below its own
+   * content and overflow-y never has anything to scroll. The panel
+   * grew past its max-height instead, and a wheel over it fell through to the
+   * page — which made every group below the fold unreachable. Same shape as
+   * the min-width: auto that broke the colour popover in the lab.
+   */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
@@ -284,6 +307,41 @@ const CSS = `
 .edit-hex:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
 .edit-sides { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+
+/* A shadow is a list, so its row is a block rather than a line. */
+.edit-line-block { display: block; padding: ${SPACE.base}px 10px; }
+.edit-stack { display: grid; gap: 6px; }
+.edit-layer { background: ${surface(2)}; padding: 6px; }
+.edit-layer-head {
+  display: flex; align-items: center; gap: 4px;
+  margin-bottom: 4px;
+}
+.edit-layer-name {
+  flex: 1; min-width: 0;
+  color: ${TEXT.tertiary};
+  font-size: ${TYPE.tag}px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.edit-layer-head .edit-swatch { width: 18px; height: 18px; }
+.edit-mini {
+  flex: none;
+  width: 20px; height: 20px;
+  padding: 0; border: 0; border-radius: 0;
+  background: ${surface(3)}; color: ${TEXT.secondary};
+  font: inherit; font-size: ${TYPE.tag}px; line-height: 1;
+  cursor: pointer;
+}
+.edit-mini:hover:not(:disabled) { background: ${surface(5)}; color: ${TEXT.primary}; }
+.edit-mini:disabled { color: ${TEXT.disabled}; cursor: default; }
+.edit-mini:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
+.edit-add {
+  width: 100%;
+  padding: 7px; border: 0; border-radius: 0;
+  background: ${surface(2)}; color: ${TEXT.secondary};
+  font: inherit; font-size: ${TYPE.tag}px; cursor: pointer;
+}
+.edit-add:hover { background: ${surface(4)}; color: ${TEXT.primary}; }
+.edit-add:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-sides > * { min-width: 0; }
 
 .edit-linked {
@@ -509,6 +567,166 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     return { el: wrap, sync };
   }
 
+  /**
+   * The shadow stack.
+   *
+   * Rebuilt wholesale whenever a layer is added, removed or reordered, and
+   * updated in place while a slider moves. Rebuilding on every drag would
+   * destroy the slider mid-gesture, which takes the pointer capture with it.
+   */
+  function buildShadow(spec: Spec): { el: HTMLElement; sync: () => void; sliders: Slider[] } {
+    const wrap = document.createElement('div');
+    wrap.className = 'edit-stack';
+    let layers: Shadow[] = [];
+    let sliders: Slider[] = [];
+
+    function push(): void {
+      write(spec.prop, formatShadows(layers));
+    }
+
+    function render(): void {
+      for (const s of sliders) s.destroy();
+      sliders = [];
+      wrap.textContent = '';
+
+      layers.forEach((layer, index) => {
+        const card = document.createElement('div');
+        card.className = 'edit-layer';
+
+        const head = document.createElement('div');
+        head.className = 'edit-layer-head';
+        const name = document.createElement('span');
+        name.className = 'edit-layer-name';
+        name.textContent = `Layer ${index + 1}`;
+
+        const swatch = document.createElement('input');
+        swatch.type = 'color';
+        swatch.className = 'edit-swatch';
+        swatch.setAttribute('aria-label', `Layer ${index + 1} colour`);
+        swatch.value = toHexInput(layer.colour);
+        swatch.addEventListener('input', () => {
+          layers[index] = { ...layer, colour: swatch.value };
+          layer = layers[index]!;
+          push();
+        });
+
+        const insetBtn = document.createElement('button');
+        insetBtn.type = 'button';
+        insetBtn.className = 'edit-opt';
+        insetBtn.textContent = 'inset';
+        insetBtn.toggleAttribute('data-on', layer.inset);
+        insetBtn.addEventListener('click', () => {
+          layers[index] = { ...layer, inset: !layer.inset };
+          layer = layers[index]!;
+          insetBtn.toggleAttribute('data-on', layer.inset);
+          push();
+        });
+
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.className = 'edit-mini';
+        up.setAttribute('aria-label', `Move layer ${index + 1} up`);
+        up.textContent = '↑';
+        up.disabled = index === 0;
+        up.addEventListener('click', () => {
+          layers = moveLayer(layers, index, index - 1);
+          push();
+          render();
+        });
+
+        const down = document.createElement('button');
+        down.type = 'button';
+        down.className = 'edit-mini';
+        down.setAttribute('aria-label', `Move layer ${index + 1} down`);
+        down.textContent = '↓';
+        down.disabled = index === layers.length - 1;
+        down.addEventListener('click', () => {
+          layers = moveLayer(layers, index, index + 1);
+          push();
+          render();
+        });
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'edit-mini';
+        remove.setAttribute('aria-label', `Remove layer ${index + 1}`);
+        remove.textContent = '×';
+        remove.addEventListener('click', () => {
+          layers = layers.filter((_, i) => i !== index);
+          push();
+          render();
+        });
+
+        head.append(name, swatch, insetBtn, up, down, remove);
+
+        const grid = document.createElement('div');
+        grid.className = 'edit-sides';
+        const fields = [
+          { key: 'x' as const, label: 'x', min: -64, max: 64 },
+          { key: 'y' as const, label: 'y', min: -64, max: 64 },
+          { key: 'blur' as const, label: 'blur', min: 0, max: 96 },
+          { key: 'spread' as const, label: 'spread', min: -32, max: 32 },
+        ];
+        for (const field of fields) {
+          const slider = createSlider(root, {
+            label: field.label,
+            value: layer[field.key],
+            min: field.min,
+            max: field.max,
+            step: 1,
+            unit: 'px',
+            onChange: (v) => {
+              layers[index] = { ...layers[index]!, [field.key]: v };
+              layer = layers[index]!;
+              push();
+            },
+          });
+          sliders.push(slider);
+          grid.appendChild(slider.el);
+        }
+
+        card.append(head, grid);
+        wrap.appendChild(card);
+      });
+
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'edit-add';
+      add.textContent = layers.length === 0 ? 'Add a shadow' : 'Add another layer';
+      add.addEventListener('click', () => {
+        layers = [...layers, { ...EMPTY_SHADOW }];
+        push();
+        render();
+      });
+      wrap.appendChild(add);
+    }
+
+    function sync(): void {
+      layers = target ? parseShadows(readValue(target, spec.prop)) : [];
+      render();
+    }
+
+    return { el: wrap, sync, sliders: [] as Slider[] };
+  }
+
+  /** Backdrop blur: one length, read out of and written back into a filter. */
+  function buildBlur(spec: Spec): { el: HTMLElement; sync: () => void; slider: Slider } {
+    const slider = createSlider(root, {
+      label: spec.label,
+      value: target ? parseBackdropBlur(readValue(target, spec.prop)) : 0,
+      min: spec.min ?? 0,
+      max: spec.max ?? 40,
+      step: spec.step ?? 1,
+      unit: spec.unit ?? 'px',
+      onChange: (v) => write(spec.prop, formatBackdropBlur(v)),
+    });
+    return {
+      el: slider.el,
+      slider,
+      sync: () => { if (target) slider.set(parseBackdropBlur(readValue(target, spec.prop))); },
+    };
+  }
+
   function buildRow(spec: Spec): Row {
     const row = document.createElement('div');
     row.className = 'edit-row';
@@ -530,8 +748,15 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       grid.className = 'edit-sides';
       grid.style.flex = '1';
       for (const side of spec.sides) {
-        // The last word is the side, which is what the row is asking about.
-        const short = side.split('-').filter((p) => p !== 'border' && p !== 'radius' && p !== 'width').pop() ?? side;
+        /*
+         * What is left once the property's own words are removed. A corner has
+         * two of them and a side has one, so taking the last word alone labels
+         * all four corners "left, right, right, left" — which is what it did.
+         */
+        const short = side
+          .split('-')
+          .filter((p) => p !== 'border' && p !== 'radius' && p !== 'width' && p !== 'padding' && p !== 'margin')
+          .join(' ') || side;
         const built = buildSlider(spec, side, short);
         sliders.push(built.slider);
         syncs.push(built.sync);
@@ -549,6 +774,17 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         link.toggleAttribute('data-on', linked.has(spec.prop));
       });
       field.append(grid, link);
+    } else if (spec.kind === 'shadow') {
+      const built = buildShadow(spec);
+      syncs.push(built.sync);
+      built.el.style.flex = '1';
+      field.appendChild(built.el);
+    } else if (spec.kind === 'blur') {
+      const built = buildBlur(spec);
+      sliders.push(built.slider);
+      syncs.push(built.sync);
+      built.el.style.flex = '1';
+      field.appendChild(built.el);
     } else if (spec.kind === 'choice') {
       const built = buildChoice(spec);
       syncs.push(built.sync);
@@ -588,6 +824,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
      * both, every slider row overflowed a 300px panel and the values were
      * clipped. Choice and colour rows have no such label, so they keep it.
      */
+    if (spec.kind === 'shadow') line.classList.add('edit-line-block');
     const labelled = !spec.sides && (spec.kind === 'choice' || spec.kind === 'colour');
     if (labelled) line.appendChild(label);
     line.append(field, revert);

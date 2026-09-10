@@ -29,9 +29,12 @@ const VIEW_BOX = '0 0 24 24';
 const STROKE_WIDTH = '2';
 
 /** One icon: the `d` of each path, in draw order. `rect` entries are boxes. */
-type Shape = { path: string } | { rect: [number, number, number, number, number] };
+type Shape =
+  | { path: string; fade?: number }
+  | { rect: [number, number, number, number, number]; fade?: number };
 
-const p = (path: string): Shape => ({ path });
+const p = (path: string, fade?: number): Shape =>
+  (fade === undefined ? { path } : { path, fade });
 /** x, y, width, height, radius — Lucide's rects all carry a corner radius. */
 const r = (x: number, y: number, w: number, h: number, rx: number): Shape =>
   ({ rect: [x, y, w, h, rx] });
@@ -116,6 +119,20 @@ export const ICONS = {
    * stop: an arrow glyph inherits the font's own weight and baseline and sits
    * a pixel off from every real icon beside it.
    */
+  /*
+   * Which edge of a box. Figma labels its padding fields this way and it is
+   * the right call at this size: "bottom" is six characters competing with the
+   * number beside it, where the glyph says the same thing in a corner of the
+   * space and never wraps.
+   *
+   * The box is faded and the edge is not, so it reads as *this side of that
+   * box* rather than as four unrelated marks.
+   */
+  sideTop: [p('M4 5h16v14H4z', 0.3), p('M4 5h16')],
+  sideRight: [p('M4 5h16v14H4z', 0.3), p('M20 5v14')],
+  sideBottom: [p('M4 5h16v14H4z', 0.3), p('M4 19h16')],
+  sideLeft: [p('M4 5h16v14H4z', 0.3), p('M4 5v14')],
+
   arrowUp: [p('m5 12 7-7 7 7'), p('M12 19V5')],
   arrowDown: [p('M12 5v14'), p('m19 12-7 7-7-7')],
   link: [
@@ -164,6 +181,9 @@ export function icon(name: IconName, size = 16): SVGSVGElement {
     } else {
       const el = document.createElementNS(NS, 'path');
       el.setAttribute('d', shape.path);
+      // Same colour at less strength, so a glyph can carry two levels without
+      // a second colour that would have to be kept in step with the theme.
+      if (shape.fade !== undefined) el.setAttribute('opacity', String(shape.fade));
       svg.appendChild(el);
     }
   }

@@ -1,3 +1,4 @@
+import { createScrub, type Scrub } from './scrub';
 import { createSlider, type Slider } from './slider';
 import { readValue, type Editor } from './edit';
 import {
@@ -378,6 +379,8 @@ const CSS = `
   color: ${TEXT.secondary};
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.regular};
 }
+/* Two columns of badges. They size to their own digits, so the grid can be
+   tight without anything being clipped. */
 .edit-sides { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 
 /* A shadow is a list, so its row is a block rather than a line. */
@@ -488,6 +491,8 @@ interface Row {
   /** Re-read from the element. */
   sync: () => void;
   sliders: Slider[];
+  /** The per-side badges, which a linked change has to keep in step. */
+  scrubs: Scrub[];
 }
 
 export function createControls(root: ShadowRoot, editor: Editor): Controls {
@@ -587,6 +592,52 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       el: slider.el,
       slider,
       sync: () => { if (target) slider.set(numberFrom(readValue(target, prop))); },
+    };
+  }
+
+  /**
+   * One side of a box, as a badge you drag.
+   *
+   * The drag axis follows the edge: top and bottom scrub vertically, left and
+   * right horizontally, so the pointer moves the way the value grows and the
+   * cursor says so before you press.
+   */
+  function buildScrub(spec: Spec, prop: string, short: string): {
+    el: HTMLElement; sync: () => void; scrub: Scrub;
+  } {
+    const vertical = /(^|\s)(top|bottom)(\s|$)/.test(short);
+    const glyph = short === 'top' ? 'sideTop'
+      : short === 'right' ? 'sideRight'
+      : short === 'bottom' ? 'sideBottom'
+      : short === 'left' ? 'sideLeft'
+      : undefined;
+
+    const scrub = createScrub(root, {
+      label: `${spec.label} ${short}`,
+      value: target ? numberFrom(readValue(target, prop)) : 0,
+      min: spec.min ?? 0,
+      max: spec.max ?? 999,
+      step: spec.step ?? 1,
+      axis: vertical ? 'y' : 'x',
+      // A corner has no single edge to draw, so it keeps its words.
+      ...(glyph ? { glyph } : { text: short }),
+      onChange: (v) => {
+        const value = `${v}${spec.unit ?? ''}`;
+        if (linked.has(spec.prop) && spec.sides) {
+          for (const side of spec.sides) write(side, value);
+          for (const row of rows) {
+            if (row.spec.prop !== spec.prop) continue;
+            for (const other of row.scrubs) other.set(v);
+          }
+        } else {
+          write(prop, value);
+        }
+      },
+    });
+    return {
+      el: scrub.el,
+      scrub,
+      sync: () => { if (target) scrub.set(numberFrom(readValue(target, prop))); },
     };
   }
 
@@ -835,6 +886,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     field.className = 'edit-field';
 
     const sliders: Slider[] = [];
+    const scrubs: Scrub[] = [];
     const syncs: (() => void)[] = [];
 
     if (spec.sides) {
@@ -851,8 +903,8 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
           .split('-')
           .filter((p) => p !== 'border' && p !== 'radius' && p !== 'width' && p !== 'padding' && p !== 'margin')
           .join(' ') || side;
-        const built = buildSlider(spec, side, short);
-        sliders.push(built.slider);
+        const built = buildScrub(spec, side, short);
+        scrubs.push(built.scrub);
         syncs.push(built.sync);
         grid.appendChild(built.el);
       }
@@ -951,11 +1003,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     }
     line.append(field, revert);
     row.appendChild(line);
-    return { spec, el: row, sliders, sync: () => { for (const s of syncs) s(); } };
+    return { spec, el: row, sliders, scrubs, sync: () => { for (const s of syncs) s(); } };
   }
 
   function build(): void {
-    for (const row of rows) for (const s of row.sliders) s.destroy();
+    for (const row of rows) {
+      for (const s of row.sliders) s.destroy();
+      for (const s of row.scrubs) s.destroy();
+    }
     rows.length = 0;
     body.textContent = '';
 
@@ -1030,6 +1085,21 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
 
   return {
     show(el) {
+      /*
+       * The same element is a refresh, never a rebuild.
+       *
+       * The shell re-renders whenever the locked element's measurements
+       * change, which editing padding does by definition. Rebuilding on that
+       * threw away every control and rebuilt it: the panel scrolled back to
+       * the top mid-drag, and the slider under the pointer stopped existing
+       * halfway through its own gesture. Re-reading the values keeps the
+       * elements, the scroll position and the gesture.
+       */
+      if (el === target) {
+        for (const row of rows) row.sync();
+        markTouched();
+        return;
+      }
       target = el;
       subject.textContent = el
         ? el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '')
@@ -1049,7 +1119,10 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       return editor.asPrompt();
     },
     destroy() {
-      for (const row of rows) for (const s of row.sliders) s.destroy();
+      for (const row of rows) {
+        for (const s of row.sliders) s.destroy();
+        for (const s of row.scrubs) s.destroy();
+      }
       rows.length = 0;
       dock.remove();
       style.remove();

@@ -26,8 +26,10 @@
 /** One icon: the `d` of each path, in draw order. `rect` entries are boxes. */
 type Shape = {
     path: string;
+    fade?: number;
 } | {
     rect: [number, number, number, number, number];
+    fade?: number;
 };
 export declare const ICONS: {
     /** ruler-dimension-line — a rule with ticks, and a dimension line above it. */
@@ -80,6 +82,10 @@ export declare const ICONS: {
      * stop: an arrow glyph inherits the font's own weight and baseline and sits
      * a pixel off from every real icon beside it.
      */
+    readonly sideTop: readonly [Shape, Shape];
+    readonly sideRight: readonly [Shape, Shape];
+    readonly sideBottom: readonly [Shape, Shape];
+    readonly sideLeft: readonly [Shape, Shape];
     readonly arrowUp: readonly [Shape, Shape];
     readonly arrowDown: readonly [Shape, Shape];
     readonly link: readonly [Shape, Shape];

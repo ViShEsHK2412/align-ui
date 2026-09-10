@@ -86,6 +86,45 @@ export declare const ICONS: {
     readonly sideRight: readonly [Shape, Shape];
     readonly sideBottom: readonly [Shape, Shape];
     readonly sideLeft: readonly [Shape, Shape];
+    readonly fontSize: readonly [Shape, Shape, Shape];
+    /** bold. Weight is the one type property everyone already has a glyph for. */
+    readonly fontWeight: readonly [Shape];
+    readonly lineHeight: readonly [Shape, Shape, Shape];
+    readonly tracking: readonly [Shape, Shape, Shape];
+    readonly italic: readonly [Shape, Shape, Shape];
+    readonly textAlign: readonly [Shape, Shape, Shape];
+    readonly textCase: readonly [Shape, Shape, Shape, Shape];
+    readonly underline: readonly [Shape, Shape];
+    /** A letter sitting on its colour. */
+    readonly textColour: readonly [Shape, Shape, Shape];
+    /** The surface behind it, filled rather than outlined. */
+    readonly backgroundColour: readonly [Shape, Shape, Shape];
+    /** A ring, which is what a border colour paints. */
+    readonly borderColour: readonly [Shape, Shape];
+    /** Half of it showing through. */
+    readonly opacity: readonly [Shape, Shape];
+    /** A box inside a box: the space between them is the padding. */
+    readonly padding: readonly [Shape, Shape];
+    /** The same, the other way round: the space outside is the margin. */
+    readonly margin: readonly [Shape, Shape];
+    /** Which edges the width is measured to. */
+    readonly boxSizing: readonly [Shape, Shape];
+    /** move-horizontal and move-vertical. Lucide's, and three strokes each. */
+    readonly widthIcon: readonly [Shape, Shape, Shape];
+    readonly heightIcon: readonly [Shape, Shape, Shape];
+    readonly borderWidth: readonly [Shape, Shape];
+    readonly borderStyle: readonly [Shape, Shape, Shape];
+    readonly borderRadius: readonly [Shape];
+    /** Two blocks and the space between them. */
+    readonly gap: readonly [Shape, Shape, Shape];
+    readonly flexDirection: readonly [Shape, Shape, Shape];
+    readonly justify: readonly [Shape, Shape, Shape];
+    readonly alignItems: readonly [Shape, Shape, Shape];
+    readonly flexWrap: readonly [Shape, Shape];
+    /** A card and the shadow it casts. */
+    readonly shadow: readonly [Shape, Shape];
+    /** What shows through a frosted surface. */
+    readonly backdrop: readonly [Shape, Shape, Shape, Shape];
     readonly arrowUp: readonly [Shape, Shape];
     readonly arrowDown: readonly [Shape, Shape];
     readonly link: readonly [Shape, Shape];

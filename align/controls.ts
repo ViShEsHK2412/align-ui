@@ -4,7 +4,7 @@ import { readValue, type Editor } from './edit';
 import {
   GROUND, HAIRLINE, MOTION, ROW, SHADOW, SPACE, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
-import { icon } from './icons';
+import { icon, type IconName } from './icons';
 import {
   EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
   parseBackdropBlur, parseShadows, type Shadow,
@@ -53,6 +53,8 @@ interface Spec {
   sides?: readonly string[];
   /** Behind the disclosure rather than in the first screen. */
   more?: boolean;
+  /** The glyph that names the row. Every row has one. */
+  glyph: IconName;
 }
 
 interface Group {
@@ -78,49 +80,49 @@ export const GROUPS: readonly Group[] = [
   {
     name: 'Type',
     specs: [
-      { prop: 'font-size', label: 'Size', kind: 'length', min: 8, max: 96, step: 1, unit: 'px' },
-      { prop: 'font-weight', label: 'Weight', kind: 'number', min: 100, max: 900, step: 100 },
-      { prop: 'line-height', label: 'Line height', kind: 'length', min: 0, max: 96, step: 1, unit: 'px' },
-      { prop: 'letter-spacing', label: 'Tracking', kind: 'length', min: -4, max: 12, step: 0.1, unit: 'px' },
-      { prop: 'font-style', label: 'Style', kind: 'choice', options: ['normal', 'italic'], more: true },
-      { prop: 'text-align', label: 'Align', kind: 'choice', options: ['start', 'center', 'end', 'justify'], more: true },
-      { prop: 'text-transform', label: 'Case', kind: 'choice', options: ['none', 'uppercase', 'lowercase', 'capitalize'], more: true },
-      { prop: 'text-decoration-line', label: 'Decoration', kind: 'choice', options: ['none', 'underline', 'line-through'], more: true },
+      { prop: 'font-size', label: 'Size', kind: 'length', glyph: 'fontSize', min: 8, max: 96, step: 1, unit: 'px' },
+      { prop: 'font-weight', label: 'Weight', kind: 'number', glyph: 'fontWeight', min: 100, max: 900, step: 100 },
+      { prop: 'line-height', label: 'Line height', kind: 'length', glyph: 'lineHeight', min: 0, max: 96, step: 1, unit: 'px' },
+      { prop: 'letter-spacing', label: 'Tracking', kind: 'length', glyph: 'tracking', min: -4, max: 12, step: 0.1, unit: 'px' },
+      { prop: 'font-style', label: 'Style', kind: 'choice', glyph: 'italic', options: ['normal', 'italic'], more: true },
+      { prop: 'text-align', label: 'Align', kind: 'choice', glyph: 'textAlign', options: ['start', 'center', 'end', 'justify'], more: true },
+      { prop: 'text-transform', label: 'Case', kind: 'choice', glyph: 'textCase', options: ['none', 'uppercase', 'lowercase', 'capitalize'], more: true },
+      { prop: 'text-decoration-line', label: 'Decoration', kind: 'choice', glyph: 'underline', options: ['none', 'underline', 'line-through'], more: true },
     ],
   },
   {
     name: 'Colour',
     specs: [
-      { prop: 'color', label: 'Text', kind: 'colour' },
-      { prop: 'background-color', label: 'Background', kind: 'colour' },
-      { prop: 'border-color', label: 'Border', kind: 'colour', more: true },
-      { prop: 'opacity', label: 'Opacity', kind: 'number', min: 0, max: 1, step: 0.01 },
+      { prop: 'color', label: 'Text', kind: 'colour', glyph: 'textColour' },
+      { prop: 'background-color', label: 'Background', kind: 'colour', glyph: 'backgroundColour' },
+      { prop: 'border-color', label: 'Border', kind: 'colour', glyph: 'borderColour', more: true },
+      { prop: 'opacity', label: 'Opacity', kind: 'number', glyph: 'opacity', min: 0, max: 1, step: 0.01 },
     ],
   },
   {
     name: 'Box',
     specs: [
-      { prop: 'padding', label: 'Padding', kind: 'length', min: 0, max: 128, step: 1, unit: 'px', sides: SIDES.map((s) => `padding-${s}`) },
-      { prop: 'margin', label: 'Margin', kind: 'length', min: -64, max: 128, step: 1, unit: 'px', sides: SIDES.map((s) => `margin-${s}`) },
-      { prop: 'width', label: 'Width', kind: 'length', min: 0, max: 1600, step: 1, unit: 'px', more: true },
-      { prop: 'height', label: 'Height', kind: 'length', min: 0, max: 1200, step: 1, unit: 'px', more: true },
-      { prop: 'box-sizing', label: 'Sizing', kind: 'choice', options: ['content-box', 'border-box'] },
+      { prop: 'padding', label: 'Padding', kind: 'length', glyph: 'padding', min: 0, max: 128, step: 1, unit: 'px', sides: SIDES.map((s) => `padding-${s}`) },
+      { prop: 'margin', label: 'Margin', kind: 'length', glyph: 'margin', min: -64, max: 128, step: 1, unit: 'px', sides: SIDES.map((s) => `margin-${s}`) },
+      { prop: 'width', label: 'Width', kind: 'length', glyph: 'widthIcon', min: 0, max: 1600, step: 1, unit: 'px', more: true },
+      { prop: 'height', label: 'Height', kind: 'length', glyph: 'heightIcon', min: 0, max: 1200, step: 1, unit: 'px', more: true },
+      { prop: 'box-sizing', label: 'Sizing', kind: 'choice', glyph: 'boxSizing', options: ['content-box', 'border-box'] },
     ],
   },
   {
     name: 'Border',
     specs: [
-      { prop: 'border-width', label: 'Width', kind: 'length', min: 0, max: 24, step: 1, unit: 'px', sides: SIDES.map((s) => `border-${s}-width`) },
-      { prop: 'border-style', label: 'Style', kind: 'choice', options: ['none', 'solid', 'dashed', 'dotted'] },
-      { prop: 'border-radius', label: 'Radius', kind: 'length', min: 0, max: 64, step: 1, unit: 'px', sides: CORNERS },
+      { prop: 'border-width', label: 'Width', kind: 'length', glyph: 'borderWidth', min: 0, max: 24, step: 1, unit: 'px', sides: SIDES.map((s) => `border-${s}-width`) },
+      { prop: 'border-style', label: 'Style', kind: 'choice', glyph: 'borderStyle', options: ['none', 'solid', 'dashed', 'dotted'] },
+      { prop: 'border-radius', label: 'Radius', kind: 'length', glyph: 'borderRadius', min: 0, max: 64, step: 1, unit: 'px', sides: CORNERS },
     ],
   },
   {
     name: 'Effects',
     specs: [
-      { prop: 'box-shadow', label: 'Shadow', kind: 'shadow' },
+      { prop: 'box-shadow', label: 'Shadow', kind: 'shadow', glyph: 'shadow' },
       {
-        prop: 'backdrop-filter', label: 'Backdrop blur', kind: 'blur',
+        prop: 'backdrop-filter', label: 'Backdrop blur', kind: 'blur', glyph: 'backdrop',
         min: 0, max: 40, step: 1, unit: 'px', more: true,
       },
     ],
@@ -128,12 +130,12 @@ export const GROUPS: readonly Group[] = [
   {
     name: 'Layout',
     specs: [
-      { prop: 'display', label: 'Display', kind: 'choice', options: ['block', 'flex', 'grid', 'inline-flex', 'inline-block', 'none'] },
-      { prop: 'flex-direction', label: 'Direction', kind: 'choice', options: ['row', 'column', 'row-reverse', 'column-reverse'], more: true },
-      { prop: 'justify-content', label: 'Justify', kind: 'choice', options: ['flex-start', 'center', 'flex-end', 'space-between'], more: true },
-      { prop: 'align-items', label: 'Align', kind: 'choice', options: ['stretch', 'flex-start', 'center', 'flex-end'], more: true },
-      { prop: 'flex-wrap', label: 'Wrap', kind: 'choice', options: ['nowrap', 'wrap'], more: true },
-      { prop: 'gap', label: 'Gap', kind: 'length', min: 0, max: 96, step: 1, unit: 'px' },
+      { prop: 'display', label: 'Display', kind: 'choice', glyph: 'boxSizing', options: ['block', 'flex', 'grid', 'inline-flex', 'inline-block', 'none'] },
+      { prop: 'flex-direction', label: 'Direction', kind: 'choice', glyph: 'flexDirection', options: ['row', 'column', 'row-reverse', 'column-reverse'], more: true },
+      { prop: 'justify-content', label: 'Justify', kind: 'choice', glyph: 'justify', options: ['flex-start', 'center', 'flex-end', 'space-between'], more: true },
+      { prop: 'align-items', label: 'Align', kind: 'choice', glyph: 'alignItems', options: ['stretch', 'flex-start', 'center', 'flex-end'], more: true },
+      { prop: 'flex-wrap', label: 'Wrap', kind: 'choice', glyph: 'flexWrap', options: ['nowrap', 'wrap'], more: true },
+      { prop: 'gap', label: 'Gap', kind: 'length', glyph: 'gap', min: 0, max: 96, step: 1, unit: 'px' },
     ],
   },
 ];
@@ -181,6 +183,19 @@ export interface Controls {
 const PANEL_W = 320;
 
 const CSS = `
+/*
+ * The reset the shadow root does not come with.
+ *
+ * The host sets all:initial, which stops the page's styles leaking in and also
+ * means there is no box-sizing rule at all, so padding and borders are added
+ * outside a flex-computed width. The hex field's 12px of padding and 2px of
+ * border did exactly that: the colour rows measured 306px inside a 294px
+ * column and hung past every other row in the panel.
+ *
+ * Scoped to the dock so it cannot reach the page.
+ */
+.edit-dock, .edit-dock * { box-sizing: border-box; }
+
 .edit-dock {
   position: fixed;
   top: ${SPACE.edge}px;
@@ -313,7 +328,16 @@ const CSS = `
   letter-spacing: 0.04em; text-transform: uppercase;
   color: ${TEXT.secondary};
 }
-.edit-rows { display: grid; gap: ${SPACE.base}px; }
+/*
+ * minmax(0, 1fr), not 1fr.
+ *
+ * A grid track sized 1fr still refuses to go below its content's min-content
+ * width, so one row whose contents will not shrink drags the whole column
+ * wider than the panel. That is what made the colour rows 306px inside a 294px
+ * column and hang past every other row: an input carries an intrinsic width
+ * from its size attribute, and the track grew to fit it.
+ */
+.edit-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: ${SPACE.base}px; }
 
 /*
  * A row the tool has written shows its revert control and nothing else.
@@ -331,8 +355,15 @@ const CSS = `
   padding: 0 10px;
   background: ${surface(1)};
 }
+.edit-glyph {
+  flex: none;
+  display: grid; place-items: center;
+  width: 15px; height: 15px;
+  color: ${TEXT.tertiary};
+}
+
 .edit-label {
-  flex: none; width: 88px;
+  flex: none; width: 74px;
   color: ${TEXT.secondary};
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -341,7 +372,19 @@ const CSS = `
 /* Choice: one button per value, the current one filled. Buttons rather than a
    select, because a select hides every option until you open it and the whole
    value of these is seeing the alternatives. */
-.edit-choice { display: flex; flex-wrap: wrap; gap: 2px; }
+/*
+ * A segmented control: the options share the row rather than huddling at the
+ * left with the rest of it empty. Nothing was ever going to fill that space,
+ * so it read as a control that had failed to lay itself out.
+ *
+ * They wrap when there are too many to fit, and a wrapped row shares its own
+ * width, so six display values come out as two even rows rather than four and
+ * a ragged two.
+ */
+/* The group has to grow before its buttons can share anything: it is itself a
+   flex item, and a flex item is content-sized until told otherwise. */
+.edit-choice { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+.edit-choice .edit-opt { flex: 1 1 auto; }
 .edit-opt {
   /* 24px is WCAG's AA floor and these were 21 by a padding accident. */
   min-height: 24px;
@@ -372,13 +415,14 @@ const CSS = `
 .edit-hex:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
 .edit-row-name {
-  display: block;
+  display: flex; align-items: center; gap: 6px;
   /* Half the gap between rows, so the name binds to its own control rather
      than floating between two of them. */
   margin: 0 0 ${SPACE.tight}px 10px;
   color: ${TEXT.secondary};
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.regular};
 }
+.edit-row-name .edit-glyph { color: ${TEXT.tertiary}; }
 /* Two columns of badges. They size to their own digits, so the grid can be
    tight without anything being clipped. */
 .edit-sides { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
@@ -976,8 +1020,12 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     if (spec.kind === 'shadow') line.classList.add('edit-line-block');
     // Only a colour row keeps a leading label. Its control is a swatch and a
     // field, both narrow, and the label sits comfortably beside them.
+    const glyph = document.createElement('span');
+    glyph.className = 'edit-glyph';
+    glyph.appendChild(icon(spec.glyph, 15));
+
     const labelled = !spec.sides && spec.kind === 'colour';
-    if (labelled) line.appendChild(label);
+    if (labelled) line.prepend(glyph, label);
     /*
      * A per-side group had no name at all, and that was the worst thing in the
      * panel. Its four sliders say "top, right, bottom, left" and nothing said
@@ -993,13 +1041,19 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
      * they fit, and so do the four border styles.
      */
     if (spec.sides || spec.kind === 'shadow' || spec.kind === 'choice') {
+      // The glyph rides with the name, so a row whose control sits underneath
+      // still leads with the same 15px column as one whose control is beside
+      // it. Without that the panel has two different leading edges.
       const above = document.createElement('span');
       above.className = 'edit-row-name';
-      above.textContent = spec.label;
+      above.append(glyph, document.createTextNode(spec.label));
       // Appended before the line, so the DOM order is the reading order.
       // Reversing it in CSS instead put the name under its own grid and
       // directly above the next one, where it named the wrong thing.
       row.appendChild(above);
+    }
+    if (!labelled && !spec.sides && spec.kind !== 'shadow' && spec.kind !== 'choice') {
+      line.appendChild(glyph);
     }
     line.append(field, revert);
     row.appendChild(line);

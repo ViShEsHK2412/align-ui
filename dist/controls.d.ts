@@ -1,4 +1,5 @@
 import { type Editor } from './edit';
+import { type IconName } from './icons';
 /**
  * The controls.
  *
@@ -40,6 +41,8 @@ interface Spec {
     sides?: readonly string[];
     /** Behind the disclosure rather than in the first screen. */
     more?: boolean;
+    /** The glyph that names the row. Every row has one. */
+    glyph: IconName;
 }
 interface Group {
     name: string;

@@ -36,8 +36,11 @@ type Shape =
 const p = (path: string, fade?: number): Shape =>
   (fade === undefined ? { path } : { path, fade });
 /** x, y, width, height, radius — Lucide's rects all carry a corner radius. */
-const r = (x: number, y: number, w: number, h: number, rx: number): Shape =>
-  ({ rect: [x, y, w, h, rx] });
+const r = (
+  x: number, y: number, w: number, h: number, rx: number, fade?: number,
+): Shape => (fade === undefined
+  ? { rect: [x, y, w, h, rx] }
+  : { rect: [x, y, w, h, rx], fade });
 
 export const ICONS = {
   /** ruler-dimension-line — a rule with ticks, and a dimension line above it. */
@@ -133,6 +136,73 @@ export const ICONS = {
   sideBottom: [p('M4 5h16v14H4z', 0.3), p('M4 19h16')],
   sideLeft: [p('M4 5h16v14H4z', 0.3), p('M4 5v14')],
 
+  /*
+   * One glyph per row of the edit panel.
+   *
+   * Lucide's own where it has one that means the right thing, and a drawing of
+   * the property where it does not. Line height, tracking and the gap have no
+   * Lucide equivalent, so they are drawn the way a spec sheet draws them: the
+   * thing being measured in the faded weight, and the measurement itself
+   * solid. That reads at 14px, where a literal picture of the property does
+   * not.
+   */
+  fontSize: [p('M12 4v16'), p('M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2'), p('M9 20h6')],
+  /** bold. Weight is the one type property everyone already has a glyph for. */
+  fontWeight: [
+    p('M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8'),
+  ],
+  /*
+   * Two rules and the space between them, and two uprights and the space
+   * between them. Three strokes each.
+   *
+   * The first drawing of these had arrowheads on the measure, which is how a
+   * spec sheet does it and is five more strokes: at 15px they closed into a
+   * blob, the same way this set already rejects `snowflake` and
+   * `square-dashed` for twelve strokes at 16. The bar alone says distance once
+   * the two rules give it something to be between.
+   */
+  lineHeight: [p('M3 5h18', 0.35), p('M3 19h18', 0.35), p('M12 8v8')],
+  tracking: [p('M5 5v14', 0.35), p('M19 5v14', 0.35), p('M8 12h8')],
+  italic: [p('M19 4h-9'), p('M14 20H5'), p('m15 4-4 16')],
+  textAlign: [p('M21 6H3'), p('M15 12H3'), p('M17 18H3')],
+  textCase: [p('M3.5 13h6'), p('m2 16 4.5-9 4.5 9'), p('M18 16V7'), p('m14 11 4-4 4 4')],
+  underline: [p('M6 4v6a6 6 0 0 0 12 0V4'), p('M4 20h16')],
+
+  /** A letter sitting on its colour. */
+  textColour: [p('m6 16 6-12 6 12', 0.35), p('M8 12h8', 0.35), p('M4 20h16')],
+  /** The surface behind it, filled rather than outlined. */
+  backgroundColour: [r(3, 3, 18, 18, 2), p('M3 12h18', 0.35), p('M12 3v18', 0.35)],
+  /** A ring, which is what a border colour paints. */
+  borderColour: [r(3, 3, 18, 18, 2), r(8, 8, 8, 8, 1, 0.35)],
+  /** Half of it showing through. */
+  opacity: [p('M12 3a9 9 0 0 0 0 18z'), p('M12 3a9 9 0 0 1 0 18', 0.35)],
+
+  /** A box inside a box: the space between them is the padding. */
+  padding: [r(3, 3, 18, 18, 2, 0.35), r(7, 7, 10, 10, 1)],
+  /** The same, the other way round: the space outside is the margin. */
+  margin: [r(3, 3, 18, 18, 2), r(7, 7, 10, 10, 1, 0.35)],
+  /** Which edges the width is measured to. */
+  boxSizing: [r(3, 3, 18, 18, 2), p('M7 7h10v10H7z', 0.35)],
+  /** move-horizontal and move-vertical. Lucide's, and three strokes each. */
+  widthIcon: [p('M2 12h20'), p('m6 8-4 4 4 4'), p('m18 8 4 4-4 4')],
+  heightIcon: [p('M12 2v20'), p('m8 6 4-4 4 4'), p('m8 18 4 4 4-4')],
+
+  borderWidth: [r(3, 3, 18, 18, 2), p('M3 3h18')],
+  borderStyle: [p('M3 12h4'), p('M10 12h4'), p('M17 12h4')],
+  borderRadius: [p('M21 21V9a6 6 0 0 0-6-6H3')],
+
+  /** Two blocks and the space between them. */
+  gap: [r(3, 4, 7, 16, 1, 0.35), r(14, 4, 7, 16, 1, 0.35), p('M12 8v8')],
+  flexDirection: [p('M12 5v14'), p('m8 9 4-4 4 4'), p('m8 15 4 4 4-4')],
+  justify: [p('M4 4v16', 0.35), p('M20 4v16', 0.35), r(8, 8, 8, 8, 1)],
+  alignItems: [p('M4 4h16', 0.35), p('M4 20h16', 0.35), r(8, 8, 8, 8, 1)],
+  flexWrap: [p('M3 7h13a4 4 0 0 1 0 8H8'), p('m11 12-3 3 3 3')],
+
+  /** A card and the shadow it casts. */
+  shadow: [r(3, 3, 14, 14, 2), p('M21 9v10a2 2 0 0 1-2 2H9', 0.35)],
+  /** What shows through a frosted surface. */
+  backdrop: [r(3, 3, 18, 18, 2), p('M7 12h10', 0.35), p('M7 8h10', 0.35), p('M7 16h10', 0.35)],
+
   arrowUp: [p('m5 12 7-7 7 7'), p('M12 19V5')],
   arrowDown: [p('M12 5v14'), p('m19 12-7 7-7-7')],
   link: [
@@ -177,6 +247,7 @@ export function icon(name: IconName, size = 16): SVGSVGElement {
       el.setAttribute('width', String(w));
       el.setAttribute('height', String(h));
       el.setAttribute('rx', String(rx));
+      if (shape.fade !== undefined) el.setAttribute('opacity', String(shape.fade));
       svg.appendChild(el);
     } else {
       const el = document.createElementNS(NS, 'path');

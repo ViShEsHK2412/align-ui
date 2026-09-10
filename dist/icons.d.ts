@@ -27,9 +27,11 @@
 type Shape = {
     path: string;
     fade?: number;
+    weight?: number;
 } | {
     rect: [number, number, number, number, number];
     fade?: number;
+    weight?: number;
 };
 export declare const ICONS: {
     /** ruler-dimension-line — a rule with ticks, and a dimension line above it. */
@@ -61,14 +63,6 @@ export declare const ICONS: {
     /** undo-2 — an arrow turning back on itself. */
     readonly undo: readonly [Shape, Shape];
     /**
-     * check and x — not controls, answers.
-     *
-     * A one-shot button can say it was pressed and still leave you wondering
-     * whether anything happened. These take the button's place for a moment to
-     * report the outcome, which for a clipboard write is the only way to know:
-     * the write is silent, and so is its refusal.
-     */
-    /**
      * pencil, the one control that writes to the page.
      *
      * Not `settings` or `sliders`, which is what a panel of controls looks like:
@@ -76,12 +70,6 @@ export declare const ICONS: {
      * pencil is the only glyph everyone already reads that way.
      */
     readonly edit: readonly [Shape, Shape];
-    /**
-     * arrow-up, arrow-down and link. Reordering and linking are controls, and a
-     * control drawn as a text character is the thing this icon set exists to
-     * stop: an arrow glyph inherits the font's own weight and baseline and sits
-     * a pixel off from every real icon beside it.
-     */
     readonly sideTop: readonly [Shape, Shape];
     readonly sideRight: readonly [Shape, Shape];
     readonly sideBottom: readonly [Shape, Shape];
@@ -125,9 +113,23 @@ export declare const ICONS: {
     readonly shadow: readonly [Shape, Shape];
     /** What shows through a frosted surface. */
     readonly backdrop: readonly [Shape, Shape, Shape, Shape];
+    /**
+     * arrow-up, arrow-down and link. Reordering and linking are controls, and a
+     * control drawn as a text character is the thing this icon set exists to
+     * stop: an arrow glyph inherits the font's own weight and baseline and sits
+     * a pixel off from every real icon beside it.
+     */
     readonly arrowUp: readonly [Shape, Shape];
     readonly arrowDown: readonly [Shape, Shape];
     readonly link: readonly [Shape, Shape];
+    /**
+     * check and x — not controls, answers.
+     *
+     * A one-shot button can say it was pressed and still leave you wondering
+     * whether anything happened. These take the button's place for a moment to
+     * report the outcome, which for a clipboard write is the only way to know:
+     * the write is silent, and so is its refusal.
+     */
     readonly check: readonly [Shape];
     readonly cross: readonly [Shape, Shape];
 };

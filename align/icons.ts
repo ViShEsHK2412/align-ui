@@ -30,11 +30,15 @@ const STROKE_WIDTH = '2';
 
 /** One icon: the `d` of each path, in draw order. `rect` entries are boxes. */
 type Shape =
-  | { path: string; fade?: number }
-  | { rect: [number, number, number, number, number]; fade?: number };
+  | { path: string; fade?: number; weight?: number }
+  | { rect: [number, number, number, number, number]; fade?: number; weight?: number };
 
-const p = (path: string, fade?: number): Shape =>
-  (fade === undefined ? { path } : { path, fade });
+const p = (path: string, fade?: number, weight?: number): Shape => {
+  const out: { path: string; fade?: number; weight?: number } = { path };
+  if (fade !== undefined) out.fade = fade;
+  if (weight !== undefined) out.weight = weight;
+  return out;
+};
 /** x, y, width, height, radius — Lucide's rects all carry a corner radius. */
 const r = (
   x: number, y: number, w: number, h: number, rx: number, fade?: number,
@@ -97,14 +101,6 @@ export const ICONS = {
   undo: [p('M9 14 4 9l5-5'), p('M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11')],
 
   /**
-   * check and x — not controls, answers.
-   *
-   * A one-shot button can say it was pressed and still leave you wondering
-   * whether anything happened. These take the button's place for a moment to
-   * report the outcome, which for a clipboard write is the only way to know:
-   * the write is silent, and so is its refusal.
-   */
-  /**
    * pencil, the one control that writes to the page.
    *
    * Not `settings` or `sliders`, which is what a panel of controls looks like:
@@ -116,25 +112,24 @@ export const ICONS = {
     p('m15 5 4 4'),
   ],
 
-  /**
-   * arrow-up, arrow-down and link. Reordering and linking are controls, and a
-   * control drawn as a text character is the thing this icon set exists to
-   * stop: an arrow glyph inherits the font's own weight and baseline and sits
-   * a pixel off from every real icon beside it.
-   */
   /*
    * Which edge of a box. Figma labels its padding fields this way and it is
    * the right call at this size: "bottom" is six characters competing with the
    * number beside it, where the glyph says the same thing in a corner of the
    * space and never wraps.
    *
-   * The box is faded and the edge is not, so it reads as *this side of that
-   * box* rather than as four unrelated marks.
+   * The box is drawn at a quarter strength and a thin weight, and the edge in
+   * question at nearly double the normal one. The first version drew both at
+   * the same weight and only faded the box, which at 14px made four badges
+   * that all read as "a faint square" — you could not tell top from left
+   * without counting pixels. It is the *weight* difference that separates
+   * them, not the opacity: this is Figma's own trick, and the reason its
+   * padding fields are legible at a size where a literal drawing is not.
    */
-  sideTop: [p('M4 5h16v14H4z', 0.3), p('M4 5h16')],
-  sideRight: [p('M4 5h16v14H4z', 0.3), p('M20 5v14')],
-  sideBottom: [p('M4 5h16v14H4z', 0.3), p('M4 19h16')],
-  sideLeft: [p('M4 5h16v14H4z', 0.3), p('M4 5v14')],
+  sideTop: [p('M4 5h16v14H4z', 0.25, 1.25), p('M4 5h16', 1, 3.5)],
+  sideRight: [p('M4 5h16v14H4z', 0.25, 1.25), p('M20 5v14', 1, 3.5)],
+  sideBottom: [p('M4 5h16v14H4z', 0.25, 1.25), p('M4 19h16', 1, 3.5)],
+  sideLeft: [p('M4 5h16v14H4z', 0.25, 1.25), p('M4 5v14', 1, 3.5)],
 
   /*
    * One glyph per row of the edit panel.
@@ -203,6 +198,12 @@ export const ICONS = {
   /** What shows through a frosted surface. */
   backdrop: [r(3, 3, 18, 18, 2), p('M7 12h10', 0.35), p('M7 8h10', 0.35), p('M7 16h10', 0.35)],
 
+  /**
+   * arrow-up, arrow-down and link. Reordering and linking are controls, and a
+   * control drawn as a text character is the thing this icon set exists to
+   * stop: an arrow glyph inherits the font's own weight and baseline and sits
+   * a pixel off from every real icon beside it.
+   */
   arrowUp: [p('m5 12 7-7 7 7'), p('M12 19V5')],
   arrowDown: [p('M12 5v14'), p('m19 12-7 7-7-7')],
   link: [
@@ -210,6 +211,14 @@ export const ICONS = {
     p('M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
   ],
 
+  /**
+   * check and x — not controls, answers.
+   *
+   * A one-shot button can say it was pressed and still leave you wondering
+   * whether anything happened. These take the button's place for a moment to
+   * report the outcome, which for a clipboard write is the only way to know:
+   * the write is silent, and so is its refusal.
+   */
   check: [p('M20 6 9 17l-5-5')],
   cross: [p('M18 6 6 18'), p('m6 6 12 12')],
 } as const;
@@ -248,13 +257,17 @@ export function icon(name: IconName, size = 16): SVGSVGElement {
       el.setAttribute('height', String(h));
       el.setAttribute('rx', String(rx));
       if (shape.fade !== undefined) el.setAttribute('opacity', String(shape.fade));
+      if (shape.weight !== undefined) el.setAttribute('stroke-width', String(shape.weight));
       svg.appendChild(el);
     } else {
       const el = document.createElementNS(NS, 'path');
       el.setAttribute('d', shape.path);
       // Same colour at less strength, so a glyph can carry two levels without
       // a second colour that would have to be kept in step with the theme.
+      // Weight is the stronger separator of the two, and the one that makes a
+      // 14px glyph legible where opacity alone leaves four faint squares.
       if (shape.fade !== undefined) el.setAttribute('opacity', String(shape.fade));
+      if (shape.weight !== undefined) el.setAttribute('stroke-width', String(shape.weight));
       svg.appendChild(el);
     }
   }

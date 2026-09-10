@@ -265,32 +265,64 @@ const CSS = `
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+  /*
+   * Present but not part of the design until you reach for it. The panel is
+   * mostly a column of controls, and a permanent light bar down its edge reads
+   * as one more thing to look at.
+   */
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color ${MOTION.ui};
   padding: ${SPACE.base}px;
 }
+.edit-body:hover, .edit-body:focus-within {
+  scrollbar-color: ${surface(6)} transparent;
+}
+/* WebKit does not read scrollbar-color, so it gets the same thing said twice. */
+.edit-body::-webkit-scrollbar { width: 8px; }
+.edit-body::-webkit-scrollbar-track { background: transparent; }
+.edit-body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 0;
+  transition: background ${MOTION.ui};
+}
+.edit-body:hover::-webkit-scrollbar-thumb,
+.edit-body:focus-within::-webkit-scrollbar-thumb { background: ${surface(6)}; }
 /* Nothing a control does may push the panel wider than the panel. */
 .edit-line > * { min-width: 0; }
 
-.edit-group + .edit-group { margin-top: ${SPACE.roomy}px; }
+/*
+ * Three times the gap inside a group. Ambiguous spacing is a functional bug,
+ * not an ugly one: at 12px against a 6px row gap, a group's name read as
+ * belonging to the rows above it as easily as the ones below.
+ */
+.edit-group + .edit-group { margin-top: 24px; }
+/*
+ * The section, and the label inside it, were both 11px and two pixels apart,
+ * and the child was the brighter of the two. Hierarchy inverted.
+ *
+ * They are the same size and the same colour now, and told apart by weight,
+ * case and tracking, which is what carries emphasis without making the
+ * important thing large or the subordinate thing unreadable.
+ */
 .edit-group-name {
   display: block;
-  margin: 0 0 ${SPACE.tight}px 2px;
-  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
+  margin: 0 0 ${SPACE.base}px 2px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.semibold};
   letter-spacing: 0.04em; text-transform: uppercase;
-  color: ${TEXT.tertiary};
+  color: ${TEXT.secondary};
 }
-.edit-rows { display: grid; gap: 6px; }
+.edit-rows { display: grid; gap: ${SPACE.base}px; }
 
-/* A row the tool has written. The bar is on the leading edge so a column of
-   rows shows at a glance which of them are the tool's doing and which are the
-   page's, without a word of text per row. */
+/*
+ * A row the tool has written shows its revert control and nothing else.
+ *
+ * There was a bar down the leading edge as well, which said the same thing
+ * twice: the revert arrow only appears on a touched row, so it already marks
+ * which rows are the tool's doing, and it is a control rather than a stripe.
+ * Two marks for one fact is noise in a panel with twenty rows in it.
+ */
 .edit-row { position: relative; }
-.edit-row[data-touched]::before {
-  content: '';
-  position: absolute; left: -${SPACE.base}px; top: 0; bottom: 0;
-  width: 2px;
-  background: ${TEXT.primary};
-}
 
 .edit-line {
   display: flex; align-items: center; gap: ${SPACE.base}px;
@@ -340,9 +372,11 @@ const CSS = `
 
 .edit-row-name {
   display: block;
-  margin: 0 0 2px 10px;
+  /* Half the gap between rows, so the name binds to its own control rather
+     than floating between two of them. */
+  margin: 0 0 ${SPACE.tight}px 10px;
   color: ${TEXT.secondary};
-  font-size: ${TYPE.tag}px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.regular};
 }
 .edit-sides { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 
@@ -888,7 +922,9 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
      * clipped. Choice and colour rows have no such label, so they keep it.
      */
     if (spec.kind === 'shadow') line.classList.add('edit-line-block');
-    const labelled = !spec.sides && (spec.kind === 'choice' || spec.kind === 'colour');
+    // Only a colour row keeps a leading label. Its control is a swatch and a
+    // field, both narrow, and the label sits comfortably beside them.
+    const labelled = !spec.sides && spec.kind === 'colour';
     if (labelled) line.appendChild(label);
     /*
      * A per-side group had no name at all, and that was the worst thing in the
@@ -897,7 +933,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
      * was no way to tell padding from margin. The name goes above the grid,
      * where it covers all four without being repeated four times.
      */
-    if (spec.sides || spec.kind === 'shadow') {
+    /*
+     * A choice row's name goes above its options for the same reason a
+     * per-side group's does: the label column costs 88px, and with it
+     * `content-box` and `border-box` could not sit on one line, so the second
+     * wrapped underneath and read as a separate thing. Given the full width
+     * they fit, and so do the four border styles.
+     */
+    if (spec.sides || spec.kind === 'shadow' || spec.kind === 'choice') {
       const above = document.createElement('span');
       above.className = 'edit-row-name';
       above.textContent = spec.label;
@@ -961,10 +1004,24 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     markTouched();
   });
 
+  /*
+   * A clipboard write is silent and so is its refusal, so a button that only
+   * looks pressed leaves you with no way to know whether anything happened.
+   * The label answers the question where you are already looking, and says
+   * which of the two it was.
+   */
+  let copyAck = 0;
   copyBtn.addEventListener('click', () => {
     const text = editor.asPrompt();
     if (!text) return;
-    void navigator.clipboard?.writeText(text).catch(() => { /* denied */ });
+    const say = (word: string) => {
+      copyBtn.textContent = word;
+      clearTimeout(copyAck);
+      copyAck = window.setTimeout(() => { copyBtn.textContent = 'Copy as prompt'; }, 900);
+    };
+    const clipboard = navigator.clipboard;
+    if (!clipboard) { say('No clipboard'); return; }
+    void clipboard.writeText(text).then(() => say('Copied'), () => say('Blocked'));
   });
 
   function open(): void {

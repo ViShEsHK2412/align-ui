@@ -21,6 +21,16 @@ export interface OverlayState {
   rulers: boolean;
   /** Everything drawn, held back for a moment. State is untouched. */
   hidden: boolean;
+  /**
+   * Pull the lock outline back, without touching anything else.
+   *
+   * Set while a panel control is being dragged. The outline runs along the
+   * element's own edge, which is exactly where a border or a shadow is being
+   * set, and at full strength you cannot tell the tool's line from the value
+   * you are changing. Everything else stays: the measurements are the reason
+   * you are watching, and this only quiets the one mark that competes.
+   */
+  dimLock: boolean;
   /** The design grid to check against, or null for none. */
   grid: GridSpec | null;
   /** Whether to lay the pixel texture under everything. */
@@ -69,6 +79,7 @@ export function mountOverlay(): Overlay {
 
   const state: OverlayState = {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false, hidden: false,
+    dimLock: false,
     grid: null, pixels: false,
     guides: [], liveGuide: null, activeGuide: null,
   };
@@ -377,10 +388,12 @@ export function mountOverlay(): Overlay {
       ctx.restore();
     }
 
-    for (const box of state.pinned) outline(box, c.accent);
+    const lockInk = state.dimLock ? alpha(c.accent, 0.15) : c.accent;
+    for (const box of state.pinned) outline(box, lockInk);
     if (state.hover) {
       guides(state.hover);
-      outline(state.hover, state.pinned.length ? alpha(c.accent, 0.7) : c.accent);
+      outline(state.hover, state.pinned.length || state.dimLock
+        ? alpha(lockInk, 0.7) : lockInk);
     }
     // A locked guide is drawn solid and at full strength, a loose one dashed
     // and dimmed — so which rulers are still measuring reads at a glance,

@@ -73,6 +73,15 @@ let activeGuideId: number | null = null;
  * showing nothing looks broken, which is the same argument the modes make.
  */
 let hidden = false;
+/*
+ * True while a pointer is down on one of our own controls.
+ *
+ * Only the lock outline reads this. A press inside the panel means a value is
+ * about to move, and during that you are looking at the element rather than
+ * hunting for which one is selected.
+ */
+let dimLock = false;
+let undim: ReturnType<typeof setTimeout> | undefined;
 /**
  * Undo, over every change to the guides rather than only deletions.
  *
@@ -297,6 +306,7 @@ function render(cursor?: { x: number; y: number }) {
     pinned,
     rulers,
     hidden,
+    dimLock,
     grid: grid && cfg.grid ? cfg.grid : null,
     pixels,
     guides,
@@ -436,6 +446,9 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseUp(e: MouseEvent) {
+  // Ahead of the guide-drag guard below: a press on a panel control is not
+  // a guide drag, and it is exactly the press that needs the outline back.
+  setDimLock(false);
   if (!dragging) return;
   // Pressed and released without going anywhere: a click, which locks the
   // guide so it keeps measuring after the pointer leaves. Click again to let
@@ -472,9 +485,29 @@ function fromOurUI(e: Event): boolean {
   return host ? (e.composedPath?.() ?? []).includes(host) : false;
 }
 
+/**
+ * Quieten the lock outline while a panel control is being worked.
+ *
+ * Capture, because a control inside the closed root stops the event before it
+ * reaches the document in the bubble phase, and `composedPath` sees through
+ * the root either way. The restore is held for a moment: a scrub is a run of
+ * short presses, and an outline flickering back between each of them would be
+ * worse than one that simply stays out of the way until you are done.
+ */
+function setDimLock(on: boolean): void {
+  clearTimeout(undim);
+  if (on) {
+    if (dimLock) return;
+    dimLock = true;
+    render();
+    return;
+  }
+  undim = setTimeout(() => { dimLock = false; render(); }, 200);
+}
+
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
-  if (fromOurUI(e)) return;
+  if (fromOurUI(e)) { setDimLock(true); return; }
 
   // Our own panels sit over the page, and the box model's left edge overlaps
   // the left rule. hitTest returns null over our own UI, so bailing here keeps
@@ -689,6 +722,9 @@ function deactivate() {
   removeEventListener('auxclick', onAuxClick, { capture: true });
   removeEventListener('contextmenu', onContextMenu, { capture: true });
   removeEventListener('resize', onViewportChange);
+  // A pending restore must not fire into an overlay that is already gone.
+  clearTimeout(undim);
+  dimLock = false;
   cancelAnimationFrame(watching);
   watching = 0;
   indicator?.destroy();

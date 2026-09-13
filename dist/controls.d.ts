@@ -47,6 +47,21 @@ interface Spec {
 interface Group {
     name: string;
     specs: readonly Spec[];
+    /**
+     * Whether this group is worth showing for this element.
+     *
+     * The honest version of "conditional". In CSS every property applies to
+     * every element — `getComputedStyle` answers for all of them, always — so
+     * unlike Figma, which can hide Auto layout because a plain frame genuinely
+     * has no such properties, this can only ever be a judgement about
+     * *relevance*. Which means it has to be a judgement that is obviously right,
+     * or it is a tool hiding things from you.
+     *
+     * Only one rule clears that bar: flex and grid properties do nothing at all
+     * on an element that is neither. `flex-direction` on a block is not a
+     * setting you might want, it is a setting with no effect.
+     */
+    when?: (el: Element) => boolean;
 }
 /**
  * What the panel offers.

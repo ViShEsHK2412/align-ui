@@ -21,6 +21,20 @@ export interface Shadow {
     /** Drawn inside the box rather than outside it. */
     inset: boolean;
 }
+/**
+ * A new shadow, at rest.
+ *
+ * Every number is zero, deliberately. This used to open at 0 2px 8px, which is
+ * a perfectly nice shadow and exactly the problem: the panel had picked one for
+ * you and then showed you its numbers as though you had. You would drag y and
+ * be adjusting someone else's 2px rather than setting your own. Zero is the
+ * only starting point that is not an opinion - the layer exists, draws nothing,
+ * and every pixel after that is yours.
+ *
+ * The colour is not zero, because a transparent shadow could never become
+ * visible by dragging the lengths, and a control that cannot do anything until
+ * you find the one field that unlocks it is a trap rather than a default.
+ */
 export declare const EMPTY_SHADOW: Shadow;
 /**
  * Split on a separator that is not inside brackets.

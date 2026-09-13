@@ -17,6 +17,16 @@ export interface OverlayState {
     rulers: boolean;
     /** Everything drawn, held back for a moment. State is untouched. */
     hidden: boolean;
+    /**
+     * Pull the lock outline back, without touching anything else.
+     *
+     * Set while a panel control is being dragged. The outline runs along the
+     * element's own edge, which is exactly where a border or a shadow is being
+     * set, and at full strength you cannot tell the tool's line from the value
+     * you are changing. Everything else stays: the measurements are the reason
+     * you are watching, and this only quiets the one mark that competes.
+     */
+    dimLock: boolean;
     /** The design grid to check against, or null for none. */
     grid: GridSpec | null;
     /** Whether to lay the pixel texture under everything. */

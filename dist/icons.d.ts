@@ -131,6 +131,7 @@ export declare const ICONS: {
      * the write is silent, and so is its refusal.
      */
     readonly check: readonly [Shape];
+    readonly warning: readonly [Shape, Shape, Shape];
     readonly cross: readonly [Shape, Shape];
 };
 export type IconName = keyof typeof ICONS;

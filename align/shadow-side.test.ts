@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_SHADOW, confineToSide, sideOf, type Edge, type Shadow } from './shadow';
+import {
+  EMPTY_SHADOW, axisOf, confineToAxis, confineToSide, sideOf,
+  type Edge, type Shadow,
+} from './shadow';
 
 /**
  * One-sided shadows.
@@ -127,5 +130,71 @@ describe('confineToSide', () => {
   it('leaves a positive spread alone when releasing', () => {
     // A spread someone chose is theirs; only the negative one is machinery.
     expect(confineToSide(s({ spread: 6, y: 4, blur: 8 }), 'all').spread).toBe(6);
+  });
+});
+
+describe('axisOf and confineToAxis', () => {
+  it('calls top and bottom one axis, and left and right the other', () => {
+    expect(axisOf(confineToSide(s({ blur: 8 }), 'top'))).toBe('y');
+    expect(axisOf(confineToSide(s({ blur: 8 }), 'bottom'))).toBe('y');
+    expect(axisOf(confineToSide(s({ blur: 8 }), 'left'))).toBe('x');
+    expect(axisOf(confineToSide(s({ blur: 8 }), 'right'))).toBe('x');
+    expect(axisOf(s({ y: 4, blur: 8 }))).toBe('all');
+  });
+
+  it('leaves the direction to the sign of the offset', () => {
+    // The whole point: the axis is the choice, the sign is the slider.
+    const down = confineToAxis(s({ blur: 8, y: 6 }), 'y');
+    expect(down.y).toBeGreaterThan(0);
+    expect(sideOf(down)).toBe('bottom');
+
+    // Same axis, dragged past zero. Nothing was re-pressed.
+    const up = { ...down, y: -down.y };
+    expect(sideOf(up)).toBe('top');
+    expect(axisOf(up)).toBe('y');
+  });
+
+  it('keeps the lean on an axis that has one', () => {
+    // Already leaning left: pressing Horizontal must not flip it right.
+    const left = confineToSide(s({ blur: 8, x: 10 }), 'left');
+    expect(confineToAxis(left, 'x')).toEqual(left);
+    const up = confineToSide(s({ blur: 8, y: 10 }), 'top');
+    expect(confineToAxis(up, 'y')).toEqual(up);
+  });
+
+  it('defaults to down and right on an axis with nothing to go on', () => {
+    /*
+     * Switching axis crosses to one the shadow has no opinion about: a shadow
+     * above its element says nothing about left versus right, because the two
+     * offsets are independent. Guessing "left" from "top" would be inventing a
+     * relationship. Down and right is where interfaces put light.
+     */
+    const above = confineToSide(s({ blur: 8, y: 10 }), 'top');
+    expect(above.x).toBe(0);
+    expect(sideOf(confineToAxis(above, 'x'))).toBe('right');
+  });
+
+  it('keeps how far the shadow sits when the axis changes', () => {
+    const above = confineToSide(s({ blur: 8, y: 10 }), 'top');
+    const sideways = confineToAxis(above, 'x');
+    expect(Math.abs(sideways.x)).toBe(Math.abs(above.y));
+  });
+
+  it('starts down and right for a shadow with no lean', () => {
+    expect(sideOf(confineToAxis(s({ blur: 8 }), 'y'))).toBe('bottom');
+    expect(sideOf(confineToAxis(s({ blur: 8 }), 'x'))).toBe('right');
+  });
+
+  it('round-trips through every axis', () => {
+    for (const axis of ['x', 'y'] as const) {
+      for (const start of [s({}), s({ y: 4, blur: 8 }), s({ x: -3, y: 9, blur: 2, spread: 5 })]) {
+        expect(axisOf(confineToAxis(start, axis))).toBe(axis);
+      }
+    }
+  });
+
+  it('releases back to four sides', () => {
+    const confined = confineToAxis(s({ blur: 8, y: 6 }), 'y');
+    expect(axisOf(confineToAxis(confined, 'all'))).toBe('all');
   });
 });

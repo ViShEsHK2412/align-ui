@@ -8,8 +8,8 @@ import { icon, type IconName } from './icons';
 import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
 import { formatColour, formatOf, parseColour } from './oklch';
 import {
-  confineToSide, EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
-  parseBackdropBlur, parseShadows, sideOf, type Shadow, type Side,
+  axisOf, confineToAxis, EMPTY_SHADOW, formatBackdropBlur, formatShadows,
+  moveLayer, parseBackdropBlur, parseShadows, type Confine, type Shadow,
 } from './shadow';
 
 /**
@@ -1182,47 +1182,44 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         }
 
         /*
-         * Which edge this shadow lands on.
+         * Which axis this shadow is confined to.
          *
-         * box-shadow has no such property - it draws the whole box. A shadow
-         * on one side is a negative spread hiding three edges behind the
-         * element and the offset pushing the fourth out, which is a recipe
-         * people paste rather than a thing they can ask for. These buttons do
-         * that arithmetic; shadow.ts has the geometry and the proof.
+         * box-shadow has no side at all - it draws the whole box - so a shadow
+         * on one edge is a negative spread hiding three of them behind the
+         * element and the offset pushing the fourth out. shadow.ts has that
+         * geometry and its proof.
+         *
+         * Two buttons rather than four, because top and bottom are not two
+         * settings: they are one axis and the sign of y, exactly as they are
+         * everywhere else in CSS. Offering all four asks you to choose
+         * something the slider already says, and then contradicts the slider
+         * the moment you drag it past zero.
          *
          * The state is read back off the four numbers rather than stored, so
-         * dragging y out of a confined shadow turns the button off by itself
-         * instead of leaving the panel claiming a side the shadow is not on.
+         * dragging x out of a vertical shadow turns the button off by itself
+         * instead of leaving the panel claiming a shape the shadow has lost.
          */
         const edges = document.createElement('div');
         edges.className = 'edit-edges';
-        const current = sideOf(layer);
-        const EDGES: { side: Side; label: string; glyph?: IconName }[] = [
-          { side: 'all', label: 'All' },
-          { side: 'top', label: 'Top', glyph: 'sideTop' },
-          { side: 'right', label: 'Right', glyph: 'sideRight' },
-          { side: 'bottom', label: 'Bottom', glyph: 'sideBottom' },
-          { side: 'left', label: 'Left', glyph: 'sideLeft' },
+        const confined = axisOf(layer);
+        const AXES: { axis: Confine; label: string; hint: string }[] = [
+          { axis: 'all', label: 'All', hint: 'Shadow on all four sides' },
+          { axis: 'y', label: 'Vertical', hint: 'Top or bottom only — y sets which' },
+          { axis: 'x', label: 'Horizontal', hint: 'Left or right only — x sets which' },
         ];
-        for (const edge of EDGES) {
+        for (const choice of AXES) {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'edit-opt';
-          if (edge.glyph) {
-            b.appendChild(icon(edge.glyph, 13));
-            b.setAttribute('aria-label', `Shadow on the ${edge.label.toLowerCase()}`);
-            b.title = `Shadow on the ${edge.label.toLowerCase()}`;
-          } else {
-            b.textContent = edge.label;
-            b.title = 'Shadow on all four sides';
-          }
-          b.toggleAttribute('data-on', edge.side === current);
-          b.setAttribute('aria-pressed', String(edge.side === current));
+          b.textContent = choice.label;
+          b.title = choice.hint;
+          b.toggleAttribute('data-on', choice.axis === confined);
+          b.setAttribute('aria-pressed', String(choice.axis === confined));
           b.addEventListener('click', () => {
-            layers[index] = confineToSide(layers[index]!, edge.side);
+            layers[index] = confineToAxis(layers[index]!, choice.axis);
             layer = layers[index]!;
             push();
-            // Wholesale, because four sliders moved at once and each of them
+            // Wholesale, because three sliders moved at once and each of them
             // owns a pointer capture that an in-place update would not clear.
             render();
           });

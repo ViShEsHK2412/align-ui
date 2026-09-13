@@ -107,3 +107,20 @@ export declare function sideOf(s: Shadow): Side;
  * is half the blur. Tightening it further would only eat into the shadow.
  */
 export declare function confineToSide(s: Shadow, side: Side): Shadow;
+/**
+ * The same confinement, said the way it actually is.
+ *
+ * Four sides is one too many ideas. Top and bottom are not two settings, they
+ * are one axis and the sign of `y`; left and right are the same for `x`. A
+ * panel offering all four asks you to choose something you have already
+ * chosen, and then disagrees with the slider when you drag it past zero.
+ *
+ * So the choice is the axis, and the direction stays where it was always
+ * legible: on the offset itself. Drag `y` negative and the shadow is above the
+ * element, because that is what a negative `y` means everywhere else in CSS.
+ */
+export type Axis = 'x' | 'y';
+export type Confine = Axis | 'all';
+/** Which axis this shadow is confined to, derived like `sideOf` is. */
+export declare function axisOf(s: Shadow): Confine;
+export declare function confineToAxis(s: Shadow, axis: Confine): Shadow;

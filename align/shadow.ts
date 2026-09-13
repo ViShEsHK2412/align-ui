@@ -271,3 +271,37 @@ export function confineToSide(s: Shadow, side: Side): Shadow {
     case 'right': return { ...s, x: d, y: 0, spread };
   }
 }
+
+/**
+ * The same confinement, said the way it actually is.
+ *
+ * Four sides is one too many ideas. Top and bottom are not two settings, they
+ * are one axis and the sign of `y`; left and right are the same for `x`. A
+ * panel offering all four asks you to choose something you have already
+ * chosen, and then disagrees with the slider when you drag it past zero.
+ *
+ * So the choice is the axis, and the direction stays where it was always
+ * legible: on the offset itself. Drag `y` negative and the shadow is above the
+ * element, because that is what a negative `y` means everywhere else in CSS.
+ */
+export type Axis = 'x' | 'y';
+export type Confine = Axis | 'all';
+
+/** Which axis this shadow is confined to, derived like `sideOf` is. */
+export function axisOf(s: Shadow): Confine {
+  const side = sideOf(s);
+  if (side === 'all') return 'all';
+  return side === 'top' || side === 'bottom' ? 'y' : 'x';
+}
+
+export function confineToAxis(s: Shadow, axis: Confine): Shadow {
+  if (axis === 'all') return confineToSide(s, 'all');
+  /*
+   * The direction it already leans is kept. Switching axis on a shadow sitting
+   * above its element should move it to the side, not quietly drop it below —
+   * and a shadow with no lean yet gets down and right, which is where light
+   * comes from in every interface anyone has built.
+   */
+  if (axis === 'y') return confineToSide(s, s.y < 0 ? 'top' : 'bottom');
+  return confineToSide(s, s.x < 0 ? 'left' : 'right');
+}

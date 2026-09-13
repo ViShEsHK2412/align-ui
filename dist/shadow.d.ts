@@ -88,3 +88,22 @@ export declare function parseBackdropBlur(value: string): number;
  * characteristic the page never had.
  */
 export declare function formatBackdropBlur(px: number): string;
+export type Edge = 'top' | 'right' | 'bottom' | 'left';
+/** `all` is the ordinary four-sided shadow, and the absence of confinement. */
+export type Side = Edge | 'all';
+/**
+ * Which edge this shadow actually shows on, derived rather than remembered.
+ *
+ * Derived, because the four numbers are editable on their own. A side stored
+ * as its own field would be a fifth piece of state that the first drag of the
+ * y slider makes a lie, and the panel would then be reporting a shadow that
+ * is not the one on the page.
+ */
+export declare function sideOf(s: Shadow): Side;
+/**
+ * Put a shadow on one edge, keeping as much of it as the geometry allows.
+ *
+ * The spread is set to the smallest magnitude that can hide three edges, which
+ * is half the blur. Tightening it further would only eat into the shadow.
+ */
+export declare function confineToSide(s: Shadow, side: Side): Shadow;

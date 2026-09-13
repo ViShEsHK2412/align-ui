@@ -8,8 +8,8 @@ import { icon, type IconName } from './icons';
 import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
 import { formatColour, formatOf, parseColour } from './oklch';
 import {
-  EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
-  parseBackdropBlur, parseShadows, type Shadow,
+  confineToSide, EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
+  parseBackdropBlur, parseShadows, sideOf, type Shadow, type Side,
 } from './shadow';
 
 /**
@@ -108,7 +108,17 @@ export const GROUPS: readonly Group[] = [
       { prop: 'font-size', label: 'Size', kind: 'length', glyph: 'fontSize', min: 8, max: 96, step: 1, unit: 'px' },
       { prop: 'font-weight', label: 'Weight', kind: 'number', glyph: 'fontWeight', min: 100, max: 900, step: 100 },
       { prop: 'line-height', label: 'Line height', kind: 'length', glyph: 'lineHeight', min: 0, max: 96, step: 1, unit: 'px' },
-      { prop: 'letter-spacing', label: 'Tracking', kind: 'length', glyph: 'tracking', min: -4, max: 12, step: 0.1, unit: 'px' },
+      /*
+       * Behind "more", to pay for border colour coming out from behind it.
+       *
+       * The first screen has a budget and a test that enforces it, and the
+       * right response to hitting it is to spend the slot better rather than
+       * raise the number. Size, weight and line height are reached for
+       * constantly; tracking is a refinement you go looking for. Border colour
+       * is the opposite - you cannot style a border without it, and it was
+       * filed under Colour and hidden, which together made it unfindable.
+       */
+      { prop: 'letter-spacing', label: 'Tracking', kind: 'length', glyph: 'tracking', min: -4, max: 12, step: 0.1, unit: 'px', more: true },
       { prop: 'font-style', label: 'Style', kind: 'choice', glyph: 'italic', options: ['normal', 'italic'], more: true },
       { prop: 'text-align', label: 'Align', kind: 'choice', glyph: 'textAlign', options: ['start', 'center', 'end', 'justify'], more: true },
       { prop: 'text-transform', label: 'Case', kind: 'choice', glyph: 'textCase', options: ['none', 'uppercase', 'lowercase', 'capitalize'], more: true },
@@ -120,7 +130,6 @@ export const GROUPS: readonly Group[] = [
     specs: [
       { prop: 'color', label: 'Text', kind: 'colour', glyph: 'textColour' },
       { prop: 'background-color', label: 'Background', kind: 'colour', glyph: 'backgroundColour' },
-      { prop: 'border-color', label: 'Border', kind: 'colour', glyph: 'borderColour', more: true },
       { prop: 'opacity', label: 'Opacity', kind: 'number', glyph: 'opacity', min: 0, max: 1, step: 0.01 },
     ],
   },
@@ -138,6 +147,14 @@ export const GROUPS: readonly Group[] = [
     name: 'Border',
     specs: [
       { prop: 'border-width', label: 'Width', kind: 'length', glyph: 'borderWidth', min: 0, max: 24, step: 1, unit: 'px', sides: SIDES.map((s) => `border-${s}-width`) },
+      /*
+       * Under Border, where you look for it, and not behind "more".
+       *
+       * It was in the Colour group and hidden, which between them made it
+       * unreachable in practice: you go to Border to change a border, find
+       * width, style and radius, and conclude the panel cannot do colour.
+       */
+      { prop: 'border-color', label: 'Colour', kind: 'colour', glyph: 'borderColour', sides: SIDES.map((s) => `border-${s}-color`) },
       { prop: 'border-style', label: 'Style', kind: 'choice', glyph: 'borderStyle', options: ['none', 'solid', 'dashed', 'dotted'] },
       { prop: 'border-radius', label: 'Radius', kind: 'length', glyph: 'borderRadius', min: 0, max: 64, step: 1, unit: 'px', sides: CORNERS },
     ],
@@ -542,6 +559,35 @@ const CSS = PICKER_CSS + `
 .edit-add:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-sides > * { min-width: 0; }
 
+/*
+ * One side's colour: the same chip as the scrub badges beside it, with the
+ * value shown as itself rather than as a number. No hex field - a quarter of a
+ * 320px panel has no room for one, and the block is the value.
+ */
+.edit-side-colour {
+  display: flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 6px;
+  border: 0; border-radius: 0;
+  background: ${surface(1)}; color: ${TEXT.secondary};
+  font: inherit; font-size: ${TYPE.tag}px;
+  cursor: pointer;
+  transition: background ${MOTION.ui}, color ${MOTION.ui};
+}
+.edit-side-colour:hover { background: ${surface(3)}; color: ${TEXT.primary}; }
+.edit-side-colour:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
+.edit-side-colour .edit-side-name { flex: 1; min-width: 0; text-align: left; }
+.edit-side-chip {
+  flex: none; width: 14px; height: 14px;
+  background: var(--swatch, transparent);
+  background-image: linear-gradient(var(--swatch, transparent), var(--swatch, transparent)),
+    ${'conic-gradient(' + HAIRLINE + ' 0 25%, transparent 0 50%, ' + HAIRLINE + ' 0 75%, transparent 0)'};
+  background-size: auto, 6px 6px;
+}
+
+/* The edge a shadow lands on. */
+.edit-edges { display: flex; gap: 2px; margin-bottom: 6px; }
+.edit-edges .edit-opt { flex: 1; display: grid; place-items: center; min-height: 22px; padding: 0 6px; }
+
 .edit-linked {
   width: 24px; height: 24px;
   display: grid; place-items: center;
@@ -834,6 +880,75 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     };
   }
 
+  /**
+   * One side of a four-sided colour.
+   *
+   * A swatch and a name, no hex. The full field does not fit four times across
+   * a 320px panel, and the picker it opens carries the notation anyway.
+   */
+  function buildSideColour(spec: Spec, prop: string, short: string): {
+    el: HTMLElement; sync: () => void;
+  } {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'edit-side-colour';
+    cell.setAttribute('aria-haspopup', 'dialog');
+    cell.setAttribute('aria-expanded', 'false');
+    cell.setAttribute('aria-label', `${spec.label} ${short}`);
+
+    const name = document.createElement('span');
+    name.className = 'edit-side-name';
+    name.textContent = short;
+    const chip = document.createElement('span');
+    chip.className = 'edit-side-chip';
+    cell.append(name, chip);
+
+    let picker: Picker | null = null;
+    let undismiss: (() => void) | null = null;
+    function close(): void {
+      undismiss?.();
+      undismiss = null;
+      picker?.destroy();
+      picker = null;
+      cell.setAttribute('aria-expanded', 'false');
+    }
+
+    function apply(value: string): void {
+      chip.style.setProperty('--swatch', value);
+      if (linked.has(spec.prop) && spec.sides) {
+        for (const side of spec.sides) write(side, value);
+        // The other three cells are showing the old colour until told.
+        for (const row of rows) if (row.spec.prop === spec.prop) row.sync();
+      } else {
+        write(prop, value);
+      }
+    }
+
+    cell.addEventListener('click', () => {
+      if (picker) { close(); return; }
+      const current = target ? readValue(target, prop) : '';
+      picker = createPicker(root, {
+        anchor: cell,
+        value: current || '#000000',
+        onChange: apply,
+      });
+      cell.setAttribute('aria-expanded', 'true');
+      undismiss = dismissOn(cell, (n) => picker?.contains(n) ?? false, close);
+    });
+
+    colourTeardown.push(close);
+    return {
+      el: cell,
+      sync: () => {
+        const current = target ? readValue(target, prop) : '';
+        const parsed = parseColour(current);
+        const value = parsed ? formatColour(parsed, formatOf(current)) : current;
+        chip.style.setProperty('--swatch', value);
+        picker?.update(value);
+      },
+    };
+  }
+
   function buildColour(spec: Spec): { el: HTMLElement; sync: () => void } {
     const wrap = document.createElement('div');
     wrap.className = 'edit-colour';
@@ -1066,7 +1181,55 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
           grid.appendChild(slider.el);
         }
 
-        card.append(head, grid);
+        /*
+         * Which edge this shadow lands on.
+         *
+         * box-shadow has no such property - it draws the whole box. A shadow
+         * on one side is a negative spread hiding three edges behind the
+         * element and the offset pushing the fourth out, which is a recipe
+         * people paste rather than a thing they can ask for. These buttons do
+         * that arithmetic; shadow.ts has the geometry and the proof.
+         *
+         * The state is read back off the four numbers rather than stored, so
+         * dragging y out of a confined shadow turns the button off by itself
+         * instead of leaving the panel claiming a side the shadow is not on.
+         */
+        const edges = document.createElement('div');
+        edges.className = 'edit-edges';
+        const current = sideOf(layer);
+        const EDGES: { side: Side; label: string; glyph?: IconName }[] = [
+          { side: 'all', label: 'All' },
+          { side: 'top', label: 'Top', glyph: 'sideTop' },
+          { side: 'right', label: 'Right', glyph: 'sideRight' },
+          { side: 'bottom', label: 'Bottom', glyph: 'sideBottom' },
+          { side: 'left', label: 'Left', glyph: 'sideLeft' },
+        ];
+        for (const edge of EDGES) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'edit-opt';
+          if (edge.glyph) {
+            b.appendChild(icon(edge.glyph, 13));
+            b.setAttribute('aria-label', `Shadow on the ${edge.label.toLowerCase()}`);
+            b.title = `Shadow on the ${edge.label.toLowerCase()}`;
+          } else {
+            b.textContent = edge.label;
+            b.title = 'Shadow on all four sides';
+          }
+          b.toggleAttribute('data-on', edge.side === current);
+          b.setAttribute('aria-pressed', String(edge.side === current));
+          b.addEventListener('click', () => {
+            layers[index] = confineToSide(layers[index]!, edge.side);
+            layer = layers[index]!;
+            push();
+            // Wholesale, because four sliders moved at once and each of them
+            // owns a pointer capture that an in-place update would not clear.
+            render();
+          });
+          edges.appendChild(b);
+        }
+
+        card.append(head, edges, grid);
         wrap.appendChild(card);
       });
 
@@ -1148,8 +1311,15 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
          */
         const short = side
           .split('-')
-          .filter((p) => p !== 'border' && p !== 'radius' && p !== 'width' && p !== 'padding' && p !== 'margin')
+          .filter((p) => p !== 'border' && p !== 'radius' && p !== 'width'
+            && p !== 'padding' && p !== 'margin' && p !== 'color')
           .join(' ') || side;
+        if (spec.kind === 'colour') {
+          const cell = buildSideColour(spec, side, short);
+          syncs.push(cell.sync);
+          grid.appendChild(cell.el);
+          continue;
+        }
         const built = buildScrub(spec, side, short);
         scrubs.push(built.scrub);
         syncs.push(built.sync);

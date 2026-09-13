@@ -6,11 +6,15 @@ between them, fractions included.
 
 It measures. It doesn't judge: whether `25.5px` is wrong is your call.
 
+When you want to try a change rather than only measure one, `E` arms edit mode:
+live CSS controls for the locked element, and a prompt you can copy describing
+exactly what you changed. Everything reverts when you disarm.
+
 ![Three cards locked, with the 32px gutter between them measured](docs/screenshot.png)
 
 - One line to install, one line to wire up
 - No runtime dependencies
-- 65 KB minified, 24 KB gzipped
+- 136 KB minified, 46 KB gzipped
 - Physically absent from production builds
 - Vite, Next.js, CRA, Remix, Astro, SvelteKit
 
@@ -132,6 +136,7 @@ the ticks they exist to show.
 | `G` | the design grid, when one is configured |
 | `K` | a 10px pixel grid, for reading an offset off the page |
 | `P` | pick a colour from anywhere on screen |
+| `E` | arm edit mode, and disarm it. Disarming puts everything back |
 | `C` | copy the numbers in the panel |
 | `Ctrl/Cmd` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
@@ -253,6 +258,66 @@ throw at startup. The rulers and the two grids are remembered too.
 
 Modes are not. X-ray, the type readout and the picker all start off, because a
 tool that reopens in a mode you have forgotten looks broken rather than helpful.
+
+---
+
+## Editing
+
+`E` arms edit mode. The pencil in the toolbar inverts, and the locked element
+gets a panel of live CSS controls: type, colour, spacing, size, border, shadow,
+and — for a flex or grid element — layout.
+
+It is off until you arm it, and it stays off across reloads. A tool that
+promises to leave the page as it found it does not get to start out able to
+write to it.
+
+### Everything goes back
+
+Each property records what it found the first time it is written, and disarming
+restores that. What it restores is the **inline** value, not the computed one:
+an element with no `style` attribute gets none back, and one that already had
+`style="color: red"` keeps it. Closing the tool reverts too, and so does
+navigating away — nothing survives to the next page load.
+
+The footer counts what the tool has written, and `Revert all` puts the lot back
+without disarming.
+
+### Copy prompt
+
+`Copy prompt` writes a plain description of the changes to the clipboard —
+property, old value, new value, and a selector for the element. It is meant to
+be pasted at whatever is going to make the change permanent, whether that is a
+person or a model. The tool never edits your source.
+
+### The controls
+
+Numbers are sliders with a drag that tracks your pointer exactly and a click
+that springs, plus scrub badges for the four-sided properties: drag a padding
+badge sideways for left and right, up and down for top and bottom, exactly as
+the edge it names moves.
+
+Colour opens a picker of our own rather than the browser's, which is sRGB-only
+and cannot express alpha. The field is OKLCH and each row is normalised to the
+chroma available at that lightness, so every pixel of it is a colour your
+display can actually make — unlike the HSV square, where most of the area is
+not. Hex, OKLCH and Display P3 all go in and come back out unchanged, and a
+colour outside sRGB says so rather than being quietly flattened.
+
+### Shadows
+
+`box-shadow` is a list, so the control is too: add layers, reorder them, and a
+new layer starts as a copy of the one above rather than from zero, because
+stacked shadows are almost always one shadow described twice.
+
+A shadow has no side — `box-shadow` always draws the whole box. **Vertical** and
+**Horizontal** do the geometry that confines it to one edge: a negative spread
+hides three edges behind the element and the offset pushes the fourth out.
+Which of the two parallel edges it lands on is the sign of the offset, so drag
+`y` negative and the shadow moves above the element. Drag the other axis off
+zero and the button releases itself, because the state is read back off the
+numbers rather than remembered.
+
+For a shadow on two opposite edges, use two layers.
 
 ---
 

@@ -20,6 +20,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const run = (cmd, args) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 
+/*
+ * For the gates. `run` swallows stdout to capture it, which is right for
+ * `git rev-parse` and wrong for a test runner: a failing suite would throw
+ * with its own report captured and thrown away, leaving a stack trace where
+ * the reason should be.
+ */
+const runLoud = (cmd, args) =>
+  execFileSync(cmd, args, { stdio: 'inherit' });
+
 const die = (message) => { console.error(`release: ${message}`); process.exit(1); };
 
 // Anything uncommitted would be swept into the release commit below, so the
@@ -36,9 +45,30 @@ if (branch !== 'main') die(`releases come off main, not ${branch}`);
 // The two halves of `npm run build`, run directly. Node refuses to spawn a
 // .cmd without a shell, so going through npm needs one, and a shell is a
 // portability problem of its own — node can launch both of these itself.
+/*
+ * The gates, before anything is written down.
+ *
+ * This step did not exist: the script built, bumped, tagged and pushed without
+ * ever asking whether the thing it was releasing worked. A tag is the release
+ * here - there is no registry to yank from - so a bad one is in consumers'
+ * lockfiles the moment they update, and the only fix is another tag.
+ *
+ * Ordered cheapest first, so a typo fails in seconds rather than after a
+ * build.
+ */
+console.log('release: typecheck');
+runLoud(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit']);
+
+console.log('release: tests');
+runLoud(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', '--silent']);
+
 console.log('release: building');
 run(process.execPath, ['scripts/build.mjs']);
 run(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json']);
+
+// After the build, because it measures what the build produced.
+console.log('release: size');
+runLoud(process.execPath, ['scripts/size.mjs']);
 
 const pkgPath = new URL('../package.json', import.meta.url);
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));

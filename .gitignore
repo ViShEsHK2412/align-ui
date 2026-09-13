@@ -19,3 +19,7 @@ LAB-HANDOFF.md
 EDIT-MODE.md
 AGENTS.md
 CLAUDE.md
+
+# Design exploration. Disposable by definition: variants exist to be
+# compared and thrown away, and nothing in the tool imports from here.
+prototypes/

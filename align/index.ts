@@ -446,9 +446,6 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseUp(e: MouseEvent) {
-  // Ahead of the guide-drag guard below: a press on a panel control is not
-  // a guide drag, and it is exactly the press that needs the outline back.
-  setDimLock(false);
   if (!dragging) return;
   // Pressed and released without going anywhere: a click, which locks the
   // guide so it keeps measuring after the pointer leaves. Click again to let
@@ -494,6 +491,28 @@ function fromOurUI(e: Event): boolean {
  * short presses, and an outline flickering back between each of them would be
  * worse than one that simply stays out of the way until you are done.
  */
+/**
+ * Pointer events, not mouse events.
+ *
+ * This hung off `onMouseDown` and never once fired for the gesture it exists
+ * for. The sliders and the scrub badges call `preventDefault()` on their
+ * `pointerdown`, and that suppresses the compatibility mouse events the
+ * browser would otherwise synthesise - so `mousedown` simply never arrived
+ * for a drag on a control. It worked only on the parts of the panel that do
+ * not preventDefault, which is to say: not while dragging anything.
+ *
+ * Capture, and on window, because the scrub also calls `stopPropagation()`.
+ * A capture listener has already run by the time the target can stop
+ * anything, so this sees the press either way.
+ */
+function onPointerDownAny(e: PointerEvent): void {
+  if (fromOurUI(e)) setDimLock(true);
+}
+
+function onPointerUpAny(): void {
+  setDimLock(false);
+}
+
 function setDimLock(on: boolean): void {
   clearTimeout(undim);
   if (on) {
@@ -502,12 +521,15 @@ function setDimLock(on: boolean): void {
     render();
     return;
   }
+  // Every release on the page reaches here, and almost none of them dimmed
+  // anything. Without this the tool schedules a redraw 200ms after each one.
+  if (!dimLock) return;
   undim = setTimeout(() => { dimLock = false; render(); }, 200);
 }
 
 function onMouseDown(e: MouseEvent) {
   if (e.button !== 0) return;
-  if (fromOurUI(e)) { setDimLock(true); return; }
+  if (fromOurUI(e)) return;
 
   // Our own panels sit over the page, and the box model's left edge overlaps
   // the left rule. hitTest returns null over our own UI, so bailing here keeps
@@ -700,6 +722,9 @@ function activate() {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
     hide: false, edit: false, canCopy: false, canUndo: false,
   });
+  addEventListener('pointerdown', onPointerDownAny, { capture: true });
+  addEventListener('pointerup', onPointerUpAny, { capture: true });
+  addEventListener('pointercancel', onPointerUpAny, { capture: true });
   addEventListener('mousemove', onMouseMove);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('mouseup', onMouseUp, { capture: true });
@@ -721,6 +746,9 @@ function deactivate() {
   removeEventListener('click', onClick, { capture: true });
   removeEventListener('auxclick', onAuxClick, { capture: true });
   removeEventListener('contextmenu', onContextMenu, { capture: true });
+  removeEventListener('pointerdown', onPointerDownAny, { capture: true });
+  removeEventListener('pointerup', onPointerUpAny, { capture: true });
+  removeEventListener('pointercancel', onPointerUpAny, { capture: true });
   removeEventListener('resize', onViewportChange);
   // A pending restore must not fire into an overlay that is already gone.
   clearTimeout(undim);

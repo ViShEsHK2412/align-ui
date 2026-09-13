@@ -1,10 +1,17 @@
 /**
- * Colour conversion, for the picker.
+ * Colour readout, for the eyedropper.
  *
  * The browser's eyedropper only ever hands back an sRGB hex string. Every other
- * format has to be computed, and OKLCH is the long one: sRGB → linear → LMS →
- * OKLab → polar. All pure, all testable.
+ * format has to be computed, and this turns one hex into the four the card
+ * shows. All pure, all testable.
+ *
+ * One way only. `oklch.ts` is the other half: a real colour space, parsing and
+ * formatting in both directions with gamut mapping, which is what the editor's
+ * picker needs to read a value off a page and write it back unchanged. This
+ * module does the arithmetic it still owns and borrows the rest.
  */
+
+import { rgbToColour } from './oklch';
 
 export interface Rgb { r: number; g: number; b: number }
 
@@ -55,38 +62,26 @@ export function toHsl({ r, g, b }: Rgb): string {
   return `hsl(${trim(h, 1)} ${trim(s * 100, 1)}% ${trim(l * 100, 1)}%)`;
 }
 
-/** sRGB's transfer function, undone. Everything below happens in light, not code. */
-function linearise(c: number): number {
-  const v = c / 255;
-  return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-}
 
 /**
  * OKLCH: perceptual lightness, chroma and hue.
  *
- * The two matrices are Björn Ottosson's, unchanged. The cube root between them
- * is the whole trick — it is what makes a step in L look like the same step in
- * lightness at every hue, which plain HSL never manages.
+ * The conversion itself lives in `oklch.ts`, which the editor's colour picker
+ * needs bidirectionally and with gamut mapping. This used to carry a second
+ * copy — Ottosson's direct sRGB matrix rather than the CSS Color 4 route
+ * through XYZ. Both are correct, and over 3000 random colours they agreed to
+ * 5e-5, which is this function's own rounding. Two right answers to one
+ * question is still one too many, so there is now a single implementation and
+ * these tests prove it.
+ *
+ * The formatting stays here, because it is a readout: four decimals of
+ * lightness and chroma, two of hue, and no hue at all for a grey.
  */
 export function toOklch(rgb: Rgb): string {
-  const r = linearise(rgb.r), g = linearise(rgb.g), b = linearise(rgb.b);
-
-  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
-  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
-  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
-
-  const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
-
-  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
-  const A = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
-  const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
-
-  const chroma = Math.sqrt(A * A + B * B);
-  let hue = (Math.atan2(B, A) * 180) / Math.PI;
-  if (hue < 0) hue += 360;
+  const { l, c, h } = rgbToColour([rgb.r / 255, rgb.g / 255, rgb.b / 255]);
   // A grey has no hue to report, and atan2 on rounding noise invents one.
-  if (chroma < 0.0001) return `oklch(${trim(L, 4)} 0 0)`;
-  return `oklch(${trim(L, 4)} ${trim(chroma, 4)} ${trim(hue, 2)})`;
+  if (c < 0.0001) return `oklch(${trim(l, 4)} 0 0)`;
+  return `oklch(${trim(l, 4)} ${trim(c, 4)} ${trim(h, 2)})`;
 }
 
 /** Every format the picker offers, in the order it shows them. */

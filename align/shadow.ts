@@ -184,3 +184,90 @@ export function parseBackdropBlur(value: string): number {
 export function formatBackdropBlur(px: number): string {
   return px <= 0 ? 'none' : `blur(${px}px)`;
 }
+
+// ── Which edge a shadow lands on ────────────────────────────────────────────
+
+export type Edge = 'top' | 'right' | 'bottom' | 'left';
+/** `all` is the ordinary four-sided shadow, and the absence of confinement. */
+export type Side = Edge | 'all';
+
+/**
+ * `box-shadow` has no side. It draws the whole box, always.
+ *
+ * A one-sided shadow is a shape trick, not a property: shrink the shadow with
+ * a negative spread until three of its edges hide behind the element, then
+ * push it out from under one of them with the offset. Every tool that offers
+ * "shadow on the bottom" is doing this; it is just usually done by hand, from
+ * a recipe copied off a blog, and the numbers are chosen by nudging.
+ *
+ * The geometry is exact, so the panel can do the arithmetic instead.
+ *
+ * With the element at `[0, W] x [0, H]`, a spread of `-m` insets the shadow
+ * rect by `m` on all four sides; the offset moves it by `(x, y)`; the blur
+ * then reaches `r = blur / 2` further out in every direction — that is what
+ * the blur radius means, a transition centred on the shadow's own edge.
+ *
+ * So the shadow shows past the element's right edge when `x > m - r`, past the
+ * left when `x < r - m`, and the same pair vertically. Writing `t = m - r` for
+ * the slack, it escapes on the right when `x > t`, on the left when `x < -t`,
+ * below when `y > t` and above when `y < -t`.
+ *
+ * Which makes the rest fall out: a negative `t` escapes on all four sides at
+ * once, so `m` must be at least `r` before a side can mean anything.
+ */
+function slack(s: Shadow): number {
+  return -s.spread - s.blur / 2;
+}
+
+/**
+ * Which edge this shadow actually shows on, derived rather than remembered.
+ *
+ * Derived, because the four numbers are editable on their own. A side stored
+ * as its own field would be a fifth piece of state that the first drag of the
+ * y slider makes a lie, and the panel would then be reporting a shadow that
+ * is not the one on the page.
+ */
+export function sideOf(s: Shadow): Side {
+  const t = slack(s);
+  const escapes: Edge[] = [];
+  if (s.y < -t) escapes.push('top');
+  if (s.x > t) escapes.push('right');
+  if (s.y > t) escapes.push('bottom');
+  if (s.x < -t) escapes.push('left');
+  // None at all is a shadow hidden entirely behind its element. It is not
+  // confined to a side, it is invisible, and saying `all` is the honest answer
+  // because that is the state every slider is free to move out of.
+  return escapes.length === 1 ? escapes[0]! : 'all';
+}
+
+/**
+ * Put a shadow on one edge, keeping as much of it as the geometry allows.
+ *
+ * The spread is set to the smallest magnitude that can hide three edges, which
+ * is half the blur. Tightening it further would only eat into the shadow.
+ */
+export function confineToSide(s: Shadow, side: Side): Shadow {
+  if (side === 'all') {
+    // Not "spread zero" as a value judgement — a negative spread is the only
+    // thing holding the other three sides back, so releasing it is what
+    // returning to four sides means.
+    return { ...s, spread: Math.max(0, s.spread) };
+  }
+  const m = Math.ceil(s.blur / 2);
+  const t = m - s.blur / 2;
+  /*
+   * Far enough out to clear the slack. The existing offset is kept when it
+   * already does, so switching sides on a shadow you have tuned moves it round
+   * rather than resetting how far it sits. A blur of zero leaves no slack at
+   * all, and 1px is then the smallest visible answer.
+   */
+  let d = Math.max(Math.abs(s.x), Math.abs(s.y));
+  if (d <= t) d = t + Math.max(1, Math.round(s.blur / 2));
+  const spread = -m;
+  switch (side) {
+    case 'top': return { ...s, x: 0, y: -d, spread };
+    case 'bottom': return { ...s, x: 0, y: d, spread };
+    case 'left': return { ...s, x: -d, y: 0, spread };
+    case 'right': return { ...s, x: d, y: 0, spread };
+  }
+}

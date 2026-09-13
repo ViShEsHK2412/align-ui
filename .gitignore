@@ -23,3 +23,7 @@ CLAUDE.md
 # Design exploration. Disposable by definition: variants exist to be
 # compared and thrown away, and nothing in the tool imports from here.
 prototypes/
+
+# Editor settings. Personal to whoever is looking at the repo, and a Live
+# Server port is nobody else's business.
+.vscode/

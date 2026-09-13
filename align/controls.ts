@@ -5,6 +5,8 @@ import {
   GROUND, HAIRLINE, MOTION, ROW, SHADOW, SPACE, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
+import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
+import { formatColour, formatOf, parseColour } from './oklch';
 import {
   EMPTY_SHADOW, formatBackdropBlur, formatShadows, moveLayer,
   parseBackdropBlur, parseShadows, type Shadow,
@@ -60,6 +62,29 @@ interface Spec {
 interface Group {
   name: string;
   specs: readonly Spec[];
+  /**
+   * Whether this group is worth showing for this element.
+   *
+   * The honest version of "conditional". In CSS every property applies to
+   * every element — `getComputedStyle` answers for all of them, always — so
+   * unlike Figma, which can hide Auto layout because a plain frame genuinely
+   * has no such properties, this can only ever be a judgement about
+   * *relevance*. Which means it has to be a judgement that is obviously right,
+   * or it is a tool hiding things from you.
+   *
+   * Only one rule clears that bar: flex and grid properties do nothing at all
+   * on an element that is neither. `flex-direction` on a block is not a
+   * setting you might want, it is a setting with no effect.
+   */
+  when?: (el: Element) => boolean;
+}
+
+/** Is this element laid out by flex or grid? */
+function isFlexOrGrid(el: Element): boolean {
+  // Substring, not a word boundary: every value that means flex or grid
+  // contains the word, and every value that does not, does not.
+  const d = getComputedStyle(el).display;
+  return d.includes('flex') || d.includes('grid');
 }
 
 const SIDES = ['top', 'right', 'bottom', 'left'] as const;
@@ -129,6 +154,7 @@ export const GROUPS: readonly Group[] = [
   },
   {
     name: 'Layout',
+    when: isFlexOrGrid,
     specs: [
       { prop: 'display', label: 'Display', kind: 'choice', glyph: 'boxSizing', options: ['block', 'flex', 'grid', 'inline-flex', 'inline-block', 'none'] },
       { prop: 'flex-direction', label: 'Direction', kind: 'choice', glyph: 'flexDirection', options: ['row', 'column', 'row-reverse', 'column-reverse'], more: true },
@@ -182,7 +208,7 @@ export interface Controls {
  */
 const PANEL_W = 320;
 
-const CSS = `
+const CSS = PICKER_CSS + `
 /*
  * The reset the shadow root does not come with.
  *
@@ -243,7 +269,7 @@ const CSS = `
   .edit-dock { transition: opacity ${MOTION.ui}; translate: none; }
   @starting-style { .edit-dock[data-open] { translate: none; } }
   .edit-opt:active, .edit-mini:active, .edit-add:active,
-  .edit-action:active, .edit-revert:active { scale: 1; }
+  .edit-action:active { scale: 1; }
 }
 
 .edit-head {
@@ -338,6 +364,14 @@ const CSS = `
  * from its size attribute, and the track grew to fit it.
  */
 .edit-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: ${SPACE.base}px; }
+/*
+ * A per-side group is four controls in two rows, with 4px between them. Eight
+ * outside that is only twice the gap inside, which is the floor, and at this
+ * density it read as one undifferentiated block of eight numbers: padding and
+ * margin ran together. Four more each side makes it sixteen between two
+ * groups and twelve against a plain row.
+ */
+.edit-row[data-grouped] { margin-block: ${SPACE.tight}px; }
 
 /*
  * A row the tool has written shows its revert control and nothing else.
@@ -349,11 +383,23 @@ const CSS = `
  */
 .edit-row { position: relative; }
 
+/*
+ * A row is an alignment, not a container.
+ *
+ * It used to carry a surface of its own, so every control sat in a box inside
+ * a box: the slider has a track, the badge has a chip, the hex field has a
+ * border, and each of them was then wrapped again in a rectangle that did no
+ * work. Twenty of those down a 320px panel is the boxed-in, over-
+ * compartmentalised look, and the fix for it is to drop the outer one rather
+ * than to space it better.
+ *
+ * The padding goes with it. Without a box to inset from, the controls align
+ * to the panel's own edge, and every row in the panel starts at the same
+ * place.
+ */
 .edit-line {
   display: flex; align-items: center; gap: ${SPACE.base}px;
   min-height: ${ROW}px;
-  padding: 0 10px;
-  background: ${surface(1)};
 }
 .edit-glyph {
   flex: none;
@@ -398,27 +444,51 @@ const CSS = `
 .edit-opt:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-opt[data-on] { background: ${TEXT.primary}; color: ${GROUND}; }
 
+/*
+ * The colour field is one control, not two sitting next to each other.
+ *
+ * It used to be a swatch with its own hairline ring beside a hex input with
+ * its own border, on a panel whose every other row has neither. Both edges
+ * were redundant with a fill that already drew them, and both measured under
+ * 1.2:1 against what they sat on, so neither could have identified a control
+ * even where the rules ask a border to. One surface now holds both halves:
+ * the swatch is a flush block of the value itself, the hex is the rest.
+ */
+.edit-colour {
+  flex: 1; min-width: 0;
+  display: flex; align-items: stretch;
+  height: 24px;
+  background: ${surface(1)};
+}
+.edit-colour:focus-within { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-swatch {
-  flex: none; width: 24px; height: 24px;
+  flex: none; width: 24px;
   padding: 0; border: 0; border-radius: 0;
-  box-shadow: inset 0 0 0 1px ${HAIRLINE};
+  background: var(--swatch, transparent);
+  /* The value can be translucent, and a swatch that hides that is lying. */
+  background-image: linear-gradient(var(--swatch, transparent), var(--swatch, transparent)),
+    ${'conic-gradient(' + HAIRLINE + ' 0 25%, transparent 0 50%, ' + HAIRLINE + ' 0 75%, transparent 0)'};
+  background-size: auto, 8px 8px;
+  background-position: 0 0, 0 0;
   cursor: pointer;
 }
+.edit-swatch:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 .edit-hex {
   flex: 1; min-width: 0;
-  height: 24px; padding: 0 6px;
-  border: 1px solid ${HAIRLINE}; border-radius: 0;
-  background: ${surface(1)}; color: ${TEXT.primary};
+  padding: 0 6px;
+  border: 0; border-radius: 0;
+  background: none; color: ${TEXT.primary};
   font: inherit; font-size: ${TYPE.tag}px;
   font-variant-numeric: tabular-nums;
 }
-.edit-hex:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
+/* The field owns the focus ring now; the input inside it does not draw a second. */
+.edit-hex:focus-visible { outline: none; }
 
 .edit-row-name {
   display: flex; align-items: center; gap: 6px;
   /* Half the gap between rows, so the name binds to its own control rather
      than floating between two of them. */
-  margin: 0 0 ${SPACE.tight}px 10px;
+  margin: 0 0 ${SPACE.tight}px;
   color: ${TEXT.secondary};
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.regular};
 }
@@ -447,7 +517,7 @@ const CSS = `
   font-size: ${TYPE.tag}px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.edit-layer-head .edit-swatch { width: 24px; height: 24px; }
+.edit-swatch-solo { width: 24px; height: 24px; }
 .edit-mini {
   flex: none;
   display: grid; place-items: center;
@@ -482,17 +552,6 @@ const CSS = `
 .edit-linked[data-on] { background: ${surface(4)}; color: ${TEXT.primary}; }
 .edit-linked:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
-.edit-revert {
-  width: 24px; height: 24px;
-  display: none; place-items: center;
-  padding: 0; border: 0; border-radius: 0;
-  background: none; color: ${TEXT.tertiary};
-  cursor: pointer;
-}
-.edit-row[data-touched] .edit-revert { display: grid; }
-.edit-revert:hover { color: ${TEXT.primary}; }
-.edit-revert:active { scale: 0.96; }
-.edit-revert:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
 
 .edit-more {
   width: 100%; margin-top: ${SPACE.tight}px;
@@ -582,6 +641,15 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
   let armed = false;
   let showMore = false;
   const rows: Row[] = [];
+  /*
+   * Every open colour popover. It is portalled to the shadow root rather than
+   * parented to its row, so clearing the body would leave it on screen with
+   * nothing behind it - the classic orphaned dropdown.
+   */
+  const colourTeardown: Array<() => void> = [];
+  function closePickers(): void {
+    for (const close of colourTeardown.splice(0)) close();
+  }
   /** Which per-side groups are writing all four at once. */
   const linked = new Set<string>();
 
@@ -592,7 +660,15 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     revertBtn.disabled = n === 0;
   }
 
-  /** Mark the rows the tool has written, so the panel never passes its own work off as the page's. */
+  /**
+   * Which rows the tool has written.
+   *
+   * Nothing renders this any more — the per-row revert was the only thing that
+   * did, and it is gone. The attribute stays because it is still true and
+   * still cheap, and because the footer count below is computed in the same
+   * pass. If the panel ever needs a boxless way to say "this one is mine", the
+   * hook is already here.
+   */
   function markTouched(): void {
     if (!target) return;
     for (const row of rows) {
@@ -717,42 +793,126 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     return { el: wrap, sync };
   }
 
+  /**
+   * Dismiss a popover on a press somewhere else.
+   *
+   * Two listeners, because one cannot see both sides of a closed shadow root.
+   *
+   * The root this panel lives in is closed, so `composedPath()` read from a
+   * document listener stops at the host: a press on the picker and a press on
+   * the page produce the same path, and the picker closed itself the moment
+   * you touched it. That is the same trap `fromOurUI` steps around by testing
+   * the host rather than anything inside it.
+   *
+   * So the decision is made on whichever side the press happened. Inside the
+   * root, where the path is whole, the picker can tell its own controls from
+   * the rest of the panel. Outside it, every press is someone else's and the
+   * only question is whether it reached us at all.
+   */
+  function dismissOn(
+    keep: HTMLElement,
+    isInside: (node: Node | null) => boolean,
+    close: () => void,
+  ): () => void {
+    const inRoot = (e: Event): void => {
+      const path = e.composedPath();
+      if (path.includes(keep)) return;
+      if (path.some((n) => n instanceof Node && isInside(n))) return;
+      close();
+    };
+    const onPage = (e: Event): void => {
+      // Ours, so the listener above has already had its say.
+      const path = e.composedPath?.() ?? [];
+      if (path.includes(root.host)) return;
+      close();
+    };
+    root.addEventListener('pointerdown', inRoot, true);
+    document.addEventListener('pointerdown', onPage, true);
+    return () => {
+      root.removeEventListener('pointerdown', inRoot, true);
+      document.removeEventListener('pointerdown', onPage, true);
+    };
+  }
+
   function buildColour(spec: Spec): { el: HTMLElement; sync: () => void } {
     const wrap = document.createElement('div');
-    wrap.className = 'edit-field';
-    const swatch = document.createElement('input');
-    swatch.type = 'color';
+    wrap.className = 'edit-colour';
+
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
     swatch.className = 'edit-swatch';
-    swatch.setAttribute('aria-label', `${spec.label} colour`);
+    swatch.setAttribute('aria-haspopup', 'dialog');
+    swatch.setAttribute('aria-expanded', 'false');
+    swatch.setAttribute('aria-label', `Pick the ${spec.label.toLowerCase()} colour`);
+
     const hex = document.createElement('input');
     hex.type = 'text';
     hex.className = 'edit-hex';
     hex.spellcheck = false;
-    hex.setAttribute('aria-label', `${spec.label} colour, as hex`);
+    hex.setAttribute('aria-label', `${spec.label} colour`);
 
-    swatch.addEventListener('input', () => {
-      hex.value = swatch.value;
-      write(spec.prop, swatch.value);
+    let picker: Picker | null = null;
+    let undismiss: (() => void) | null = null;
+
+    function closePicker(): void {
+      undismiss?.();
+      undismiss = null;
+      picker?.destroy();
+      picker = null;
+      swatch.setAttribute('aria-expanded', 'false');
+    }
+
+    swatch.addEventListener('click', () => {
+      if (picker) { closePicker(); return; }
+      picker = createPicker(root, {
+        anchor: swatch,
+        value: hex.value || '#000000',
+        onChange: (value) => {
+          hex.value = value;
+          paint(value);
+          write(spec.prop, value);
+        },
+      });
+      swatch.setAttribute('aria-expanded', 'true');
+      undismiss = dismissOn(swatch, (n) => picker?.contains(n) ?? false, closePicker);
     });
+
     hex.addEventListener('change', () => {
       const value = hex.value.trim();
-      // Refused rather than applied blind: an unparseable colour written to an
-      // element is a transparent element, and the panel would have caused it.
-      if (!/^#?[0-9a-f]{3}$|^#?[0-9a-f]{6}$/i.test(value)) { sync(); return; }
-      const full = value.startsWith('#') ? value : `#${value}`;
-      swatch.value = full.length === 4
-        ? `#${full[1]}${full[1]}${full[2]}${full[2]}${full[3]}${full[3]}`
-        : full;
-      write(spec.prop, swatch.value);
+      /*
+       * Refused rather than applied blind: an unparseable colour written to an
+       * element is a transparent element, and the panel would have caused it.
+       * The parser is the picker's, so anything the picker can emit round-trips
+       * — oklch() and display-p3 included, which the old hex-only test dropped.
+       */
+      if (!parseColour(value)) { sync(); return; }
+      paint(value);
+      picker?.update(value);
+      write(spec.prop, value);
     });
+
+    function paint(value: string): void {
+      swatch.style.setProperty('--swatch', value);
+    }
 
     function sync(): void {
       const current = target ? readValue(target, spec.prop) : '';
-      const asHex = toHexInput(current);
-      swatch.value = asHex;
-      hex.value = asHex;
+      const parsed = parseColour(current);
+      /*
+       * Shown in the notation the page is written in where that parses, so a
+       * value the author wrote as oklch() does not come back as a hex
+       * approximation of itself the first time the panel looks at it.
+       */
+      const value = parsed ? formatColour(parsed, formatOf(current)) : current;
+      if (document.activeElement !== hex && root.activeElement !== hex) {
+        hex.value = value;
+      }
+      paint(value);
+      picker?.update(value);
     }
+
     wrap.append(swatch, hex);
+    colourTeardown.push(closePicker);
     return { el: wrap, sync };
   }
 
@@ -788,16 +948,48 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         name.className = 'edit-layer-name';
         name.textContent = `Layer ${index + 1}`;
 
-        const swatch = document.createElement('input');
-        swatch.type = 'color';
-        swatch.className = 'edit-swatch';
+        /*
+         * The same picker as the colour rows, not the operating system's. A
+         * shadow's colour is the half of it people actually tune, and the
+         * native dialog cannot express the translucent black almost every real
+         * shadow is - it has no alpha at all.
+         */
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'edit-swatch edit-swatch-solo';
+        swatch.setAttribute('aria-haspopup', 'dialog');
+        swatch.setAttribute('aria-expanded', 'false');
         swatch.setAttribute('aria-label', `Layer ${index + 1} colour`);
-        swatch.value = toHexInput(layer.colour);
-        swatch.addEventListener('input', () => {
-          layers[index] = { ...layer, colour: swatch.value };
-          layer = layers[index]!;
-          push();
+        swatch.style.setProperty('--swatch', layer.colour);
+        let layerPicker: Picker | null = null;
+        let unlisten: (() => void) | null = null;
+        const closeLayerPicker = (): void => {
+          unlisten?.();
+          unlisten = null;
+          layerPicker?.destroy();
+          layerPicker = null;
+          swatch.setAttribute('aria-expanded', 'false');
+        };
+        swatch.addEventListener('click', () => {
+          if (layerPicker) { closeLayerPicker(); return; }
+          layerPicker = createPicker(root, {
+            anchor: swatch,
+            value: layer.colour || 'rgb(0 0 0 / 0.2)',
+            onChange: (value) => {
+              swatch.style.setProperty('--swatch', value);
+              layers[index] = { ...layer, colour: value };
+              layer = layers[index]!;
+              push();
+            },
+          });
+          swatch.setAttribute('aria-expanded', 'true');
+          unlisten = dismissOn(
+            swatch,
+            (n) => layerPicker?.contains(n) ?? false,
+            closeLayerPicker,
+          );
         });
+        colourTeardown.push(closeLayerPicker);
 
         const insetBtn = document.createElement('button');
         insetBtn.type = 'button';
@@ -883,7 +1075,18 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       add.className = 'edit-add';
       add.textContent = layers.length === 0 ? 'Add a shadow' : 'Add another layer';
       add.addEventListener('click', () => {
-        layers = [...layers, { ...EMPTY_SHADOW }];
+        /*
+         * A second layer starts as a copy of the one above it, not from zero.
+         *
+         * Stacked shadows are almost always one shadow described twice - the
+         * same colour and offset at a different blur and spread, which is how
+         * every real elevation ramp is built. Starting from the defaults threw
+         * away the colour you had just chosen and made you set it again before
+         * you could see anything at all. Copying means the new layer is
+         * already in the same family, and the first drag is the difference you
+         * actually came to make.
+         */
+        layers = [...layers, { ...(layers[layers.length - 1] ?? EMPTY_SHADOW) }];
         push();
         render();
       });
@@ -995,18 +1198,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       field.appendChild(built.el);
     }
 
-    const revert = document.createElement('button');
-    revert.type = 'button';
-    revert.className = 'edit-revert';
-    revert.setAttribute('aria-label', `Revert ${spec.label.toLowerCase()}`);
-    revert.title = 'Put this back';
-    revert.appendChild(icon('undo', 13));
-    revert.addEventListener('click', () => {
-      if (!target) return;
-      for (const p of spec.sides ?? [spec.prop]) editor.revert(target, p);
-      for (const s of syncs) s();
-      markTouched();
-    });
+    /*
+     * No per-row revert.
+     *
+     * It appeared on any row the tool had written, which meant a control that
+     * came and went as you worked and shifted the row's contents when it did.
+     * Revert all in the footer is the escape hatch, and undo is the one people
+     * actually reach for.
+     */
 
     /*
      * Only the rows whose control cannot label itself get a leading label.
@@ -1040,6 +1239,10 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
      * wrapped underneath and read as a separate thing. Given the full width
      * they fit, and so do the four border styles.
      */
+    // Rows that are a group of controls rather than one, so the spacing can
+    // give them room the single rows do not need.
+    if (spec.sides || spec.kind === 'shadow') row.setAttribute('data-grouped', '');
+
     if (spec.sides || spec.kind === 'shadow' || spec.kind === 'choice') {
       // The glyph rides with the name, so a row whose control sits underneath
       // still leads with the same 15px column as one whose control is beside
@@ -1055,12 +1258,13 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     if (!labelled && !spec.sides && spec.kind !== 'shadow' && spec.kind !== 'choice') {
       line.appendChild(glyph);
     }
-    line.append(field, revert);
+    line.appendChild(field);
     row.appendChild(line);
     return { spec, el: row, sliders, scrubs, sync: () => { for (const s of syncs) s(); } };
   }
 
   function build(): void {
+    closePickers();
     for (const row of rows) {
       for (const s of row.sliders) s.destroy();
       for (const s of row.scrubs) s.destroy();
@@ -1078,6 +1282,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     }
 
     for (const group of GROUPS) {
+      if (group.when && !group.when(target)) continue;
       const specs = group.specs.filter((s) => showMore || !s.more);
       if (specs.length === 0) continue;
       const section = document.createElement('section');
@@ -1173,6 +1378,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       return editor.asPrompt();
     },
     destroy() {
+      closePickers();
       for (const row of rows) {
         for (const s of row.sliders) s.destroy();
         for (const s of row.scrubs) s.destroy();

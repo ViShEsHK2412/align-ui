@@ -5,6 +5,7 @@ import {
   GROUND, HAIRLINE, MOTION, ROW, SHADOW, SPACE, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
+import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
 import { formatColour, formatOf, parseColour } from './oklch';
 import {
@@ -225,7 +226,7 @@ export interface Controls {
  */
 const PANEL_W = 320;
 
-const CSS = PICKER_CSS + `
+const CSS = PICKER_CSS + DRAG_CSS + `
 /*
  * The reset the shadow root does not come with.
  *
@@ -679,6 +680,13 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
   revertBtn.className = 'edit-action';
   revertBtn.textContent = 'Revert all';
   foot.append(count, revertBtn, copyBtn);
+
+  /*
+   * The header is the handle, not the whole dock: the body is a column of
+   * sliders and scrub badges, every one of which is its own drag.
+   */
+  head.setAttribute('data-drag-handle', '');
+  const drag: Draggable = makeDraggable({ surface: dock });
 
   dock.append(head, body, foot);
   root.appendChild(dock);
@@ -1545,6 +1553,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       return editor.asPrompt();
     },
     destroy() {
+      drag.destroy();
       closePickers();
       for (const row of rows) {
         for (const s of row.sliders) s.destroy();

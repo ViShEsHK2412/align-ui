@@ -5,6 +5,7 @@ import {
   typographyOf,
 } from './inspect';
 import { bandsOf, fmt, scaleOf } from './measure';
+import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import {
   GROUND, HAIRLINE, MOTION, SHADOW, SHADOW_LIFTED, SPACE, surface, TEXT, TYPE,
   WEIGHT,
@@ -62,13 +63,21 @@ const NEWLINE = String.fromCharCode(10);
 
 const MARGIN = 16;      // gap from the viewport edge, and the drag clamp
 
-const CSS = `
+const CSS = DRAG_CSS + `
 .dock {
   /* No color-scheme here: the overlay sets it inline on the shadow host, from
      what the page actually looks like rather than what the machine prefers, and
      it inherits down. Declaring 'light dark' again would undo that and hand
      light-dark() back to the media query. */
-  position: fixed; left: ${MARGIN}px; top: 0;
+  /*
+   * Bottom-left by default, said in CSS rather than computed.
+   *
+   * This used to be top: 0 plus a transform that carried the whole position,
+   * with -1 standing for "not placed yet, put it at the bottom". The drag is
+   * shared now and it treats the transform as an offset from wherever the CSS
+   * puts a surface, so the default belongs here and the sentinel is gone.
+   */
+  position: fixed; left: ${MARGIN}px; bottom: ${MARGIN}px;
   /* Clamped to the window. A narrow viewport is not an edge case for this
      tool, it is the case it exists for: you make the window 375px wide
      precisely to check a mobile layout, and a readout that hangs off the
@@ -258,9 +267,14 @@ header .scale {
 }
 `;
 
-/** Where the user left it. Survives closing and reopening, not a reload. */
-let dockX = MARGIN;
-let dockY = -1;          // -1 means "not placed yet" → default to the bottom
+/**
+ * Where the user left it. Survives closing and reopening, not a reload.
+ *
+ * Module scope, because the panel is destroyed and rebuilt every time the tool
+ * is switched off and on, and a position that lived in the instance would walk
+ * back to the corner each time.
+ */
+let dockOffset = { dx: 0, dy: 0 };
 
 /** Set by the close button, cleared by the key. Outlives one panel instance. */
 let dismissed = false;
@@ -306,45 +320,19 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
   }
   root.appendChild(dock);
 
-  const clamp = (v: number, max: number) =>
-    Math.min(Math.max(v, MARGIN), Math.max(MARGIN, max - MARGIN));
+  /*
+   * The header is the handle, named by an attribute rather than held as an
+   * element: it is rebuilt on every reading, so a reference would be a drag
+   * bound to a node that has left the document.
+   */
+  const drag: Draggable = makeDraggable({
+    surface: dock,
+    margin: MARGIN,
+    initial: dockOffset,
+    onMove: () => { dockOffset = drag.offset(); },
+  });
+  const place = () => drag.place();
 
-  function place() {
-    const h = dock.offsetHeight || 300;
-    if (dockY < 0) dockY = Math.max(MARGIN, innerHeight - h - MARGIN);
-    dockX = clamp(dockX, innerWidth - dock.offsetWidth);
-    dockY = clamp(dockY, innerHeight - h);
-    dock.style.transform = `translate(${dockX - MARGIN}px, ${dockY}px)`;
-  }
-
-  // ── Drag ──────────────────────────────────────────────────────────────────
-  // Pointer capture keeps tracking when the cursor leaves the header, and the
-  // offset from where it was grabbed is preserved rather than snapping to
-  // centre. Feedback lands on pointer-down, not on release.
-  let from: { x: number; y: number; dx: number; dy: number } | null = null;
-
-  function onPointerDown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    from = { x: e.clientX, y: e.clientY, dx: dockX, dy: dockY };
-    dock.setAttribute('data-dragging', '');
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }
-
-  function onPointerMove(e: PointerEvent) {
-    if (!from) return;
-    dockX = from.dx + (e.clientX - from.x);
-    dockY = from.dy + (e.clientY - from.y);
-    place();
-  }
-
-  function onPointerUp() {
-    from = null;
-    dock.removeAttribute('data-dragging');
-  }
-
-  addEventListener('resize', place);
   let current: Box | null = null;
   /** The rest of the last reading, so a re-render can reproduce all of it. */
   let currentGaps: GapLine[] = [];
@@ -414,9 +402,6 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       close.className = 'close';
       close.textContent = '×';
       close.title = 'close (B brings it back)';
-      // The header is the drag handle, so the button has to claim its own
-      // pointerdown or a click on it would start a drag instead.
-      close.addEventListener('pointerdown', (e) => e.stopPropagation());
       close.addEventListener('click', (e) => {
         e.stopPropagation();
         dismissed = true;
@@ -433,10 +418,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
         header.appendChild(badge);
       }
       header.appendChild(close);
-      header.addEventListener('pointerdown', onPointerDown);
-      header.addEventListener('pointermove', onPointerMove);
-      header.addEventListener('pointerup', onPointerUp);
-      header.addEventListener('pointercancel', onPointerUp);
+      header.setAttribute('data-drag-handle', '');
 
       const content = document.createElement('div');
       content.className = 'content';
@@ -594,7 +576,7 @@ export function createBoxModel(root: ShadowRoot): BoxModel {
       else { place(); dock.setAttribute('data-open', ''); }
     },
     destroy() {
-      removeEventListener('resize', place);
+      drag.destroy();
       dock.remove();
       style.remove();
     },

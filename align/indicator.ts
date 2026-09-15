@@ -3,6 +3,7 @@ import {
   WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
+import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 
 /**
  * The badge, top-right, saying the tool is running. Clicking it opens the list
@@ -106,13 +107,15 @@ const ACK_MS = 900;
 export const FLAG_H = ROW;
 export const STEP = SPACE.base;
 
-const CSS = `
+const CSS = DRAG_CSS + `
 .flag {
   position: fixed; top: ${INSET}px; right: ${INSET}px;
   display: flex; align-items: center; gap: 8px;
   transition: top ${MOTION.ui};
   padding: ${(ROW - BTN) / 2}px 10px; border-radius: 0;
-  pointer-events: auto; user-select: none; cursor: pointer;
+  /* No cursor of its own: the bar is a drag handle and takes grab from the
+     shared rules, while the buttons on it keep their own pointer. */
+  pointer-events: auto; user-select: none;
   font-family: ${TYPE.stack};
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
@@ -413,6 +416,15 @@ ${t.what}`;
 
   root.append(flag, help);
 
+  /*
+   * The whole bar is the handle. It has no header to grab - it *is* the header
+   * - and its buttons opt out by being buttons, which the drag checks for.
+   * Its own click still works: nothing is claimed until the pointer has moved
+   * past the slop.
+   */
+  flag.setAttribute('data-drag-handle', '');
+  const drag: Draggable = makeDraggable({ surface: flag });
+
   return {
     acknowledge(name, ok) {
       const b = buttons.get(name);
@@ -462,6 +474,9 @@ ${t.what}`;
       return wasOpen;
     },
     destroy() {
-      for (const t of acks.values()) clearTimeout(t); flag.remove(); help.remove(); style.remove(); },
+      for (const t of acks.values()) clearTimeout(t);
+      drag.destroy();
+      flag.remove(); help.remove(); style.remove();
+    },
   };
 }

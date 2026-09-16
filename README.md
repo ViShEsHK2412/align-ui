@@ -14,7 +14,7 @@ exactly what you changed. Everything reverts when you disarm.
 
 - One line to install, one line to wire up
 - No runtime dependencies
-- 136 KB minified, 46 KB gzipped
+- 141 KB minified, 46 KB gzipped
 - Physically absent from production builds
 - Vite, Next.js, CRA, Remix, Astro, SvelteKit
 
@@ -137,6 +137,7 @@ the ticks they exist to show.
 | `K` | a 10px pixel grid, for reading an offset off the page |
 | `P` | pick a colour from anywhere on screen |
 | `E` | arm edit mode, and disarm it. Disarming puts everything back |
+| `N` | notes mode: click an element or drag an area to screenshot it and say what to fix |
 | `C` | copy the numbers in the panel |
 | `Ctrl/Cmd` while placing | ignore snapping |
 | `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
@@ -318,6 +319,65 @@ zero and the button releases itself, because the state is read back off the
 numbers rather than remembered.
 
 For a shadow on two opposite edges, use two layers.
+
+---
+
+## Notes
+
+The loop this replaces: take a screenshot, paste it into your agent, describe
+the fix, go back, repeat, once per problem. Notes turn that into one pass over
+the page and one paste.
+
+Press `N`. From then on, **click an element** or **drag over an area**, and
+align-ui screenshots exactly that, asks what should change, and leaves a
+numbered pin on the page. Stay in the mode and keep going. When you are done,
+**Copy prompt** puts every note on the clipboard as one block of Markdown,
+screenshots included. Paste it into Claude Code, or any agent that opens image
+paths it is given.
+
+```markdown
+### 1. `a.tab`
+
+Tab label sits 1px low
+
+![note 1](/work/app/.align/notes/note-1789571968708-86023ebd.png)
+
+- Selector: `a.tab` — "Two"
+- Path: `#nav > a.tab:nth-of-type(2)`
+- Size: 80×28 · padding 0 · border 0 · margin 0
+```
+
+A clicked element carries its text and a path that tells identical siblings
+apart, since four tabs are all `a.tab`. A dragged area names its container and
+the elements inside it. Anything edit mode changed on the element comes along,
+marked as tried in the browser but not yet in source.
+
+### Screenshots
+
+They are real pixels, taken with the browser's own tab sharing. Chrome asks
+once per session: choose **This tab**. It then shows its sharing bar while the
+tool is open. Redrawing the page instead would need no prompt, but it gets
+wrong the things design notes are usually about: `backdrop-filter`, blend
+modes, cross-origin images, video and canvas. The tool's own overlay is hidden
+for the moment each screenshot is taken.
+
+Decline the share and notes still work, just without pictures. Press `N` twice
+to be asked again.
+
+### Where they go
+
+With the Vite plugin, each screenshot is written to `.align/notes/` in your
+project, and the paste carries its absolute path. That folder brings its own
+`.gitignore`, so nothing reaches a commit and yours stays untouched. The
+endpoint exists only on the dev server, accepts only PNGs, refuses cross-site
+requests, and can only read or delete files it named itself.
+
+Without the plugin (Next.js, or the tool loaded some other way), screenshots
+download instead, and the paste names each file.
+
+Notes survive a reload, which matters: your agent editing the source is exactly
+what reloads the page. Click a pin to edit or delete its note. **Clear** takes
+two presses, because it also deletes the screenshots.
 
 ---
 

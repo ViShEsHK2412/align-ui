@@ -3,6 +3,7 @@ import { createHistory } from './history';
 import { mergeConfig, type Config } from './config';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
+import { createNoteBoard, type NoteBoard } from './noteboard';
 import { createEditor, type Editor } from './edit';
 import {
   boxOf, chainPairs, gapSegments, guideGapSegments, guideSegments, guideUnder, hitTest,
@@ -36,6 +37,7 @@ let boxmodel: BoxModel | null = null;
 let indicator: Indicator | null = null;
 let picker: Picker | null = null;
 let controls: Controls | null = null;
+let noteboard: NoteBoard | null = null;
 /**
  * The one thing here that outlives a session rather than a mount.
  *
@@ -317,6 +319,7 @@ function render(cursor?: { x: number; y: number }) {
   });
   indicator?.update(pinned.length, {
     edit: editor.armed,
+    notes: noteboard?.mode() ?? false,
     rulers,
     xray,
     grid,
@@ -419,6 +422,7 @@ function onTool(name: ToolName): void {
       // it has to be told rather than left showing the state before the revert.
       if (pinned.length) render();
       break;
+    case 'notes': noteboard?.setMode(!noteboard.mode()); break;
     case 'undo': undo(); break;
   }
   render();
@@ -717,10 +721,20 @@ function activate() {
   boxmodel = createBoxModel(overlay.root);
   indicator = createIndicator(overlay.root, onTool);
   controls = createControls(overlay.root, editor);
+  noteboard = createNoteBoard({
+    root: overlay.root,
+    cfg,
+    // Only what was changed on this element, so a note says what was tried on
+    // the thing it is about and nothing from elsewhere on the page.
+    changesFor: (el) => editor.changes()
+      .filter((c) => c.el === el)
+      .map(({ prop, from, to }) => ({ prop, from, to })),
+    onChange: () => render(),
+  });
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
-    hide: false, edit: false, canCopy: false, canUndo: false,
+    hide: false, edit: false, notes: false, canCopy: false, canUndo: false,
   });
   addEventListener('pointerdown', onPointerDownAny, { capture: true });
   addEventListener('pointerup', onPointerUpAny, { capture: true });
@@ -758,6 +772,8 @@ function deactivate() {
   indicator?.destroy();
   controls?.destroy();
   controls = null;
+  noteboard?.destroy();
+  noteboard = null;
   picker?.destroy();
   picker = null;
   // Never leave the page outlined because the tool was closed while x-ray was on.
@@ -798,6 +814,19 @@ function deactivate() {
  * invisible to a plain check.
  */
 function typing(e: KeyboardEvent): boolean {
+  /*
+   * Our own fields first. The overlay's root is closed, so from this listener
+   * on window the event's path stops at the host and composedPath()[0] is the
+   * host, never the input inside it. Every text field the tool owns was
+   * therefore invisible here: typing the hex colour #bec3fe fired b, c, e and
+   * f, and e disarmed edit mode and reverted every change. The root's own
+   * activeElement is readable to whoever holds the root, and we do.
+   */
+  const ours = overlay?.root.activeElement as HTMLElement | null | undefined;
+  if (ours && (ours.isContentEditable
+    || ours.tagName === 'INPUT' || ours.tagName === 'TEXTAREA' || ours.tagName === 'SELECT')) {
+    return true;
+  }
   const el = (e.composedPath?.()[0] ?? e.target) as HTMLElement | null;
   if (!el || typeof el !== 'object' || !('tagName' in el)) return false;
   if (el.isContentEditable) return true;
@@ -878,6 +907,12 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     onTool('edit');
     return;
+  } else if (overlay && e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // Notes. Not while a modifier is held: Ctrl+N is a new window, and taking
+    // it would be the tool eating a keystroke that was never meant for it.
+    e.preventDefault();
+    onTool('notes');
+    return;
   } else if (overlay && e.key.toLowerCase() === 'f') {
     // Hold the page still. Everything worth measuring that moves — a hover, a
     // dropdown mid-open, a skeleton — is unmeasurable until this exists.
@@ -929,6 +964,7 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape' && overlay) {
     // Escape dismisses the topmost thing first: help, then the locks, then the
     // tool itself.
+    if (noteboard?.escape()) return;
     if (picker?.close()) return;
     if (indicator?.closeHelp()) return;
     if (pinned.length) { pinned = []; boxmodel?.hide(); controls?.show(null); render(); }

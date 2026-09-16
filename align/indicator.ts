@@ -27,6 +27,8 @@ export interface ToolState {
    * say so louder than it says anything else.
    */
   edit: boolean;
+  /** Whether notes mode is catching clicks. */
+  notes: boolean;
   /** Whether the two one-shots have anything to act on right now. */
   canCopy: boolean;
   canUndo: boolean;
@@ -34,7 +36,7 @@ export interface ToolState {
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
 export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
-  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit';
+  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes';
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
@@ -318,6 +320,8 @@ const TOOLS: Tool[] = [
     what: 'sample a colour from anywhere on screen and match it against your palette' },
   { name: 'edit', label: 'Edit', key: 'E', toggle: true,
     what: 'let the panel change the page. Off until you say so, shown while it is on, and everything goes back when you turn it off' },
+  { name: 'notes', label: 'Notes', key: 'N', toggle: true,
+    what: 'click an element or drag an area to screenshot it and say what to fix. Copy prompt hands every note, pictures included, to your agent in one paste' },
   { name: 'undo', label: 'Undo', key: 'Ctrl/Cmd + Z', toggle: false,
     what: 'step back through the guides — a whole run of nudges counts as one' },
 ];

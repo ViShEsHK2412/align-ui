@@ -131,6 +131,8 @@ export declare const ICONS: {
      * the write is silent, and so is its refusal.
      */
     readonly check: readonly [Shape];
+    readonly notes: readonly [Shape, Shape, Shape];
+    readonly trash: readonly [Shape, Shape, Shape];
     readonly warning: readonly [Shape, Shape, Shape];
     readonly cross: readonly [Shape, Shape];
 };

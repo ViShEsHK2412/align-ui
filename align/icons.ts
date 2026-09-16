@@ -220,6 +220,17 @@ export const ICONS = {
    * the write is silent, and so is its refusal.
    */
   check: [p('M20 6 9 17l-5-5')],
+  // A speech bubble with a plus: say something about this, and add it to the pile.
+  notes: [
+    p('M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'),
+    p('M12 7v6'),
+    p('M9 10h6'),
+  ],
+  trash: [
+    p('M3 6h18'),
+    p('M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'),
+    p('M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'),
+  ],
   warning: [
     p('m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'),
     p('M12 9v4'),

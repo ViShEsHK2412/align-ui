@@ -110,3 +110,25 @@ export function loadPoint(name: string): { x: number; y: number } | null {
 export function savePoint(name: string, p: { x: number; y: number }): void {
   write(`${NS}:${name}`, JSON.stringify({ x: p.x, y: p.y }));
 }
+
+/**
+ * Notes, for the whole origin rather than per route.
+ *
+ * A batch of feedback usually spans pages — the header on the home page, the
+ * table on /billing — and each note records its own path. Keeping them per
+ * route would split one batch into several and make you copy each. They carry
+ * no images, only paths to them, so they stay small enough for storage.
+ */
+export function loadNotes(): unknown {
+  const raw = read(`${NS}:notes`);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function saveNotes(notes: unknown): void {
+  write(`${NS}:notes`, JSON.stringify(notes));
+}

@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Config } from './config';
+import { notesMiddleware, type Next } from './notes-server';
 
 /**
  * Vite plugin. The whole integration is one line in vite.config:
@@ -17,6 +18,10 @@ import type { Config } from './config';
 interface VitePluginLike {
   name: string;
   apply: 'serve';
+  configureServer(server: {
+    config: { root: string };
+    middlewares: { use(fn: (req: never, res: never, next: Next) => void): void };
+  }): void;
   transformIndexHtml(): {
     tag: string;
     attrs: Record<string, string>;
@@ -51,6 +56,16 @@ export default function align(options: Partial<Config> = {}): VitePluginLike {
   return {
     name: 'align-ui',
     apply: 'serve',
+
+    /*
+     * Notes send their screenshots here, and the files land in the project
+     * where a path to them means something. Serve-only like the rest of the
+     * plugin, so there is no endpoint in a build to find.
+     */
+    configureServer(server) {
+      const handle = notesMiddleware(server.config.root);
+      server.middlewares.use((req, res, next) => { void handle(req, res, next); });
+    },
 
     transformIndexHtml() {
       return [{

@@ -1,4 +1,5 @@
 import type { Config } from './config';
+import { type Next } from './notes-server';
 /**
  * Vite plugin. The whole integration is one line in vite.config:
  *
@@ -13,6 +14,14 @@ import type { Config } from './config';
 interface VitePluginLike {
     name: string;
     apply: 'serve';
+    configureServer(server: {
+        config: {
+            root: string;
+        };
+        middlewares: {
+            use(fn: (req: never, res: never, next: Next) => void): void;
+        };
+    }): void;
     transformIndexHtml(): {
         tag: string;
         attrs: Record<string, string>;

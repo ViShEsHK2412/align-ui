@@ -37,6 +37,15 @@ export interface Config {
      * is the way out when it guesses wrong.
      */
     theme: 'auto' | 'light' | 'dark';
+    /**
+     * Where notes send their screenshots, or null to always download them.
+     *
+     * The Vite plugin serves this path and writes each image into the project,
+     * which is what lets the copied notes carry real file paths. Anywhere it is
+     * not served — Next, or a Vite app loading the tool without the plugin — the
+     * first save finds that out and falls back to the downloads folder.
+     */
+    notesEndpoint: string | null;
 }
 export declare const DEFAULTS: Config;
 export declare function mergeConfig(partial?: Partial<Config>): Config;

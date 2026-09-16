@@ -19,12 +19,14 @@ export interface ToolState {
      * say so louder than it says anything else.
      */
     edit: boolean;
+    /** Whether notes mode is catching clicks. */
+    notes: boolean;
     /** Whether the two one-shots have anything to act on right now. */
     canCopy: boolean;
     canUndo: boolean;
 }
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes';
 export interface Indicator {
     update(locked: number, state: ToolState): void;
     /**

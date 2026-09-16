@@ -1,10 +1,15 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { cssStrings } from './css-strings.mjs';
 
 // A clean dist, so modules deleted from source can't linger as stale .d.ts.
 rmSync('dist', { recursive: true, force: true });
 
-const common = { bundle: true, format: 'esm', minify: true, logLevel: 'error' };
+const common = {
+  bundle: true, format: 'esm', minify: true, logLevel: 'error',
+  // Comments inside the CSS strings survive minification; see css-strings.mjs.
+  plugins: [cssStrings],
+};
 
 // The tool itself.
 await build({ ...common, entryPoints: ['align/index.ts'], outfile: 'dist/align.js' });

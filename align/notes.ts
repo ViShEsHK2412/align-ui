@@ -60,6 +60,15 @@ export interface Note {
    * share a selector. The container alone says where; this says what.
    */
   inside?: { selector: string; count: number; text?: string }[];
+  /**
+   * Where the area sits inside its element, as fractions of the element's box.
+   *
+   * Page coordinates follow scrolling and nothing else. Inside a canvas app the
+   * element moves when the canvas zooms or pans, and a pin held to the page
+   * stayed where the element used to be. Fractions of the element's own box
+   * scale with it, so the pin can be placed from wherever the element is now.
+   */
+  anchor?: { fx: number; fy: number; fw: number; fh: number };
   /** What edit mode had changed on that element when the note was taken. */
   changes?: { prop: string; from: string; to: string }[];
   /**
@@ -167,6 +176,22 @@ function linkTarget(path: string): string {
 }
 
 /**
+ * A comment, quoted line by line.
+ *
+ * The comment is the one part of the paste a person typed, and typed text can
+ * be Markdown. Pasted raw, a comment starting "### 99." forged a heading, so an
+ * agent reading the batch found a note 99 that does not exist, and an unclosed
+ * code fence swallowed every note after it. Quoted, a heading is text inside a
+ * quote and a fence ends where the quote does, so nothing typed can reach the
+ * structure around it. Blank lines stay inside the quote rather than ending it.
+ */
+export function quote(comment: string): string {
+  const text = comment.replace(/\r\n?/g, '\n').trim();
+  if (!text) return '> _(no comment)_';
+  return text.split('\n').map((line) => (line ? `> ${line}` : '>')).join('\n');
+}
+
+/**
  * The batch, as one paste.
  *
  * Grouped by page, in the order the notes were taken, because that is the
@@ -211,7 +236,7 @@ export function notesToMarkdown(notes: readonly Note[]): string {
           : `### ${note.n}. \`${note.target.label}\``;
       out.push(heading);
       out.push('');
-      out.push(note.comment.trim() || '_(no comment)_');
+      out.push(quote(note.comment));
       out.push('');
 
       if (note.image) {
@@ -297,6 +322,10 @@ export function reviveNotes(raw: unknown): Note[] {
       rect: { x: rect['x'], y: rect['y'], w: rect['w'], h: rect['h'] },
     };
     if (o['region'] === true) note.region = true;
+    const an = o['anchor'] as Record<string, unknown> | undefined;
+    if (an && isNum(an['fx']) && isNum(an['fy']) && isNum(an['fw']) && isNum(an['fh'])) {
+      note.anchor = { fx: an['fx'], fy: an['fy'], fw: an['fw'], fh: an['fh'] };
+    }
 
     const t = o['target'] as Record<string, unknown> | undefined;
     const size = t?.['size'] as Record<string, unknown> | undefined;
@@ -354,4 +383,146 @@ export function reviveNotes(raw: unknown): Note[] {
  */
 export function nextNumber(notes: readonly Note[]): number {
   return notes.reduce((m, n) => Math.max(m, n.n), 0) + 1;
+}
+
+/** Overlap over union: 1 for the same rectangle, 0 for disjoint ones. */
+export function iou(a: Rect, b: Rect): number {
+  const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  const y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  const inter = x * y;
+  const union = a.w * a.h + b.w * b.h - inter;
+  return union > 0 ? inter / union : 0;
+}
+
+/**
+ * Did this drag really mean one element?
+ *
+ * People drag around a thing as often as they click it, and a drag used to
+ * produce a vaguer note than a click on the same element: "region inside
+ * main.stage" rather than the tab, its text, its path and its box model — the
+ * numbers a note like "increase the padding" actually needs. The gesture should
+ * not decide how precise the note is.
+ *
+ * Two cases count as one element. The drag holds exactly one outermost
+ * element, however loosely it was drawn round it. Or it holds none but sits
+ * almost exactly on the element it is inside — a drag drawn just within a
+ * card's edges. Anything else is genuinely an area, and stays one.
+ *
+ * Returns the index of the outermost element meant, 'container', or null.
+ */
+export function subjectOf(
+  region: Rect,
+  outermost: readonly Rect[],
+  container: Rect | null,
+  fit = 0.6,
+): number | 'container' | null {
+  if (outermost.length === 1) return 0;
+  if (outermost.length === 0 && container && iou(region, container) >= fit) return 'container';
+  return null;
+}
+
+/**
+ * A drag held to the window.
+ *
+ * Pointer capture keeps a drag alive past the edge of the window, which is
+ * right for the gesture and wrong for the note: nothing out there can be
+ * pointed at, screenshotted or named. Unclamped, a drag half off the right edge
+ * stored an area the picture did not show and looked for its container at a
+ * centre point outside the page, where there is no element to find.
+ */
+export function clampToViewport(r: Rect, viewport: { w: number; h: number }): Rect {
+  const x = Math.max(0, Math.min(r.x, viewport.w));
+  const y = Math.max(0, Math.min(r.y, viewport.h));
+  const right = Math.max(0, Math.min(r.x + r.w, viewport.w));
+  const bottom = Math.max(0, Math.min(r.y + r.h, viewport.h));
+  return { x, y, w: right - x, h: bottom - y };
+}
+
+/**
+ * Where each pin goes, so every note stays reachable.
+ *
+ * A pin marks the corner of what a note is about, and two notes about the same
+ * element share a corner. Drawn there, the later pin covered the earlier one
+ * completely — three notes on one tab showed one pin, and the two beneath it
+ * could not be opened, edited or deleted. Colliding pins fan out to the right
+ * instead, in note order, so the first note keeps the true corner.
+ *
+ * Page coordinates in and out, so the fan does not reshuffle as you scroll.
+ */
+export function layoutPins(
+  anchors: readonly { x: number; y: number }[],
+  size: number,
+  gap = 2,
+): { x: number; y: number }[] {
+  const placed: { x: number; y: number }[] = [];
+  for (const a of anchors) {
+    const p = { x: a.x, y: a.y };
+    while (placed.some((q) => Math.abs(q.x - p.x) < size && Math.abs(q.y - p.y) < size)) {
+      p.x += size + gap;
+    }
+    placed.push(p);
+  }
+  return placed;
+}
+
+/**
+ * A pin's centre held inside the window.
+ *
+ * Centred on the corner it marks, a pin for anything flush with the window
+ * edge hung half outside it: note 20 read as "0". It is pulled in just far
+ * enough to be whole.
+ */
+export function clampPin(x: number, y: number, size: number, viewport: { w: number; h: number }) {
+  const half = size / 2 + 1;
+  return {
+    x: Math.min(Math.max(x, half), Math.max(half, viewport.w - half)),
+    y: Math.min(Math.max(y, half), Math.max(half, viewport.h - half)),
+  };
+}
+
+/** An area as fractions of the element it is inside. Null for an element with no size. */
+export function anchorIn(area: Rect, element: Rect): Note['anchor'] | null {
+  if (element.w <= 0 || element.h <= 0) return null;
+  return {
+    fx: (area.x - element.x) / element.w,
+    fy: (area.y - element.y) / element.h,
+    fw: area.w / element.w,
+    fh: area.h / element.h,
+  };
+}
+
+/** The same area, from wherever the element is now and however big it is drawn. */
+export function areaFrom(anchor: NonNullable<Note['anchor']>, element: Rect): Rect {
+  return {
+    x: element.x + anchor.fx * element.w,
+    y: element.y + anchor.fy * element.h,
+    w: anchor.fw * element.w,
+    h: anchor.fh * element.h,
+  };
+}
+
+/**
+ * How far the notes bar has to rise to clear the page's own bottom chrome.
+ *
+ * Bottom centre is where the bar starts, and it is also where canvas apps put
+ * their own toolbar: in the interaction lab the two sat exactly on top of each
+ * other. A blocker is anything painted under the bar that looks docked to the
+ * bottom rather than like content: its bottom edge near the window's, and short
+ * and narrow enough to be a toolbar rather than a page. Returns the distance
+ * from the window's bottom edge the bar should sit at, or null to stay put.
+ */
+export function barLift(
+  bar: Rect,
+  blockers: readonly Rect[],
+  viewport: { w: number; h: number },
+  gap = 8,
+): number | null {
+  let top = Infinity;
+  for (const b of blockers) {
+    const docked = b.y + b.h >= viewport.h - 120;
+    const compact = b.h <= 160 && b.w <= viewport.w * 0.9;
+    const overlaps = b.x < bar.x + bar.w && b.x + b.w > bar.x && b.y < bar.y + bar.h && b.y + b.h > bar.y;
+    if (docked && compact && overlaps) top = Math.min(top, b.y);
+  }
+  return top === Infinity ? null : viewport.h - top + gap;
 }

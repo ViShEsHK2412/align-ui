@@ -81,16 +81,22 @@ function readBody(req: Req): Promise<Uint8Array | null> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
     let size = 0;
+    /*
+     * Past the limit the rest is drained and dropped, not torn down.
+     *
+     * Destroying the request closed the socket before the 413 could be written,
+     * so an oversized upload got no answer at all — and a page reads a dead
+     * connection as "server unreachable" and falls back to a download instead
+     * of being told why. Draining costs the read, never the memory.
+     */
+    let over = false;
     req.on('data', (chunk: Uint8Array) => {
       size += chunk.length;
-      if (size > MAX_BYTES) {
-        req.destroy();
-        resolve(null);
-        return;
-      }
-      chunks.push(chunk);
+      if (size > MAX_BYTES) over = true;
+      if (!over) chunks.push(chunk);
     });
     req.on('end', () => {
+      if (over) { resolve(null); return; }
       const out = new Uint8Array(size);
       let at = 0;
       for (const c of chunks) { out.set(c, at); at += c.length; }
@@ -119,6 +125,21 @@ async function notesDir(root: string): Promise<string> {
 }
 
 export type Next = (err?: unknown) => void;
+
+/**
+ * The file name after the route, or '' when it cannot be decoded.
+ *
+ * decodeURIComponent throws on a malformed escape like "%E0%A4%A", and that
+ * surfaced as a 500 — a server error for what is only a bad request. An empty
+ * name fails the pattern check and is answered as the 400 it is.
+ */
+function nameFrom(url: string): string {
+  try {
+    return decodeURIComponent(url.slice(NOTES_ROUTE.length + 1));
+  } catch {
+    return '';
+  }
+}
 
 export function notesMiddleware(root: string) {
   return async function handle(req: Req, res: Res, next: Next): Promise<void> {
@@ -155,7 +176,7 @@ export function notesMiddleware(root: string) {
        * hand out a file this middleware made.
        */
       if (req.method === 'GET' && url.startsWith(NOTES_ROUTE + '/')) {
-        const file = decodeURIComponent(url.slice(NOTES_ROUTE.length + 1));
+        const file = nameFrom(url);
         if (!NOTE_FILE.test(file)) { send(res, 400, { error: 'bad name' }); return; }
         let bytes: Uint8Array;
         try {
@@ -172,7 +193,7 @@ export function notesMiddleware(root: string) {
       }
 
       if (req.method === 'DELETE' && url.startsWith(NOTES_ROUTE + '/')) {
-        const file = decodeURIComponent(url.slice(NOTES_ROUTE.length + 1));
+        const file = nameFrom(url);
         if (!NOTE_FILE.test(file)) { send(res, 400, { error: 'bad name' }); return; }
         try {
           await unlink(join(root, '.align', 'notes', file));

@@ -3,9 +3,12 @@ import { createTabCapture, type TabCapture } from './capture';
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { icon } from './icons';
 import { selectorOf } from './inspect';
-import { bandsOf, boxOf, hitTest } from './measure';
+import { bandsOf, boxOf, hitTestThrough } from './measure';
 import {
-  nextNumber, notesToMarkdown, rectFrom, reviveNotes, type Note, type Rect,
+  anchorIn, areaFrom, barLift, clampPin, clampToViewport, layoutPins, nextNumber, notesToMarkdown,
+  rectFrom, reviveNotes,
+  subjectOf,
+  type Note, type Rect,
 } from './notes';
 import { loadNotes, saveNotes } from './store';
 import {
@@ -51,6 +54,8 @@ const MIN_AREA = 6;
 /** Context kept around a clicked element, so its edges are in the picture. */
 const CLICK_PAD = 8;
 const PIN = 20;
+/** The tallest the comment box grows before it scrolls: about twelve lines. */
+const TEXT_MAX = 240;
 
 export const NOTES_CSS = `
 /*
@@ -143,16 +148,50 @@ export const NOTES_CSS = `
 }
 .nb-shot img { display: block; max-width: 100%; max-height: 132px; object-fit: contain; }
 
+/*
+ * Grows with what you write, from three lines to about twelve, then scrolls.
+ *
+ * field-sizing does the growing where the browser has it; a small script does
+ * it where not. No resize grip: a box that already fits its text has nothing
+ * to drag, and the grip was a second, fussier way to get the same thing.
+ */
 .nb-text {
-  width: 100%; min-height: 64px; max-height: 200px;
-  resize: vertical;
+  display: block;
+  width: 100%;
+  min-height: ${Math.round(TYPE.body * 1.45 * 3 + SPACE.base * 2)}px;
+  max-height: ${TEXT_MAX}px;
+  field-sizing: content;
+  resize: none;
+  overflow-y: auto;
   padding: ${SPACE.base}px;
   border: 0; border-radius: 0;
   background: ${surface(1)}; color: ${TEXT.primary};
   font: inherit; font-size: ${TYPE.body}px; line-height: 1.45;
+  overflow-wrap: anywhere;
+  caret-color: ${TEXT.primary};
 }
-.nb-text::placeholder { color: ${TEXT.secondary}; }
+.nb-text::placeholder { color: ${TEXT.secondary}; opacity: 1; }
 .nb-text:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
+.nb-text::selection { background: ${surface(6)}; color: ${TEXT.primary}; }
+
+/*
+ * A 3px bar, invisible until the box is hovered or being typed in.
+ *
+ * WebKit rules only, and deliberately no scrollbar-width alongside them:
+ * Chromium 121 and later ignore every ::-webkit-scrollbar rule on an element
+ * that sets the standard property, and the standard "thin" is still around
+ * eleven pixels there. Firefox, which has no pseudo-element, gets the standard
+ * property on its own below.
+ */
+.nb-text::-webkit-scrollbar { width: 3px; }
+.nb-text::-webkit-scrollbar-track { background: transparent; }
+.nb-text::-webkit-scrollbar-thumb { background: transparent; border-radius: 0; }
+.nb-text:hover::-webkit-scrollbar-thumb,
+.nb-text:focus::-webkit-scrollbar-thumb { background: ${surface(6)}; }
+@supports not selector(::-webkit-scrollbar) {
+  .nb-text { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .nb-text:hover, .nb-text:focus { scrollbar-color: ${surface(6)} transparent; }
+}
 
 .nb-row { display: flex; align-items: center; gap: ${SPACE.tight}px; }
 .nb-grow { flex: 1; min-width: 0; }
@@ -205,12 +244,29 @@ export const NOTES_CSS = `
   user-select: none;
 }
 .nb-bar[data-open] { display: flex; }
-.nb-bar .nb-label { display: flex; align-items: center; gap: 6px; font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium}; }
-.nb-bar .nb-label svg { color: ${TEXT.secondary}; }
+.nb-bar .nb-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
+  white-space: nowrap;
+}
+/* A flex child shrinks by default, and an icon has no content to stop it. */
+.nb-bar .nb-label svg { flex: none; color: ${TEXT.secondary}; }
 .nb-sep { width: 1px; align-self: stretch; margin: 2px 0; background: ${HAIRLINE}; }
+/*
+ * Its own row, under the controls, and never truncated.
+ *
+ * It sat inline with an ellipsis, and every message that mattered was cut
+ * exactly before its instruction: "That share was not this tab. Screenshots…"
+ * with "press N twice to share again" lost off the end. It also squeezed the
+ * label beside it onto two lines. A message is only ever shown because
+ * something needs saying, so it gets the width to say it.
+ */
+.nb-bar { flex-wrap: wrap; max-width: min(520px, calc(100vw - ${SPACE.edge * 2}px)); }
 .nb-status {
-  font-size: ${TYPE.tag}px; color: ${TEXT.secondary};
-  max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  order: 10;
+  flex-basis: 100%;
+  padding: 2px ${SPACE.tight}px ${SPACE.tight}px 0;
+  font-size: ${TYPE.tag}px; line-height: 1.4; color: ${TEXT.secondary};
 }
 .nb-status:empty { display: none; }
 
@@ -324,7 +380,51 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     copy.disabled = n === 0;
     clear.disabled = n === 0;
     done.hidden = !on;
-    if (show) requestAnimationFrame(() => drag.place());
+    if (show) requestAnimationFrame(() => { clearPageChrome(); drag.place(); });
+  }
+
+  /** Painted: has a fill or a shadow, so it is something you can see sitting there. */
+  function painted(node: Element): boolean {
+    const cs = getComputedStyle(node);
+    const bg = cs.backgroundColor.replace(/\s+/g, '');
+    const clear = bg === 'transparent' || bg === 'rgba(0,0,0,0)' || /\/0\)$|,0\)$/.test(bg);
+    return !clear || cs.boxShadow !== 'none';
+  }
+
+  /**
+   * Start the bar above whatever the page docks at the bottom.
+   *
+   * Only while you have not moved it: a bar you dragged is where you want it.
+   * Sampled with elementsFromPoint across the bar's own area, then walked up to
+   * the first painted ancestor, because a toolbar's buttons are what the point
+   * hits and the toolbar is what has a size worth clearing.
+   */
+  function clearPageChrome(): void {
+    if (drag.moved()) return;
+    bar.style.bottom = '';
+    const r = bar.getBoundingClientRect();
+    if (!r.width) return;
+    const blockers: Rect[] = [];
+    const seen = new Set<Element>();
+    for (const fx of [0.1, 0.5, 0.9]) {
+      for (const fy of [0.25, 0.75]) {
+        for (const hit of document.elementsFromPoint(r.left + r.width * fx, r.top + r.height * fy)) {
+          if (hit === host || hit === document.body || hit === document.documentElement) continue;
+          let node: Element | null = hit;
+          while (node && node !== document.body && !painted(node)) node = node.parentElement;
+          if (!node || node === document.body || seen.has(node)) continue;
+          seen.add(node);
+          const b = node.getBoundingClientRect();
+          blockers.push({ x: b.left, y: b.top, w: b.width, h: b.height });
+        }
+      }
+    }
+    const lift = barLift(
+      { x: r.left, y: r.top, w: r.width, h: r.height },
+      blockers,
+      { w: innerWidth, h: innerHeight },
+    );
+    if (lift !== null) bar.style.bottom = `${lift}px`;
   }
 
   function renderPins(): void {
@@ -334,8 +434,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       pin.setAttribute('aria-label', `Note ${note.n}: ${note.comment.slice(0, 60)}`);
       pin.title = note.comment;
       pin.dataset['id'] = note.id;
-      pin.addEventListener('pointerenter', () => showArea(note.rect));
-      pin.addEventListener('pointerleave', () => area.removeAttribute('data-on'));
+      pin.addEventListener('pointerenter', () => { hoveredPin = note.id; showArea(note); });
+      pin.addEventListener('pointerleave', () => { hoveredPin = null; area.removeAttribute('data-on'); });
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
         openComposer({ note });
@@ -345,20 +445,101 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     place();
   }
 
-  /** Pins and the hovered area follow the page as it scrolls. */
+  /**
+   * The element each note is about, found again after a reload.
+   *
+   * Held while the page lives; after a reload it is looked up by the path the
+   * note recorded, and that path is only trusted if what it finds still has the
+   * note's selector. A note whose element cannot be found falls back to the page
+   * position it was taken at.
+   */
+  const elements = new Map<string, Element>();
+  function elementOf(note: Note): Element | null {
+    const held = elements.get(note.id);
+    if (held?.isConnected) return held;
+    const t = note.target;
+    if (!t) return null;
+    for (const query of [t.path, t.selector]) {
+      if (!query) continue;
+      try {
+        const found = document.querySelector(query);
+        if (found && selectorOf(found) === t.selector) {
+          elements.set(note.id, found);
+          return found;
+        }
+      } catch {
+        /* a path written by an older version may not parse */
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Where a note's area is right now, in viewport pixels.
+   *
+   * From the element's live box when it can be found, so a canvas that zooms or
+   * pans takes the pin with it; from the page position otherwise, which still
+   * follows scrolling.
+   */
+  function areaOf(note: Note): Rect {
+    const found = elementOf(note);
+    if (found) {
+      const b = found.getBoundingClientRect();
+      const live = { x: b.left, y: b.top, w: b.width, h: b.height };
+      return note.anchor ? areaFrom(note.anchor, live) : live;
+    }
+    return { x: note.rect.x - scrollX, y: note.rect.y - scrollY, w: note.rect.w, h: note.rect.h };
+  }
+
   function place(): void {
-    for (const pin of Array.from(pins.children) as HTMLElement[]) {
-      const note = notes.find((n) => n.id === pin.dataset['id']);
-      if (!note) continue;
-      pin.style.translate = `${note.rect.x - scrollX}px ${note.rect.y - scrollY}px`;
+    const els = Array.from(pins.children) as HTMLElement[];
+    const shown = els
+      .map((pin) => notes.find((n) => n.id === pin.dataset['id']))
+      .filter((n): n is Note => Boolean(n));
+    const viewport = { w: innerWidth, h: innerHeight };
+    const areas = new Map(shown.map((n) => [n.id, areaOf(n)]));
+    /*
+     * Only notes whose area is on screen get a pin; a note about something you
+     * cannot see has nothing to point at. Held inside the window first, fanned
+     * out second, because fanning what will actually be drawn is the only order
+     * that cannot re-create a collision at the edge.
+     */
+    const onScreen = shown.filter((n) => {
+      const a = areas.get(n.id)!;
+      return a.x + a.w > 0 && a.y + a.h > 0 && a.x < viewport.w && a.y < viewport.h;
+    });
+    const spots = layoutPins(
+      onScreen.map((n) => { const a = areas.get(n.id)!; return clampPin(a.x, a.y, PIN, viewport); }),
+      PIN,
+    );
+    for (const pin of els) {
+      const i = onScreen.findIndex((n) => n.id === pin.dataset['id']);
+      const display = i < 0 ? 'none' : '';
+      if (pin.style.display !== display) pin.style.display = display;
+      if (i < 0) continue;
+      const translate = Math.round(spots[i]!.x) + 'px ' + Math.round(spots[i]!.y) + 'px';
+      // Written only when it moved: this runs every frame.
+      if (pin.style.translate !== translate) pin.style.translate = translate;
+    }
+    if (hoveredPin) {
+      const note = notes.find((n) => n.id === hoveredPin);
+      if (note) showArea(note);
     }
   }
 
+  /*
+   * Every frame while there are pins, not on scroll. A canvas zoom or pan
+   * moves the elements without scrolling anything, so no event says a pin is
+   * now in the wrong place; reading the boxes each frame is the only signal
+   * that covers every way an element can move.
+   */
   let placing = 0;
-  const onScroll = (): void => {
-    if (placing) return;
-    placing = requestAnimationFrame(() => { placing = 0; place(); });
-  };
+  let hoveredPin: string | null = null;
+  function tick(): void {
+    placing = 0;
+    if (pins.childElementCount > 0) place();
+    placing = requestAnimationFrame(tick);
+  }
 
   function box(node: HTMLElement, r: Rect): void {
     node.style.translate = `${r.x}px ${r.y}px`;
@@ -366,8 +547,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     node.style.height = `${r.h}px`;
   }
 
-  function showArea(pageRect: Rect): void {
-    box(area, { ...pageRect, x: pageRect.x - scrollX, y: pageRect.y - scrollY });
+  function showArea(note: Note): void {
+    box(area, areaOf(note));
     area.setAttribute('data-on', '');
   }
 
@@ -384,7 +565,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   function elementAt(x: number, y: number): Element | null {
     layer.style.pointerEvents = 'none';
     try {
-      return hitTest(x, y, cfg)?.el ?? null;
+      return hitTestThrough(x, y, cfg)?.el ?? null;
     } finally {
       layer.style.pointerEvents = '';
     }
@@ -450,7 +631,10 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     hoverBox.removeAttribute('data-on');
     if (layer.hasPointerCapture(e.pointerId)) layer.releasePointerCapture(e.pointerId);
 
-    const dragged = rectFrom(from.x, from.y, e.clientX, e.clientY);
+    const dragged = clampToViewport(
+      rectFrom(from.x, from.y, e.clientX, e.clientY),
+      { w: innerWidth, h: innerHeight },
+    );
     if (wasBand && dragged.w >= MIN_AREA && dragged.h >= MIN_AREA) {
       void take(dragged, containerOf(dragged), true);
       return;
@@ -478,8 +662,12 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     url?: string;
     /** Measured when the area was dragged, before any scrolling could move it. */
     inside?: NonNullable<Note['inside']>;
+    /** The area inside its element, measured at the same moment. */
+    anchor?: NonNullable<Note['anchor']>;
   }
   let draft: Draft | null = null;
+  /** Where the open composer is anchored, so it can be re-placed as it grows. */
+  let anchor: Rect | null = null;
 
   /**
    * Hide the whole tool for the length of a screenshot.
@@ -499,6 +687,29 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   }
 
   async function take(region: Rect, target: Element | null, isRegion: boolean): Promise<void> {
+    /*
+     * Measured before the screenshot, not after: the capture waits for a fresh
+     * frame, and a page that scrolls in that time would move what the drag was
+     * drawn around.
+     */
+    let inside: NonNullable<Note['inside']> | undefined;
+    if (isRegion) {
+      const found = outermostIn(region, target);
+      const rectOf = (e: Element) => {
+        const b = e.getBoundingClientRect();
+        return { x: b.left, y: b.top, w: b.width, h: b.height };
+      };
+      const subject = subjectOf(region, found.map(rectOf), target ? rectOf(target) : null);
+      if (subject === 0) {
+        target = found[0]!;
+        isRegion = false;
+      } else if (subject === 'container') {
+        isRegion = false;
+      } else {
+        inside = grouped(found);
+      }
+    }
+
     let blob: Blob | null = null;
     if (capture.active()) {
       const crop = isRegion ? region : {
@@ -514,7 +725,12 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       }
     }
     const d: Draft = { region, target, isRegion, blob };
-    if (isRegion) d.inside = insideOf(region, target);
+    if (inside) d.inside = inside;
+    if (target) {
+      const b = target.getBoundingClientRect();
+      const a = anchorIn(region, { x: b.left, y: b.top, w: b.width, h: b.height });
+      if (a) d.anchor = a;
+    }
     openComposer(d);
   }
 
@@ -553,16 +769,17 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     }
 
     text.value = d.note?.comment ?? '';
+    // Sized for what is already in it, so an edited long note opens at its length.
+    requestAnimationFrame(fit);
     del.hidden = !editing;
     save.textContent = editing ? 'Update' : 'Save';
     save.disabled = false;
     composer.setAttribute('data-open', '');
 
-    const anchor = d.note
-      ? { x: d.note.rect.x - scrollX, y: d.note.rect.y - scrollY, w: d.note.rect.w, h: d.note.rect.h }
-      : d.region!;
-    if (d.note) showArea(d.note.rect);
-    positionComposer(anchor);
+    const target = d.note ? areaOf(d.note) : d.region!;
+    if (d.note) showArea(d.note);
+    anchor = target;
+    positionComposer(target);
     text.focus({ preventScroll: true });
   }
 
@@ -697,7 +914,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
    * same thing six times. Bounded, because a region dragged across a large page
    * would otherwise walk every element on it for a note nobody reads to the end.
    */
-  function insideOf(r: Rect, container: Element | null): NonNullable<Note['inside']> {
+  function outermostIn(r: Rect, container: Element | null): Element[] {
     const scope = container ?? document.body;
     const found: Element[] = [];
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT);
@@ -711,6 +928,10 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       if (b.left >= r.x - 1 && b.top >= r.y - 1
         && b.right <= r.x + r.w + 1 && b.bottom <= r.y + r.h + 1) found.push(e);
     }
+    return found;
+  }
+
+  function grouped(found: readonly Element[]): NonNullable<Note['inside']> {
     const groups = new Map<string, { selector: string; count: number; text?: string }>();
     for (const e of found) {
       const selector = selectorOf(e);
@@ -724,9 +945,25 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     return Array.from(groups.values()).slice(0, 8);
   }
 
+  /**
+   * A save in progress. Enter on a held key repeats in milliseconds, and each
+   * repeat used to start another save of the same draft while the first was
+   * still uploading, so one note could land twice with two screenshots.
+   */
+  let saving = false;
+
   async function commit(): Promise<void> {
     const d = draft;
-    if (!d) return;
+    if (!d || saving) return;
+    saving = true;
+    try {
+      await commitDraft(d);
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function commitDraft(d: Draft): Promise<void> {
     const comment = text.value.trim();
 
     if (d.note) {
@@ -753,7 +990,9 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       note.region = true;
       if (d.inside?.length) note.inside = d.inside;
     }
+    if (d.anchor) note.anchor = d.anchor;
     if (d.target) {
+      elements.set(note.id, d.target);
       note.target = targetData(d.target);
       const changes = changesFor(d.target);
       if (changes.length) note.changes = changes;
@@ -780,6 +1019,22 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   }
 
   // ── Composer controls ─────────────────────────────────────────────────────
+
+  /*
+   * Growing without field-sizing, and staying on screen either way.
+   *
+   * A box that grows downwards can push the composer's buttons off the bottom
+   * of the window, so each change re-places it against the thing it is about.
+   */
+  const grows = typeof CSS !== 'undefined' && CSS.supports?.('field-sizing', 'content');
+  function fit(): void {
+    if (!grows) {
+      text.style.height = 'auto';
+      text.style.height = `${Math.min(text.scrollHeight, TEXT_MAX)}px`;
+    }
+    if (anchor && composer.hasAttribute('data-open')) positionComposer(anchor);
+  }
+  text.addEventListener('input', fit);
 
   text.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -878,8 +1133,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     }
   }
 
-  addEventListener('scroll', onScroll, { capture: true, passive: true });
-  addEventListener('resize', onScroll);
+  placing = requestAnimationFrame(tick);
+  addEventListener('resize', place);
   renderPins();
   renderBar();
 
@@ -897,8 +1152,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       clearTimeout(clearArmed);
       cancelAnimationFrame(placing);
       cancelAnimationFrame(hovering);
-      removeEventListener('scroll', onScroll, { capture: true });
-      removeEventListener('resize', onScroll);
+      removeEventListener('resize', place);
       closeComposer();
       capture.stop();
       drag.destroy();

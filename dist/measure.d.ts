@@ -27,7 +27,10 @@ export declare function sharedScale(a: Box, b: Box): {
  * `document.elementFromPoint` stops at a shadow host, so a web component would
  * otherwise only ever measure as one opaque box — no good on a page built from
  * Lit or Shoelace components. Descending through open roots measures the real
- * element instead. Closed roots stay closed, including our own overlay.
+ * element instead. Closed roots stay closed.
+ *
+ * Except ours, which is open now, so the descent stops at anything the tool is
+ * told to ignore. Otherwise hovering the toolbar would measure the toolbar.
  */
 export declare function hitTest(x: number, y: number, cfg: Config): Box | null;
 export declare function bandsOf(el: Element): Bands;
@@ -205,3 +208,38 @@ export interface Scale {
 export declare function scaleFromTransform(t: string): Scale;
 /** Every scale between an element and the document, multiplied together. */
 export declare function scaleOf(el: Element): Scale;
+/**
+ * Is this an invisible element that exists only to catch the pointer?
+ *
+ * Canvas apps lay an empty, transparent layer over their content so a press
+ * pans or selects instead of reaching the page beneath — the interaction lab
+ * puts one over every screen. Hit testing then finds the shield, and a note
+ * about a button came back as a note about a div that draws nothing.
+ *
+ * It has to draw nothing at all to count: no children, no text, no background,
+ * no border, no shadow, and not a replaced element that paints by itself. Pure,
+ * so the rule can be tested without a layout.
+ */
+export declare function isHitCatcher(el: {
+    tag: string;
+    children: number;
+    text: string;
+    background: string;
+    backgroundImage: string;
+    borderWidths: readonly number[];
+    boxShadow: string;
+    outlineWidth: number;
+}): boolean;
+/**
+ * Like hitTest, but sees through invisible layers laid over the content.
+ *
+ * Walks every element under the point from the top down, skips our own UI,
+ * anything ignored, and anything that catches the pointer without drawing,
+ * and takes the first element that is actually part of what you are looking at.
+ */
+export declare function hitTestThrough(x: number, y: number, cfg: Config): Box | null;
+/**
+ * The deepest descendant containing the point, found by box rather than by
+ * hit testing. Later siblings win ties, since they paint on top.
+ */
+export declare function deepestAt(el: Element, x: number, y: number, skip?: (child: Element) => boolean): Element;

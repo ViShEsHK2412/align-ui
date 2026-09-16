@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  frameCrop, looksLikeThisTab, nextNumber, notesToMarkdown, outputSize,
-  rectFrom, reviveNotes, shorthand, type Note,
+  frameCrop, iou, looksLikeThisTab, nextNumber, notesToMarkdown, outputSize,
+  anchorIn, areaFrom, barLift, clampPin, clampToViewport, layoutPins, quote, rectFrom, reviveNotes, shorthand, subjectOf, type Note,
 } from './notes';
 
 const note = (p: Partial<Note> = {}): Note => ({
@@ -112,7 +112,7 @@ describe('notesToMarkdown', () => {
       },
     })]);
     expect(md).toContain('# UI feedback — 1 note');
-    expect(md).toContain('too loud');
+    expect(md).toContain('> too loud');
     expect(md).toContain('![note 1](/work/app/.align/notes/note-1.png)');
     expect(md).toContain('- Selector: `main > button.cta`');
     expect(md).toContain('180×44 · padding 12 20 · border 1 · margin 0');
@@ -225,5 +225,171 @@ describe('nextNumber', () => {
   it('starts at one and continues past the highest', () => {
     expect(nextNumber([])).toBe(1);
     expect(nextNumber([note({ n: 1 }), note({ n: 4 })])).toBe(5);
+  });
+});
+
+describe('subjectOf', () => {
+  const R = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+
+  it('treats a loose drag around one element as that element', () => {
+    // Your note 2: a 104.8x43.2 drag around the 80x28 "One" tab.
+    expect(subjectOf(R(464, 57.4, 104.8, 43.2), [R(476, 64, 80, 28)], R(0, 40, 1521, 1400))).toBe(0);
+  });
+
+  it('keeps a drag over several elements an area', () => {
+    expect(subjectOf(R(0, 0, 300, 300), [R(10, 10, 50, 50), R(100, 10, 50, 50)], null)).toBeNull();
+  });
+
+  it('treats a drag drawn just inside an element as that element', () => {
+    expect(subjectOf(R(22, 22, 196, 96), [], R(20, 20, 200, 100))).toBe('container');
+  });
+
+  it('keeps a small drag inside a big container an area', () => {
+    // Empty space in the middle of a page: not a claim about the page.
+    expect(subjectOf(R(400, 300, 120, 80), [], R(0, 0, 1500, 1400))).toBeNull();
+  });
+
+  it('keeps an empty drag with no container an area', () => {
+    expect(subjectOf(R(0, 0, 10, 10), [], null)).toBeNull();
+  });
+});
+
+describe('iou', () => {
+  it('is 1 for the same rectangle and 0 for disjoint ones', () => {
+    const a = { x: 0, y: 0, w: 10, h: 10 };
+    expect(iou(a, a)).toBe(1);
+    expect(iou(a, { x: 20, y: 20, w: 5, h: 5 })).toBe(0);
+    expect(iou(a, { x: 5, y: 0, w: 10, h: 10 })).toBeCloseTo(50 / 150, 6);
+  });
+});
+
+describe('clampToViewport', () => {
+  const vp = { w: 1036, h: 647 };
+  it('trims a drag that ran off the right and bottom edges', () => {
+    expect(clampToViewport({ x: 1000, y: 600, w: 150, h: 120 }, vp)).toEqual({ x: 1000, y: 600, w: 36, h: 47 });
+  });
+  it('trims a drag that started off the top-left', () => {
+    expect(clampToViewport({ x: -40, y: -10, w: 100, h: 50 }, vp)).toEqual({ x: 0, y: 0, w: 60, h: 40 });
+  });
+  it('leaves nothing of a drag entirely outside', () => {
+    const r = clampToViewport({ x: 2000, y: 10, w: 50, h: 50 }, vp);
+    expect(r.w).toBe(0);
+  });
+  it('leaves an on-screen drag alone', () => {
+    const r = { x: 10, y: 10, w: 100, h: 100 };
+    expect(clampToViewport(r, vp)).toEqual(r);
+  });
+});
+
+describe('quote', () => {
+  it('stops a typed heading forging a note', () => {
+    const md = notesToMarkdown([note({ n: 2, comment: '### 99. Fake heading\nsecond line' })]);
+    // Exactly one real heading per note, and the typed one is inside a quote.
+    expect(md.match(/^### /gm)).toHaveLength(1);
+    expect(md).toContain('> ### 99. Fake heading\n> second line');
+  });
+
+  it('keeps an unclosed fence from swallowing the notes after it', () => {
+    const md = notesToMarkdown([
+      note({ id: 'a', n: 1, comment: 'look ``` here' }),
+      note({ id: 'b', n: 2, comment: 'next' }),
+    ]);
+    expect(md).toContain('> look ``` here');
+    expect(md).toContain('### 2. Region');
+  });
+
+  it('keeps blank lines inside the quote', () => {
+    expect(quote('one\n\ntwo')).toBe('> one\n>\n> two');
+  });
+
+  it('normalises Windows line endings', () => {
+    expect(quote('a\r\nb')).toBe('> a\n> b');
+  });
+
+  it('says so when there is nothing to quote', () => {
+    expect(quote('   ')).toBe('> _(no comment)_');
+  });
+});
+
+describe('layoutPins', () => {
+  it('fans out pins that share a corner, first note keeps the corner', () => {
+    const out = layoutPins([{ x: 100, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 50 }], 20);
+    expect(out).toEqual([{ x: 100, y: 50 }, { x: 122, y: 50 }, { x: 144, y: 50 }]);
+  });
+  it('leaves pins that do not collide exactly where they are', () => {
+    const anchors = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }];
+    expect(layoutPins(anchors, 20)).toEqual(anchors);
+  });
+  it('treats near misses as collisions, since a pin 5px over still hides the number', () => {
+    const out = layoutPins([{ x: 100, y: 50 }, { x: 105, y: 53 }], 20);
+    expect(Math.abs(out[1]!.x - out[0]!.x)).toBeGreaterThanOrEqual(20);
+  });
+  it('keeps fanning past a pin already sitting in the next slot', () => {
+    const out = layoutPins([{ x: 100, y: 0 }, { x: 122, y: 0 }, { x: 100, y: 0 }], 20);
+    expect(out[2]).toEqual({ x: 144, y: 0 });
+  });
+});
+
+describe('clampPin', () => {
+  const vp = { w: 1000, h: 600 };
+  it('pulls a pin at the left or top edge fully inside', () => {
+    expect(clampPin(0, 0, 20, vp)).toEqual({ x: 11, y: 11 });
+  });
+  it('pulls a pin past the right or bottom edge fully inside', () => {
+    expect(clampPin(1000, 600, 20, vp)).toEqual({ x: 989, y: 589 });
+  });
+  it('leaves a pin well inside alone', () => {
+    expect(clampPin(300, 200, 20, vp)).toEqual({ x: 300, y: 200 });
+  });
+});
+
+describe('anchorIn and areaFrom', () => {
+  const el = { x: 100, y: 200, w: 400, h: 100 };
+  const area = { x: 150, y: 220, w: 80, h: 30 };
+
+  it('round-trips while the element stays put', () => {
+    expect(areaFrom(anchorIn(area, el)!, el)).toEqual(area);
+  });
+
+  it('follows the element when a canvas zooms it to half size and pans it', () => {
+    const zoomed = { x: 10, y: 20, w: 200, h: 50 };
+    expect(areaFrom(anchorIn(area, el)!, zoomed)).toEqual({ x: 35, y: 30, w: 40, h: 15 });
+  });
+
+  it('has nothing to anchor to on an element with no size', () => {
+    expect(anchorIn(area, { x: 0, y: 0, w: 0, h: 10 })).toBeNull();
+  });
+
+  it('survives storage', () => {
+    const n = note({ anchor: { fx: 0.125, fy: 0.2, fw: 0.2, fh: 0.3 } });
+    expect(reviveNotes(JSON.parse(JSON.stringify([n])))[0]!.anchor).toEqual(n.anchor);
+  });
+});
+
+describe('barLift', () => {
+  const vp = { w: 1036, h: 703 };
+  const bar = { x: 330, y: 650, w: 380, h: 37 };
+
+  it('lifts the bar above a docked toolbar it sits on', () => {
+    // The interaction lab HUD: 520 wide, 36 tall, 16 from the bottom.
+    const hud = { x: 258, y: 651, w: 520, h: 36 };
+    expect(barLift(bar, [hud], vp)).toBe(703 - 651 + 8);
+  });
+
+  it('stays put when nothing is underneath', () => {
+    expect(barLift(bar, [], vp)).toBeNull();
+    expect(barLift(bar, [{ x: 0, y: 0, w: 200, h: 40 }], vp)).toBeNull();
+  });
+
+  it('ignores page content that merely reaches the bottom', () => {
+    // A full-width footer or a tall panel is the page, not a toolbar.
+    expect(barLift(bar, [{ x: 0, y: 620, w: 1036, h: 83 }], vp)).toBeNull();
+    expect(barLift(bar, [{ x: 300, y: 300, w: 500, h: 403 }], vp)).toBeNull();
+  });
+
+  it('clears the highest of several blockers', () => {
+    const a = { x: 400, y: 660, w: 100, h: 30 };
+    const b = { x: 450, y: 600, w: 200, h: 90 };
+    expect(barLift(bar, [a, b], vp)).toBe(703 - 600 + 8);
   });
 });

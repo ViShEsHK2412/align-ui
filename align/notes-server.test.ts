@@ -152,3 +152,18 @@ describe('the pieces', () => {
     expect(noteFileName(1, '00000000') < noteFileName(2, '00000000')).toBe(true);
   });
 });
+
+describe('hostile requests, answered properly', () => {
+  it('answers an oversized upload with 413 instead of dropping the connection', async () => {
+    const big = new Uint8Array(21 * 1024 * 1024);
+    big.set(PNG.slice(0, 8));
+    const r = await call(root, 'POST', NOTES_ROUTE, big);
+    expect(r.status).toBe(413);
+    expect(existsSync(join(root, '.align', 'notes'))).toBe(false);
+  });
+
+  it('answers a malformed escape with 400, not a server error', async () => {
+    expect((await call(root, 'GET', `${NOTES_ROUTE}/%E0%A4%A`)).status).toBe(400);
+    expect((await call(root, 'DELETE', `${NOTES_ROUTE}/%E0%A4%A`)).status).toBe(400);
+  });
+});

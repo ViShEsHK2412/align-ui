@@ -75,6 +75,20 @@ export interface Note {
         count: number;
         text?: string;
     }[];
+    /**
+     * Where the area sits inside its element, as fractions of the element's box.
+     *
+     * Page coordinates follow scrolling and nothing else. Inside a canvas app the
+     * element moves when the canvas zooms or pans, and a pin held to the page
+     * stayed where the element used to be. Fractions of the element's own box
+     * scale with it, so the pin can be placed from wherever the element is now.
+     */
+    anchor?: {
+        fx: number;
+        fy: number;
+        fw: number;
+        fh: number;
+    };
     /** What edit mode had changed on that element when the note was taken. */
     changes?: {
         prop: string;
@@ -142,6 +156,17 @@ export declare function outputSize(w: number, h: number, max?: number): {
 /** A Quad in the order CSS writes it, collapsed the way a person would. */
 export declare function shorthand([t, rt, b, l]: Quad): string;
 /**
+ * A comment, quoted line by line.
+ *
+ * The comment is the one part of the paste a person typed, and typed text can
+ * be Markdown. Pasted raw, a comment starting "### 99." forged a heading, so an
+ * agent reading the batch found a note 99 that does not exist, and an unclosed
+ * code fence swallowed every note after it. Quoted, a heading is text inside a
+ * quote and a fence ends where the quote does, so nothing typed can reach the
+ * structure around it. Blank lines stay inside the quote rather than ending it.
+ */
+export declare function quote(comment: string): string;
+/**
  * The batch, as one paste.
  *
  * Grouped by page, in the order the notes were taken, because that is the
@@ -168,3 +193,85 @@ export declare function reviveNotes(raw: unknown): Note[];
  * only reused once nothing on the page carries it.
  */
 export declare function nextNumber(notes: readonly Note[]): number;
+/** Overlap over union: 1 for the same rectangle, 0 for disjoint ones. */
+export declare function iou(a: Rect, b: Rect): number;
+/**
+ * Did this drag really mean one element?
+ *
+ * People drag around a thing as often as they click it, and a drag used to
+ * produce a vaguer note than a click on the same element: "region inside
+ * main.stage" rather than the tab, its text, its path and its box model — the
+ * numbers a note like "increase the padding" actually needs. The gesture should
+ * not decide how precise the note is.
+ *
+ * Two cases count as one element. The drag holds exactly one outermost
+ * element, however loosely it was drawn round it. Or it holds none but sits
+ * almost exactly on the element it is inside — a drag drawn just within a
+ * card's edges. Anything else is genuinely an area, and stays one.
+ *
+ * Returns the index of the outermost element meant, 'container', or null.
+ */
+export declare function subjectOf(region: Rect, outermost: readonly Rect[], container: Rect | null, fit?: number): number | 'container' | null;
+/**
+ * A drag held to the window.
+ *
+ * Pointer capture keeps a drag alive past the edge of the window, which is
+ * right for the gesture and wrong for the note: nothing out there can be
+ * pointed at, screenshotted or named. Unclamped, a drag half off the right edge
+ * stored an area the picture did not show and looked for its container at a
+ * centre point outside the page, where there is no element to find.
+ */
+export declare function clampToViewport(r: Rect, viewport: {
+    w: number;
+    h: number;
+}): Rect;
+/**
+ * Where each pin goes, so every note stays reachable.
+ *
+ * A pin marks the corner of what a note is about, and two notes about the same
+ * element share a corner. Drawn there, the later pin covered the earlier one
+ * completely — three notes on one tab showed one pin, and the two beneath it
+ * could not be opened, edited or deleted. Colliding pins fan out to the right
+ * instead, in note order, so the first note keeps the true corner.
+ *
+ * Page coordinates in and out, so the fan does not reshuffle as you scroll.
+ */
+export declare function layoutPins(anchors: readonly {
+    x: number;
+    y: number;
+}[], size: number, gap?: number): {
+    x: number;
+    y: number;
+}[];
+/**
+ * A pin's centre held inside the window.
+ *
+ * Centred on the corner it marks, a pin for anything flush with the window
+ * edge hung half outside it: note 20 read as "0". It is pulled in just far
+ * enough to be whole.
+ */
+export declare function clampPin(x: number, y: number, size: number, viewport: {
+    w: number;
+    h: number;
+}): {
+    x: number;
+    y: number;
+};
+/** An area as fractions of the element it is inside. Null for an element with no size. */
+export declare function anchorIn(area: Rect, element: Rect): Note['anchor'] | null;
+/** The same area, from wherever the element is now and however big it is drawn. */
+export declare function areaFrom(anchor: NonNullable<Note['anchor']>, element: Rect): Rect;
+/**
+ * How far the notes bar has to rise to clear the page's own bottom chrome.
+ *
+ * Bottom centre is where the bar starts, and it is also where canvas apps put
+ * their own toolbar: in the interaction lab the two sat exactly on top of each
+ * other. A blocker is anything painted under the bar that looks docked to the
+ * bottom rather than like content: its bottom edge near the window's, and short
+ * and narrow enough to be a toolbar rather than a page. Returns the distance
+ * from the window's bottom edge the bar should sit at, or null to stay put.
+ */
+export declare function barLift(bar: Rect, blockers: readonly Rect[], viewport: {
+    w: number;
+    h: number;
+}, gap?: number): number | null;

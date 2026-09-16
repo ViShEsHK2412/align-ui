@@ -60,13 +60,16 @@ function up(el: Element): Element | null {
  * `document.elementFromPoint` stops at a shadow host, so a web component would
  * otherwise only ever measure as one opaque box — no good on a page built from
  * Lit or Shoelace components. Descending through open roots measures the real
- * element instead. Closed roots stay closed, including our own overlay.
+ * element instead. Closed roots stay closed.
+ *
+ * Except ours, which is open now, so the descent stops at anything the tool is
+ * told to ignore. Otherwise hovering the toolbar would measure the toolbar.
  */
 export function hitTest(x: number, y: number, cfg: Config): Box | null {
   const skip = skipSelector(cfg);
   let el = document.elementFromPoint(x, y);
 
-  while (el?.shadowRoot) {
+  while (el?.shadowRoot && !el.matches(skip)) {
     const inner = el.shadowRoot.elementFromPoint(x, y);
     if (!inner || inner === el) break;
     el = inner;
@@ -553,4 +556,111 @@ export function scaleOf(el: Element): Scale {
     y *= s.y;
   }
   return { x, y };
+}
+
+/**
+ * Is this an invisible element that exists only to catch the pointer?
+ *
+ * Canvas apps lay an empty, transparent layer over their content so a press
+ * pans or selects instead of reaching the page beneath — the interaction lab
+ * puts one over every screen. Hit testing then finds the shield, and a note
+ * about a button came back as a note about a div that draws nothing.
+ *
+ * It has to draw nothing at all to count: no children, no text, no background,
+ * no border, no shadow, and not a replaced element that paints by itself. Pure,
+ * so the rule can be tested without a layout.
+ */
+export function isHitCatcher(el: {
+  tag: string;
+  children: number;
+  text: string;
+  background: string;
+  backgroundImage: string;
+  borderWidths: readonly number[];
+  boxShadow: string;
+  outlineWidth: number;
+}): boolean {
+  if (/^(img|svg|canvas|video|iframe|input|textarea|select|button|picture|object|embed)$/i.test(el.tag)) return false;
+  if (el.children > 0 || el.text.trim() !== '') return false;
+  const bg = el.background.replace(/\s+/g, '');
+  const transparent = bg === 'transparent' || bg === 'rgba(0,0,0,0)' || /\/0\)$|,0\)$/.test(bg);
+  if (!transparent) return false;
+  if (el.backgroundImage && el.backgroundImage !== 'none') return false;
+  if (el.borderWidths.some((w) => w > 0)) return false;
+  if (el.boxShadow && el.boxShadow !== 'none') return false;
+  return el.outlineWidth <= 0;
+}
+
+function catcher(el: Element): boolean {
+  const cs = getComputedStyle(el);
+  return isHitCatcher({
+    tag: el.tagName,
+    children: el.childElementCount,
+    text: el.textContent ?? '',
+    background: cs.backgroundColor,
+    backgroundImage: cs.backgroundImage,
+    borderWidths: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map(px),
+    boxShadow: cs.boxShadow,
+    outlineWidth: cs.outlineStyle === 'none' ? 0 : px(cs.outlineWidth),
+  });
+}
+
+/**
+ * Like hitTest, but sees through invisible layers laid over the content.
+ *
+ * Walks every element under the point from the top down, skips our own UI,
+ * anything ignored, and anything that catches the pointer without drawing,
+ * and takes the first element that is actually part of what you are looking at.
+ */
+export function hitTestThrough(x: number, y: number, cfg: Config): Box | null {
+  const skip = skipSelector(cfg);
+  let lookedThrough = false;
+  for (let el of document.elementsFromPoint(x, y)) {
+    if (el === document.documentElement || el === document.body) break;
+    if (el.closest(skip)) continue;
+    if (catcher(el)) { lookedThrough = true; continue; }
+    while (el.shadowRoot && !el.matches(skip)) {
+      const inner = el.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    /*
+     * Past a shield, the content underneath usually has pointer-events: none —
+     * that is how the shield gets every press — and elementsFromPoint leaves
+     * out anything that takes no pointer events. The lab's button was simply
+     * not in the list, so the note landed on the screen frame around it. From
+     * here the search is by geometry, which pointer-events cannot hide.
+     */
+    if (lookedThrough) el = deepestAt(el, x, y);
+    return boxOf(el);
+  }
+  return null;
+}
+
+/**
+ * The deepest descendant containing the point, found by box rather than by
+ * hit testing. Later siblings win ties, since they paint on top.
+ */
+export function deepestAt(
+  el: Element,
+  x: number,
+  y: number,
+  skip: (child: Element) => boolean = catcher,
+): Element {
+  let at = el;
+  for (let depth = 0; depth < 64; depth++) {
+    let next: Element | null = null;
+    for (const child of Array.from(at.children)) {
+      // The shield is usually the frame's last child, and "later siblings win"
+      // would otherwise walk straight back onto the thing we looked through.
+      if (skip(child)) continue;
+      const b = child.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0 && x >= b.left && x <= b.right && y >= b.top && y <= b.bottom) {
+        next = child;
+      }
+    }
+    if (!next) break;
+    at = next;
+  }
+  return at;
 }

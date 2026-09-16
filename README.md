@@ -425,8 +425,10 @@ are re-read every frame while the tool is open, which keeps the overlay correct
 through CSS transitions, image loads and framework re-renders, and drops
 anything that leaves the document. Nothing redraws unless something moved.
 
-The whole UI lives in a closed shadow root on a host with `all: initial`, so the
-page's CSS cannot reach it and it cannot reach the page's.
+The whole UI lives in a shadow root on a host with `all: initial`, so the
+page's CSS cannot reach it and it cannot reach the page's. The root is open
+rather than closed, so a host app's "is the user typing?" check can see the
+tool's own text fields and does not act on keys typed into them.
 
 ```
 align/

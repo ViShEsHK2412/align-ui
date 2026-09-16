@@ -17,7 +17,7 @@ const ID = '__align_xray';
  * measurement, blue a selection and cyan a guide, and structure is none of
  * those. Grey also stays visible on a light page and a dark one.
  *
- * One exclusion is enough. Our own UI lives in a closed shadow root, and a rule
+ * One exclusion is enough. Our own UI lives in a shadow root, and a rule
  * in the page cannot match through a shadow boundary, so only the host element
  * itself is reachable from here.
  */

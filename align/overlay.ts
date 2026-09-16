@@ -71,7 +71,23 @@ export function mountOverlay(): Overlay {
     'z-index: 2147483647; pointer-events: none;';
   document.documentElement.appendChild(host);
 
-  const root = host.attachShadow({ mode: 'closed' });
+  /*
+   * Open, not closed.
+   *
+   * Closed was chosen for isolation, but isolation is what any shadow root
+   * gives: page CSS cannot match into it and its CSS cannot leak out, whatever
+   * the mode. The mode only decides whether scripts can see inside, and closed
+   * turned out to hide the one thing host apps need to see.
+   *
+   * Every app with keyboard shortcuts guards them with "is the user typing?",
+   * and the careful ones read composedPath()[0] so an input in a shadow tree
+   * still counts. A closed root cuts that path at the host, so the answer came
+   * back "a div", and the app acted on keys typed into this tool. Measured in
+   * the interaction lab: pressing Enter to save a note also zoomed the canvas
+   * into the selected screen, 28% to 71%. Its guard is written for open roots
+   * and is right; this is what it could not see past.
+   */
+  const root = host.attachShadow({ mode: 'open' });
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position: fixed; inset: 0; pointer-events: none;';
   root.appendChild(canvas);

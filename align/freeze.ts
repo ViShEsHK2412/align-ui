@@ -20,7 +20,7 @@ const STYLE_ID = '__align_freeze';
  * arrival costs one rule and covers the case where a hover fires under a
  * stationary cursor.
  *
- * Our own UI is in a closed shadow root, which a page rule cannot reach into,
+ * Our own UI is in a shadow root, which a page rule cannot reach into,
  * so the host element is the only thing needing an exception.
  */
 const CSS = `

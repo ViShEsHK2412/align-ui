@@ -137,7 +137,16 @@ const CSS = DRAG_CSS + `
    down out of the way rather than covering the ticks the rulers exist to show. */
 .flag[data-rulers] { top: ${INSET + RULER}px; }
 .help[data-rulers] { top: ${INSET + RULER + FLAG_H + STEP}px; }
-.flag:hover { background: ${surface(1)}; }
+/*
+ * The film goes over the ground, not instead of it.
+ *
+ * Every surface() level is a translucent film meant to sit on an opaque
+ * ground. Set as the whole background it replaced the badge's ground, so on
+ * hover the bar became 93% see-through: invisible on a dark page, and on a
+ * light one, the interaction lab's, it turned white and its light icons
+ * vanished into it.
+ */
+.flag:hover { background-color: ${GROUND}; background-image: linear-gradient(${surface(1)}, ${surface(1)}); }
 .flag .count { color: ${TEXT.secondary}; }
 
 /* A layers bar, not a palette. Switches, then the one control that changes the

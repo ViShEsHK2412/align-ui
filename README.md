@@ -501,8 +501,9 @@ initAlign({
   // not named stays on. `guides: false` also takes the guide keys and undo.
   features: { notes: false, pick: false },
 
-  // Where the overlay mounts, read each time the tool opens. See below.
-  portalTarget: () => document.querySelector('dialog[open]'),
+  // Where the overlay mounts. Rarely needed: modals are followed on their
+  // own. See below.
+  portalTarget: () => document.querySelector('#app-shell'),
 
   // 'session' keeps guides, notes and preferences per tab.
   storage: 'local',
@@ -514,10 +515,13 @@ initAlign({
 
 ### Host integration
 
-`portalTarget` exists for modals. A modal `<dialog>` makes everything outside
-it inert, the tool included, so open the dialog first and the tool mounts
-inside it. Anything unusable, such as a function that throws or an element no
-longer in the document, falls back to the page root.
+Modals need no setup. A modal `<dialog>` makes everything outside it inert,
+the tool included, so while one is open the tool moves inside the topmost one,
+and back out when it closes or is removed. It follows them live, whether the
+dialog opened before the tool or after. `portalTarget` names somewhere else to
+mount, an element or a function returning one, and is re-read every frame the
+same way. Anything unusable, such as a function that throws or an element no
+longer in the document, falls back to the open modal, then the page root.
 
 `onToolsChange` is called with the tool's state whenever it changes: opened,
 closed, a tool switched, an element locked, a guide added. Never per frame: a

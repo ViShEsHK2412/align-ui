@@ -72,9 +72,8 @@ export interface Config {
     features: Features;
     /**
      * Where the overlay mounts: an element, or a function returning one, read
-     * each time the tool opens. The page's root when left out, or when the
-     * element is not in the document. Point it inside a modal `<dialog>` to
-     * keep the tool usable while the modal makes the rest of the page inert.
+     * every frame. Left out, or unusable, it is the topmost open modal dialog,
+     * which makes the rest of the page inert, and otherwise the page root.
      */
     portalTarget: PortalTarget;
     /**

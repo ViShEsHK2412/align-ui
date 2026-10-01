@@ -23,6 +23,20 @@ export type PortalTarget = HTMLElement | (() => HTMLElement | null | undefined) 
  * nowhere to draw.
  */
 export declare function resolvePortal(target: PortalTarget | undefined, fallback: HTMLElement): HTMLElement;
+/**
+ * The open modal dialog on top, if any. A modal makes everything outside it
+ * inert, so this is where the tool has to be to stay usable — with no config
+ * at all. Dialogs open in the top layer in the order they were opened, which
+ * for nested modals is document order often enough, and the last match is
+ * the best guess either way.
+ */
+export declare function topModal(root?: ParentNode): HTMLElement | null;
+/**
+ * Where the overlay belongs right now: the configured target if it is usable,
+ * otherwise the top modal, otherwise the page root. Asked every frame, so a
+ * dialog opened or closed while the tool is on takes the tool with it.
+ */
+export declare function portalFor(target: PortalTarget | undefined, root: HTMLElement): HTMLElement;
 /** What the tool is doing, as a host app sees it. */
 export interface ToolsState {
     open: boolean;

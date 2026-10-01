@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CLOSED, createToolsReporter, featureOn, resolvePortal, type ToolsState } from './api';
+import { CLOSED, createToolsReporter, featureOn, portalFor, resolvePortal, topModal, type ToolsState } from './api';
 import { mergeConfig } from './config';
 import { createIndicator } from './indicator';
 import { loadFlag, saveFlag, useStorage } from './store';
@@ -52,6 +52,32 @@ describe('resolvePortal', () => {
     expect(resolvePortal(() => null, root)).toBe(root);
     expect(resolvePortal(() => { throw new Error('not ready'); }, root)).toBe(root);
     expect(resolvePortal('#app' as unknown as HTMLElement, root)).toBe(root);
+  });
+});
+
+describe('topModal and portalFor', () => {
+  const root = document.documentElement;
+  const fakeRoot = (found: HTMLElement[] | 'throw') => ({
+    querySelectorAll: () => { if (found === 'throw') throw new SyntaxError(':modal'); return found; },
+  }) as unknown as ParentNode;
+
+  it('picks the last open modal, and nothing when there is none', () => {
+    const a = document.createElement('dialog');
+    const b = document.createElement('dialog');
+    expect(topModal(fakeRoot([a, b]))).toBe(b);
+    expect(topModal(fakeRoot([]))).toBeNull();
+  });
+
+  it('copes with a browser that has no :modal', () => {
+    expect(topModal(fakeRoot('throw'))).toBeNull();
+  });
+
+  it('prefers a configured target that works, and the page root with no modal open', () => {
+    const el = document.createElement('div');
+    document.body.append(el);
+    expect(portalFor(el, root)).toBe(el);
+    expect(portalFor(null, root)).toBe(root);
+    expect(portalFor(() => null, root)).toBe(root);
   });
 });
 

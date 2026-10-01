@@ -8,7 +8,7 @@ import {
   clearAxis, dragGroup, duplicate, guidesIn, prune, removeSelected, shift, toggle,
 } from './guide-select';
 import type { GridDraw } from './overlay';
-import { CLOSED, createToolsReporter, featureOn, resolvePortal, type Feature, type ToolsState } from './api';
+import { CLOSED, createToolsReporter, featureOn, portalFor, type Feature, type ToolsState } from './api';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
 import { createNoteBoard, type NoteBoard } from './noteboard';
@@ -747,8 +747,16 @@ function onMouseDown(e: MouseEvent) {
   // Precedence, so the gestures never fight: a rule starts a new guide, a
   // guide under the cursor gets picked up, anything else locks an element.
   const fromRuler = inRuler(e.clientX, e.clientY);
-  if (fromRuler && on('guides')) {
+  if (!fromRuler && rulers && e.clientX < RULER && e.clientY < RULER) {
+    // The corner where the rules meet is chrome too.
     swallow(e);
+    return;
+  }
+  if (fromRuler) {
+    swallow(e);
+    // The rule is chrome: with guides switched off a press there does nothing,
+    // rather than falling through and locking whatever is underneath.
+    if (!on('guides')) return;
     grabFrom = null;
     dragging = addGuide(fromRuler, e.clientX, e.clientY, free(e));
     render({ x: e.clientX, y: e.clientY });
@@ -891,6 +899,16 @@ let drawnAtY = 0;
 function watch() {
   watching = requestAnimationFrame(watch);
 
+  // Follow the portal. A modal opened while the tool is on would otherwise
+  // leave it outside, inert and unclickable; closing it, or removing the
+  // element the tool sat in, brings it back to the page. Moving the host
+  // keeps its shadow root, so nothing inside is rebuilt.
+  const host = overlay?.root.host;
+  if (host) {
+    const target = portalFor(cfg.portalTarget, document.documentElement);
+    if (host.parentElement !== target) target.appendChild(host);
+  }
+
   const live = pinned.filter((b) => b.el.isConnected);
   const next = live.map((b) => boxOf(b.el));
   const nextHover = hover && hover.el.isConnected ? boxOf(hover.el) : null;
@@ -961,7 +979,7 @@ function activate() {
   if (overlay) return;
   // Loaded here rather than at init, so the tool still costs nothing at rest.
   loadFont();
-  overlay = mountOverlay(resolvePortal(cfg.portalTarget, document.documentElement));
+  overlay = mountOverlay(portalFor(cfg.portalTarget, document.documentElement));
   boxmodel = createBoxModel(overlay.root);
   if (!on('panel')) boxmodel.setHidden(true);
   indicator = createIndicator(overlay.root, onTool, on);

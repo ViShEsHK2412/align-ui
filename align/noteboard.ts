@@ -270,11 +270,20 @@ export const NOTES_CSS = `
   box-shadow: ${SHADOW};
   user-select: none;
 }
-.nb-bar[data-open] { display: flex; }
+.nb-bar[data-open] { display: flex; flex-direction: column; align-items: stretch; }
+/*
+ * The controls are one row that never wraps. They shared a wrapping row with
+ * the status, capped at 520px, and on a narrow window or with a long hint the
+ * last button — Done — dropped onto a line of its own. Now the buttons keep
+ * their size and only the label's words may wrap, inside the label.
+ */
+.nb-controls { display: flex; align-items: center; gap: ${SPACE.base}px; flex-wrap: nowrap; }
+.nb-controls .nb-btn, .nb-controls .nb-sep { flex: none; }
 .nb-bar .nb-label {
   display: flex; align-items: center; gap: 6px;
+  flex: 1 1 auto; min-width: 0;
   font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium};
-  white-space: nowrap;
+  line-height: 1.3;
 }
 /* A flex child shrinks by default, and an icon has no content to stop it. */
 .nb-bar .nb-label svg { flex: none; color: ${TEXT.secondary}; }
@@ -288,10 +297,8 @@ export const NOTES_CSS = `
  * label beside it onto two lines. A message is only ever shown because
  * something needs saying, so it gets the width to say it.
  */
-.nb-bar { flex-wrap: wrap; max-width: min(520px, calc(100vw - ${SPACE.edge * 2}px)); }
+.nb-bar { width: max-content; max-width: calc(100vw - ${SPACE.edge * 2}px); }
 .nb-status {
-  order: 10;
-  flex-basis: 100%;
   padding: 2px ${SPACE.tight}px ${SPACE.tight}px 0;
   font-size: ${TYPE.tag}px; line-height: 1.4; color: ${TEXT.secondary};
 }
@@ -411,7 +418,9 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   const done = el('button', 'nb-btn', 'Done');
   done.setAttribute('data-quiet', '');
   done.title = 'Leave notes mode (N)';
-  bar.append(label, status, el('span', 'nb-sep'), copy, clearResolved, clear, done);
+  const controls = el('div', 'nb-controls');
+  controls.append(label, el('span', 'nb-sep'), copy, clearResolved, clear, done);
+  bar.append(controls, status);
 
   root.append(style);
   root.prepend(layer);

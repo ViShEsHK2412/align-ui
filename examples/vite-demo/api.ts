@@ -15,7 +15,6 @@ if (import.meta.env.DEV) {
   import('../../align/index').then((m) => m.initAlign({
     features: { notes: false, pick: false },
     storage: 'session',
-    portalTarget: () => document.querySelector<HTMLElement>('dialog[open]'),
     onToolsChange: (s) => show('callback', s as unknown as Record<string, unknown>),
   }));
 }

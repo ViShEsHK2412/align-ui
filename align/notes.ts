@@ -83,8 +83,10 @@ export interface Note {
    * `path` is absolute and exists only when a dev server wrote the file, which
    * is the case the paste is designed around. `file` alone means it went to
    * the browser's downloads folder, whose location a page is never told.
+   * `marked` says arrows or lines were drawn on it, which the paste has to
+   * say: red marks are otherwise indistinguishable from a red page.
    */
-  image?: { file: string; path?: string };
+  image?: { file: string; path?: string; marked?: true };
 }
 
 // ── Geometry ───────────────────────────────────────────────────────────────
@@ -261,6 +263,9 @@ export function notesToMarkdown(notes: readonly Note[], options: { resolved?: nu
         } else {
           out.push(`Screenshot: \`${note.image.file}\` (downloads folder)`);
         }
+        if (note.image.marked) {
+          out.push('The red arrows and lines on it are mine, drawn to point at what to change. They are not part of the page.');
+        }
         out.push('');
       }
 
@@ -384,6 +389,7 @@ export function reviveNotes(raw: unknown): Note[] {
     if (img && typeof img['file'] === 'string') {
       note.image = { file: img['file'] };
       if (typeof img['path'] === 'string') note.image.path = img['path'];
+      if (img['marked'] === true) note.image.marked = true;
     }
 
     out.push(note);

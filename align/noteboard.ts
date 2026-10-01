@@ -13,6 +13,7 @@ import {
   type Note, type Rect,
 } from './notes';
 import { loadNotes, saveNotes } from './store';
+import { addPoint, burn, drawMarks, isMark, MARK_WIDTH, toFraction, type Stroke } from './markup';
 import {
   GROUND, HAIRLINE, MOTION, SHADOW, SHADOW_LIFTED, SPACE, surface, TEXT, TYPE, WEIGHT,
 } from './theme';
@@ -151,7 +152,7 @@ export const NOTES_CSS = `
 
 .nb-shot {
   display: grid; place-items: center;
-  min-height: 48px; max-height: 140px;
+  min-height: 48px; max-height: 188px;
   overflow: hidden;
   background: ${surface(1)};
   color: ${TEXT.secondary};
@@ -159,7 +160,20 @@ export const NOTES_CSS = `
   text-align: center;
   padding: ${SPACE.tight}px;
 }
-.nb-shot img { display: block; max-width: 100%; max-height: 132px; object-fit: contain; }
+.nb-shot img { display: block; max-width: 100%; max-height: 180px; object-fit: contain; }
+
+/*
+ * The drawing sits exactly over the picture: the wrapper is sized by the
+ * image, and the canvas fills the wrapper. Marks are kept as fractions of it,
+ * so the size it happens to be shown at never reaches the saved file.
+ */
+.nb-draw { position: relative; max-width: 100%; line-height: 0; }
+.nb-draw canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  cursor: crosshair; touch-action: none;
+}
+.nb-tool { padding: 6px; }
+.nb-btn[data-quiet][aria-pressed="true"] { background: ${surface(4)}; color: ${TEXT.primary}; }
 
 /*
  * Grows with what you write, from three lines to about twelve, then scrolls.
@@ -345,6 +359,27 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   text.placeholder = 'What should change here?';
   text.setAttribute('aria-label', 'What should change here');
   text.rows = 3;
+  /*
+   * Arrow and pen for the screenshot. Only for a picture just taken: a saved
+   * note's image is already on disk, and redrawing it would mean replacing a
+   * file an earlier paste may already point at.
+   */
+  const marks = el('div', 'nb-row');
+  const markButton = (name: 'arrow' | 'edit' | 'undo', label: string) => {
+    const b = el('button', 'nb-btn nb-tool');
+    b.setAttribute('data-quiet', '');
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.append(icon(name, 14));
+    return b;
+  };
+  const arrowTool = markButton('arrow', 'Arrow: drag on the screenshot to point at something');
+  const penTool = markButton('edit', 'Pen: draw on the screenshot, to circle or underline');
+  const undoMark = markButton('undo', 'Undo the last mark');
+  const marksHint = el('span', 'nb-grow nb-hint', 'Drag on the picture to mark it');
+  marks.append(arrowTool, penTool, marksHint, undoMark);
+  marks.hidden = true;
+
   const actions = el('div', 'nb-row');
   const del = el('button', 'nb-btn', 'Delete');
   del.setAttribute('data-quiet', '');
@@ -358,7 +393,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   const save = el('button', 'nb-btn', 'Save');
   save.setAttribute('data-primary', '');
   actions.append(del, resolve, hint, cancel, save);
-  composer.append(shot, text, actions);
+  composer.append(shot, marks, text, actions);
 
   const bar = el('div', 'nb-surface nb-bar');
   bar.setAttribute('data-drag-handle', '');
@@ -702,6 +737,9 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     inside?: NonNullable<Note['inside']>;
     /** The area inside its element, measured at the same moment. */
     anchor?: NonNullable<Note['anchor']>;
+    /** Arrows and pen strokes drawn on the screenshot, burned in on save. */
+    marks?: Stroke[];
+    canvas?: HTMLCanvasElement;
   }
   let draft: Draft | null = null;
   /** Where the open composer is anchored, so it can be re-placed as it grows. */
@@ -785,12 +823,23 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     const editing = Boolean(d.note);
 
     shot.textContent = '';
+    marks.hidden = true;
     if (d.blob) {
       d.url = URL.createObjectURL(d.blob);
       const img = document.createElement('img');
       img.alt = 'Screenshot of the area this note is about';
       img.src = d.url;
-      shot.append(img);
+      const wrap = el('div', 'nb-draw');
+      const canvas = document.createElement('canvas');
+      canvas.setAttribute('aria-hidden', 'true');
+      wrap.append(img, canvas);
+      shot.append(wrap);
+      d.marks = [];
+      d.canvas = canvas;
+      // Sized once the picture has a size; until then there is nothing to draw on.
+      img.addEventListener('load', () => { if (draft === d) paintMarks(); }, { once: true });
+      marks.hidden = false;
+      paintMarks();
     } else if (editing && d.note!.image) {
       const image = d.note!.image;
       if (image.path && cfg.notesEndpoint) {
@@ -847,7 +896,97 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     composer.style.top = `${top}px`;
   }
 
+  // ── Marking the screenshot ────────────────────────────────────────────────
+
+  let markTool: Stroke['kind'] = 'arrow';
+  let live: Stroke | null = null;
+  let livePointer = -1;
+  let painting = 0;
+
+  /**
+   * Redraw every mark at the canvas's current size, sharp at the screen's
+   * pixel ratio. Cheap enough to do whole on every move: a note carries a few
+   * strokes, not thousands.
+   */
+  function paintMarks(): void {
+    painting = 0;
+    const d = draft;
+    arrowTool.setAttribute('aria-pressed', String(markTool === 'arrow'));
+    penTool.setAttribute('aria-pressed', String(markTool === 'pen'));
+    undoMark.disabled = !d?.marks?.length;
+    const canvas = d?.canvas;
+    if (!canvas || !d.marks) return;
+    const r = canvas.getBoundingClientRect();
+    const dpr = devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * dpr));
+    const h = Math.max(1, Math.round(r.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, h);
+    drawMarks(ctx, live ? [...d.marks, live] : d.marks, w, h);
+  }
+  const queuePaint = () => { if (!painting) painting = requestAnimationFrame(paintMarks); };
+
+  function boxOfCanvas(): Rect | null {
+    const r = draft?.canvas?.getBoundingClientRect();
+    return r && r.width > 0 && r.height > 0 ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+  }
+
+  shot.addEventListener('pointerdown', (e) => {
+    const d = draft;
+    if (e.button !== 0 || !d?.canvas || e.target !== d.canvas || live) return;
+    const box = boxOfCanvas();
+    if (!box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const p = toFraction(e.clientX, e.clientY, box);
+    live = { kind: markTool, points: markTool === 'arrow' ? [p, p] : [p], width: MARK_WIDTH / box.w };
+    livePointer = e.pointerId;
+    try { d.canvas.setPointerCapture(e.pointerId); } catch { /* already up */ }
+  });
+
+  shot.addEventListener('pointermove', (e) => {
+    if (!live || e.pointerId !== livePointer) return;
+    const box = boxOfCanvas();
+    if (!box) return;
+    const p = toFraction(e.clientX, e.clientY, box);
+    if (live.kind === 'arrow') live.points[1] = p;
+    else if (!addPoint(live.points, p, box.w, box.h)) return;
+    queuePaint();
+  });
+
+  function endMark(e: PointerEvent, keep: boolean): void {
+    if (!live || e.pointerId !== livePointer) return;
+    const stroke = live;
+    live = null;
+    livePointer = -1;
+    const box = boxOfCanvas();
+    if (keep && box && draft?.marks && isMark(stroke, box.w, box.h)) draft.marks.push(stroke);
+    paintMarks();
+    // Back to the words, so Enter still saves.
+    text.focus({ preventScroll: true });
+  }
+  shot.addEventListener('pointerup', (e) => endMark(e, true));
+  shot.addEventListener('pointercancel', (e) => endMark(e, false));
+
+  const pick = (tool: Stroke['kind']) => () => { markTool = tool; paintMarks(); text.focus({ preventScroll: true }); };
+  arrowTool.addEventListener('click', pick('arrow'));
+  penTool.addEventListener('click', pick('pen'));
+  undoMark.addEventListener('click', () => {
+    draft?.marks?.pop();
+    paintMarks();
+    text.focus({ preventScroll: true });
+  });
+
   function closeComposer(): void {
+    live = null;
+    livePointer = -1;
+    cancelAnimationFrame(painting);
+    painting = 0;
     if (draft?.url) URL.revokeObjectURL(draft.url);
     draft = null;
     composer.removeAttribute('data-open');
@@ -1021,7 +1160,26 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       const changes = changesFor(d.target);
       if (changes.length) note.changes = changes;
     }
-    if (d.blob) note.image = await storeImage(d.blob, n);
+    /*
+     * Marks are burned in at the picture's full resolution. If the browser
+     * cannot redraw it, the picture is saved as it was taken: a note without
+     * its arrows still beats a note without its screenshot.
+     */
+    let blob = d.blob ?? null;
+    let marked = false;
+    let lostMarks = false;
+    if (blob && d.marks?.length) {
+      try {
+        blob = await burn(blob, d.marks);
+        marked = true;
+      } catch {
+        lostMarks = true;
+      }
+    }
+    if (blob) {
+      note.image = await storeImage(blob, n);
+      if (marked) note.image.marked = true;
+    }
 
     // The composer may have been cancelled or replaced while the upload ran.
     if (draft !== d) return;
@@ -1030,7 +1188,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     closeComposer();
     renderPins();
     renderBar();
-    say(note.image?.path ? `Note ${n} saved` : note.image ? `Note ${n} saved · screenshot downloaded` : `Note ${n} saved`, 1500);
+    if (lostMarks) say(`Note ${n} saved, but the marks could not be drawn into the screenshot`, 4000);
+    else say(note.image?.path ? `Note ${n} saved` : note.image ? `Note ${n} saved · screenshot downloaded` : `Note ${n} saved`, 1500);
   }
 
   function remove(note: Note): void {

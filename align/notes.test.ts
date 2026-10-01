@@ -126,6 +126,13 @@ describe('notesToMarkdown', () => {
     expect(md).toContain('![note 1](<C:\\Users\\Me\\My Projects\\app\\.align\\notes\\note-1.png>)');
   });
 
+  it('says the red marks on a screenshot were drawn, not part of the page', () => {
+    const marked = notesToMarkdown([note({ image: { file: 'n.png', path: '/p/n.png', marked: true } })]);
+    expect(marked).toContain('The red arrows and lines on it are mine');
+    const plain = notesToMarkdown([note({ image: { file: 'n.png', path: '/p/n.png' } })]);
+    expect(plain).not.toContain('red arrows');
+  });
+
   it('names the file when the image only reached the downloads folder', () => {
     const md = notesToMarkdown([note({ image: { file: 'align-note-1.png' } })]);
     expect(md).toContain('`align-note-1.png` (downloads folder)');
@@ -200,7 +207,7 @@ describe('reviveNotes', () => {
         text: 'Two', path: 'nav > a:nth-of-type(2)',
       },
       changes: [{ prop: 'color', from: 'red', to: 'blue' }],
-      image: { file: 'f.png', path: '/p/f.png' },
+      image: { file: 'f.png', path: '/p/f.png', marked: true },
     });
     expect(reviveNotes(JSON.parse(JSON.stringify([full])))).toEqual([full]);
   });

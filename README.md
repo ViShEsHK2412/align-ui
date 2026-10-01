@@ -391,6 +391,15 @@ for the moment each screenshot is taken.
 Decline the share and notes still work, just without pictures. Press `N` twice
 to be asked again.
 
+#### Marking the screenshot
+
+Drag on the picture in the composer to draw an arrow at the thing; switch to
+the pen to circle or underline it. Undo takes back the last mark. The marks are
+drawn into the full-resolution image when the note is saved, red with a white
+edge so they read on any page, and the paste tells the agent they were drawn by
+you and are not part of the page. Marking is for a picture just taken: a saved
+note's image is already on disk, where an earlier paste may point at it.
+
 #### Skipping the prompt: `captureFrame`
 
 A host that can capture the tab itself (an extension, Electron, a test runner)

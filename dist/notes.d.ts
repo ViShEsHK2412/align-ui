@@ -107,10 +107,13 @@ export interface Note {
      * `path` is absolute and exists only when a dev server wrote the file, which
      * is the case the paste is designed around. `file` alone means it went to
      * the browser's downloads folder, whose location a page is never told.
+     * `marked` says arrows or lines were drawn on it, which the paste has to
+     * say: red marks are otherwise indistinguishable from a red page.
      */
     image?: {
         file: string;
         path?: string;
+        marked?: true;
     };
 }
 /** A drag in either direction, as a rectangle with positive size. */

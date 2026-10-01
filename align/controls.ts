@@ -8,6 +8,8 @@ import { icon, type IconName } from './icons';
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
 import { formatColour, formatOf, parseColour } from './oklch';
+import { colourTokens, tokenIn, type ColourToken } from './colour-tokens';
+import { tokensInScope } from './inspect';
 import {
   axisOf, confineToAxis, EMPTY_SHADOW, formatBackdropBlur, formatShadows,
   moveLayer, parseBackdropBlur, parseShadows, type Confine, type Shadow,
@@ -734,6 +736,11 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     updateFooter();
   }
 
+  /** The colour tokens in scope of the element being edited, for the picker. */
+  function coloursInScope(): ColourToken[] {
+    return target ? colourTokens(tokensInScope(target), (v) => parseColour(v) !== null) : [];
+  }
+
   function write(prop: string, value: string): void {
     if (!target) return;
     editor.set(target, prop, value);
@@ -938,8 +945,8 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       cell.setAttribute('aria-expanded', 'false');
     }
 
-    function apply(value: string): void {
-      chip.style.setProperty('--swatch', value);
+    function apply(value: string, shown: string = value): void {
+      chip.style.setProperty('--swatch', shown);
       if (linked.has(spec.prop) && spec.sides) {
         for (const side of spec.sides) write(side, value);
         // The other three cells are showing the old colour until told.
@@ -952,10 +959,12 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     cell.addEventListener('click', () => {
       if (picker) { close(); return; }
       const current = target ? readValue(target, prop) : '';
+      const inline = target ? (target as HTMLElement).style.getPropertyValue(prop) : '';
       picker = createPicker(root, {
         anchor: cell,
-        value: current || '#000000',
+        value: tokenIn(inline) ? inline : current || '#000000',
         onChange: apply,
+        tokens: coloursInScope(),
       });
       cell.setAttribute('aria-expanded', 'true');
       undismiss = dismissOn(cell, (n) => picker?.contains(n) ?? false, close);
@@ -1007,11 +1016,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       picker = createPicker(root, {
         anchor: swatch,
         value: hex.value || '#000000',
-        onChange: (value) => {
+        // A token is written as the token; the swatch paints what it resolves
+        // to, since the token may be defined on the element and not in here.
+        onChange: (value, shown) => {
           hex.value = value;
-          paint(value);
+          paint(shown);
           write(spec.prop, value);
         },
+        tokens: coloursInScope(),
       });
       swatch.setAttribute('aria-expanded', 'true');
       undismiss = dismissOn(swatch, (n) => picker?.contains(n) ?? false, closePicker);
@@ -1025,6 +1037,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
        * The parser is the picker's, so anything the picker can emit round-trips
        * — oklch() and display-p3 included, which the old hex-only test dropped.
        */
+      // `var(--token)`, typed, when the page has that colour token.
+      const named = tokenIn(value);
+      const known = named ? coloursInScope().find((t) => t.name === named) : undefined;
+      if (known) {
+        paint(known.value);
+        write(spec.prop, value);
+        return;
+      }
       if (!parseColour(value)) { sync(); return; }
       paint(value);
       picker?.update(value);
@@ -1044,8 +1064,10 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
        * approximation of itself the first time the panel looks at it.
        */
       const value = parsed ? formatColour(parsed, formatOf(current)) : current;
+      // Written as a token: say the token, and paint the colour it computes to.
+      const inline = target ? (target as HTMLElement).style.getPropertyValue(spec.prop) : '';
       if (document.activeElement !== hex && root.activeElement !== hex) {
-        hex.value = value;
+        hex.value = tokenIn(inline) ? inline.trim() : value;
       }
       paint(value);
       picker?.update(value);

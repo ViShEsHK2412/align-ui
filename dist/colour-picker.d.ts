@@ -1,9 +1,17 @@
+import { type ColourToken } from './colour-tokens';
 export interface PickerOptions {
     /** Where to place it, in viewport coordinates. */
     anchor: HTMLElement;
     value: string;
-    onChange: (value: string) => void;
+    /**
+     * `value` is what to write: a colour, or `var(--token)` when a token was
+     * picked. `shown` is the colour that resolves to, for anything that has to
+     * paint it outside the page's cascade, where the token may not be defined.
+     */
+    onChange: (value: string, shown: string) => void;
     onClose?: () => void;
+    /** The page's colour tokens in scope of the element, offered as swatches. */
+    tokens?: readonly ColourToken[];
 }
 export interface Picker {
     update(value: string): void;

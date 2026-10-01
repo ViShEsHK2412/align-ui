@@ -7,6 +7,7 @@ import {
 } from './theme';
 import { SNAP_SPRING, springSettled, springStep } from './slider';
 import { icon } from './icons';
+import { filterTokens, tokenIn, type ColourToken } from './colour-tokens';
 
 /**
  * The colour picker: the editor's, not the eyedropper's.
@@ -37,8 +38,15 @@ export interface PickerOptions {
   /** Where to place it, in viewport coordinates. */
   anchor: HTMLElement;
   value: string;
-  onChange: (value: string) => void;
+  /**
+   * `value` is what to write: a colour, or `var(--token)` when a token was
+   * picked. `shown` is the colour that resolves to, for anything that has to
+   * paint it outside the page's cascade, where the token may not be defined.
+   */
+  onChange: (value: string, shown: string) => void;
   onClose?: () => void;
+  /** The page's colour tokens in scope of the element, offered as swatches. */
+  tokens?: readonly ColourToken[];
 }
 
 export interface Picker {
@@ -163,6 +171,33 @@ export const PICKER_CSS = `
 
 /* Bottom rows. */
 .pick-row { display: flex; align-items: center; gap: ${SPACE.tight}px; }
+
+/*
+ * The page's colour tokens. Small swatches in page order, which is usually
+ * scale order, so a ramp reads as a ramp. Three rows show; the rest scroll,
+ * with a filter once there are more than a glance can take in.
+ */
+.pick-tokens-head { display: flex; align-items: center; gap: ${SPACE.tight}px; }
+.pick-tokens-label { flex: 1; color: ${TEXT.secondary}; font-size: ${TYPE.tag}px; font-weight: ${WEIGHT.medium}; }
+.pick-filter {
+  width: 112px; height: 22px; padding: 0 6px; border: 0; border-radius: 0;
+  background: ${surface(2)}; color: ${TEXT.primary}; font: inherit; font-size: ${TYPE.tag}px;
+}
+.pick-filter::placeholder { color: ${TEXT.secondary}; }
+.pick-filter:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: -2px; }
+.pick-tokens {
+  display: grid; grid-template-columns: repeat(auto-fill, 18px); gap: 4px;
+  max-height: 66px; overflow-y: auto; scrollbar-width: thin;
+}
+.pick-token {
+  width: 18px; height: 18px; padding: 0; border: 0; border-radius: 0; cursor: pointer;
+  background: linear-gradient(var(--tok), var(--tok)), var(--checker);
+  box-shadow: inset 0 0 0 1px ${HAIRLINE};
+}
+.pick-token:hover { box-shadow: inset 0 0 0 1px ${TEXT.secondary}; }
+.pick-token:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: 1px; }
+.pick-token[data-on] { box-shadow: inset 0 0 0 2px ${TEXT.primary}, inset 0 0 0 3px ${GROUND}; }
+.pick-tokens-none { color: ${TEXT.secondary}; font-size: ${TYPE.tag}px; }
 .pick-seg { display: flex; gap: 2px; flex: 1; }
 .pick-fmt {
   flex: 1;
@@ -236,6 +271,14 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
    */
   let saturation = 0;
   let lastEmitted = '';
+  /** The token last picked, while the colour is still that token's. */
+  let picked: ColourToken | null = null;
+  const tokens = opts.tokens ?? [];
+  {
+    const named = tokenIn(opts.value);
+    picked = named ? tokens.find((t) => t.name === named) ?? null : null;
+    if (picked) colour = parseColour(picked.value) ?? colour;
+  }
 
   const pick = el('div', 'pick');
   pick.setAttribute('role', 'dialog');
@@ -306,7 +349,62 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
   const warnText = document.createElement('span');
   warn.append(warnText);
 
-  pick.append(plane, hue.el, alpha.el, segRow, cssRow, warn);
+  // ── Tokens ──────────────────────────────────────────────────────────────
+
+  const tokenParts: HTMLElement[] = [];
+  const swatches: { token: ColourToken; el: HTMLButtonElement }[] = [];
+  if (tokens.length) {
+    const head = el('div', 'pick-tokens-head');
+    const label = el('span', 'pick-tokens-label');
+    label.textContent = `Tokens · ${tokens.length}`;
+    head.append(label);
+    const grid = el('div', 'pick-tokens');
+    grid.setAttribute('role', 'listbox');
+    grid.setAttribute('aria-label', 'Colour tokens');
+    const none = el('div', 'pick-tokens-none');
+    none.textContent = 'No token matches';
+    none.hidden = true;
+    for (const token of tokens) {
+      const b = el('button', 'pick-token');
+      b.type = 'button';
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-label', token.name);
+      b.title = token.via ? `${token.name} → ${token.via}\n${token.value}` : `${token.name}\n${token.value}`;
+      b.style.setProperty('--tok', token.value);
+      b.addEventListener('click', () => pickToken(token));
+      grid.append(b);
+      swatches.push({ token, el: b });
+    }
+    // A filter only when there are more than a glance can take in.
+    if (tokens.length > 24) {
+      const filter = el('input', 'pick-filter');
+      filter.type = 'text';
+      filter.placeholder = 'Filter';
+      filter.spellcheck = false;
+      filter.setAttribute('aria-label', 'Filter colour tokens');
+      filter.addEventListener('input', () => {
+        const keep = new Set(filterTokens(tokens, filter.value).map((t) => t.name));
+        for (const s of swatches) s.el.hidden = !keep.has(s.token.name);
+        none.hidden = keep.size > 0;
+      });
+      filter.addEventListener('keydown', (e) => e.stopPropagation());
+      head.append(filter);
+    }
+    tokenParts.push(head, grid, none);
+  }
+
+  /** A token picked: the field moves to its colour, and the value written is the token. */
+  function pickToken(token: ColourToken): void {
+    const parsed = parseColour(token.value);
+    if (!parsed) return;
+    colour = { ...parsed, h: parsed.c < 1e-7 ? colour.h : parsed.h };
+    picked = token;
+    lastEmitted = `var(${token.name})`;
+    render();
+    opts.onChange(lastEmitted, token.value);
+  }
+
+  pick.append(plane, hue.el, alpha.el, segRow, cssRow, ...tokenParts, warn);
   root.append(pick);
 
   // ── The plane ─────────────────────────────────────────────────────────────
@@ -539,11 +637,21 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
       : fitGamut(next, format === 'p3' ? 'p3' : 'srgb');
     const value = formatColour(colour, format);
     lastEmitted = value;
+    // Moved by hand: no longer the token, whatever it started as.
+    picked = null;
     render();
-    opts.onChange(value);
+    opts.onChange(value, value);
   }
 
   function accept(input: HTMLInputElement): boolean {
+    // `var(--brand)` typed by hand is a token pick, when the page has it.
+    const named = tokenIn(input.value);
+    const known = named ? tokens.find((t) => t.name === named) : undefined;
+    if (known) {
+      input.removeAttribute('aria-invalid');
+      pickToken(known);
+      return true;
+    }
     const parsed = parseColour(input.value);
     if (!parsed) {
       input.setAttribute('aria-invalid', 'true');
@@ -556,8 +664,9 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
     colour = { ...parsed, h: parsed.c < 1e-7 ? colour.h : parsed.h };
     format = formatOf(input.value);
     lastEmitted = input.value.trim();
+    picked = null;
     render();
-    opts.onChange(lastEmitted);
+    opts.onChange(lastEmitted, lastEmitted);
     return true;
   }
 
@@ -624,8 +733,18 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
     });
 
     if (document.activeElement !== output && root.activeElement !== output) {
-      output.value = formatColour(colour, format);
+      output.value = picked ? `var(${picked.name})` : formatColour(colour, format);
       output.removeAttribute('aria-invalid');
+    }
+
+    // The token this colour is: the one picked, or any whose colour is identical.
+    const here = formatColour(colour, 'hex');
+    for (const s of swatches) {
+      const parsed = parseColour(s.token.value);
+      const on = picked ? s.token.name === picked.name
+        : !!parsed && parsed.a === colour.a && formatColour(parsed, 'hex') === here;
+      s.el.toggleAttribute('data-on', on);
+      s.el.setAttribute('aria-selected', String(on));
     }
 
     /*
@@ -693,6 +812,9 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
       if (dead || value === lastEmitted) return;
       const parsed = parseColour(value);
       if (!parsed) return;
+      // The page reports the token's computed colour back: still the token.
+      if (picked && formatColour(parsed, 'hex') === formatColour(parseColour(picked.value) ?? parsed, 'hex')) return;
+      picked = null;
       colour = { ...parsed, h: parsed.c < 1e-7 ? colour.h : parsed.h };
       format = formatOf(value);
       render();

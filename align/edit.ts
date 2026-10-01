@@ -3,6 +3,7 @@ import {
 } from './inspect';
 import { stableSelector } from './selector';
 import { checkScript } from './checks';
+import { tokenIn } from './colour-tokens';
 
 /**
  * Edit mode.
@@ -482,7 +483,9 @@ export function createEditor(now: () => number = Date.now): Editor {
           // change, and a diff that lists it wastes the reader's attention on
           // a line that says nothing.
           if (to === original.computed) continue;
-          rows.push({ selector, locator, prop, from: original.computed, to, token: tokenFor(to, tokens) });
+          // A token picked by name is that token, even where another holds the same value.
+          const written = tokenIn((el as HTMLElement).style.getPropertyValue(prop));
+          rows.push({ selector, locator, prop, from: original.computed, to, token: written ?? tokenFor(to, tokens) });
         }
       }
       return formatPrompt(rows, location.pathname);

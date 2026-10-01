@@ -382,6 +382,13 @@ display can actually make — unlike the HSV square, where most of the area is
 not. Hex, OKLCH and Display P3 all go in and come back out unchanged, and a
 colour outside sRGB says so rather than being quietly flattened.
 
+Under the field are the page's own colour tokens: every custom property in
+scope of the element whose value is a colour, aliases followed to the colour
+they are. Hover one for its name; filter by name once there are more than a
+glance can take in. Picking one writes `var(--blue-600)`, not the hex it
+happens to be, and the prompt carries the token you picked. The token matching
+the current colour is outlined. Typing `var(--name)` into the field works too.
+
 ### Shadows
 
 `box-shadow` is a list, so the control is too: add layers, reorder them, and a

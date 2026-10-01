@@ -69,6 +69,12 @@ export interface Note {
    * scale with it, so the pin can be placed from wherever the element is now.
    */
   anchor?: { fx: number; fy: number; fw: number; fh: number };
+  /**
+   * Fixed, and kept rather than deleted. The loop is note, paste, the agent
+   * fixes some of them, note again; without this the fixed ones had to be
+   * deleted or they went back into the next paste.
+   */
+  done?: boolean;
   /** What edit mode had changed on that element when the note was taken. */
   changes?: { prop: string; from: string; to: string }[];
   /**
@@ -199,13 +205,23 @@ export function quote(comment: string): string {
  * Numbers are the pins' numbers, so "fix 3" in a reply means the pin you can
  * see.
  */
-export function notesToMarkdown(notes: readonly Note[]): string {
+export function notesToMarkdown(notes: readonly Note[], options: { resolved?: number } = {}): string {
   if (notes.length === 0) return '';
 
   const out: string[] = [];
   const count = `${notes.length} note${notes.length === 1 ? '' : 's'}`;
   out.push(`# UI feedback — ${count}`);
   out.push('');
+  /*
+   * Said, not just left out: numbers skip where resolved notes were, and an
+   * agent seeing 1, 2, 5 should know that is deliberate rather than wonder
+   * what it lost.
+   */
+  if (options.resolved) {
+    const n = options.resolved;
+    out.push(`${n} earlier note${n === 1 ? ' is' : 's are'} already resolved and left out, so the numbers skip.`);
+    out.push('');
+  }
 
   const withImages = notes.filter((n) => n.image);
   if (withImages.some((n) => n.image!.path)) {
@@ -322,6 +338,7 @@ export function reviveNotes(raw: unknown): Note[] {
       rect: { x: rect['x'], y: rect['y'], w: rect['w'], h: rect['h'] },
     };
     if (o['region'] === true) note.region = true;
+    if (o['done'] === true) note.done = true;
     const an = o['anchor'] as Record<string, unknown> | undefined;
     if (an && isNum(an['fx']) && isNum(an['fy']) && isNum(an['fw']) && isNum(an['fh'])) {
       note.anchor = { fx: an['fx'], fy: an['fy'], fw: an['fw'], fh: an['fh'] };
@@ -525,4 +542,18 @@ export function barLift(
     if (docked && compact && overlaps) top = Math.min(top, b.y);
   }
   return top === Infinity ? null : viewport.h - top + gap;
+}
+
+/** The notes still to be fixed, in order. */
+export function openNotes(notes: readonly Note[]): Note[] {
+  return notes.filter((n) => !n.done);
+}
+
+/** The bar's count: "3 notes", or "3 open · 2 resolved" once any are. */
+export function countLabel(notes: readonly Note[]): string {
+  const done = notes.filter((n) => n.done).length;
+  const open = notes.length - done;
+  if (notes.length === 0) return '';
+  if (done === 0) return `${open} note${open === 1 ? '' : 's'}`;
+  return `${open} open · ${done} resolved`;
 }

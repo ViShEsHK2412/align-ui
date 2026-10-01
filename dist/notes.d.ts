@@ -89,6 +89,12 @@ export interface Note {
         fw: number;
         fh: number;
     };
+    /**
+     * Fixed, and kept rather than deleted. The loop is note, paste, the agent
+     * fixes some of them, note again; without this the fixed ones had to be
+     * deleted or they went back into the next paste.
+     */
+    done?: boolean;
     /** What edit mode had changed on that element when the note was taken. */
     changes?: {
         prop: string;
@@ -174,7 +180,9 @@ export declare function quote(comment: string): string;
  * Numbers are the pins' numbers, so "fix 3" in a reply means the pin you can
  * see.
  */
-export declare function notesToMarkdown(notes: readonly Note[]): string;
+export declare function notesToMarkdown(notes: readonly Note[], options?: {
+    resolved?: number;
+}): string;
 /**
  * Anything read back from storage, checked field by field.
  *
@@ -275,3 +283,7 @@ export declare function barLift(bar: Rect, blockers: readonly Rect[], viewport: 
     w: number;
     h: number;
 }, gap?: number): number | null;
+/** The notes still to be fixed, in order. */
+export declare function openNotes(notes: readonly Note[]): Note[];
+/** The bar's count: "3 notes", or "3 open · 2 resolved" once any are. */
+export declare function countLabel(notes: readonly Note[]): string;

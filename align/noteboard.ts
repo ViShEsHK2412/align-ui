@@ -6,7 +6,8 @@ import { selectorOf } from './inspect';
 import { resolveStable, stableSelector } from './selector';
 import { bandsOf, boxOf, hitTestThrough } from './measure';
 import {
-  anchorIn, areaFrom, barLift, clampPin, clampToViewport, layoutPins, nextNumber, notesToMarkdown,
+  anchorIn, areaFrom, barLift, clampPin, clampToViewport, countLabel, layoutPins, nextNumber,
+  notesToMarkdown, openNotes,
   rectFrom, reviveNotes,
   subjectOf,
   type Note, type Rect,
@@ -109,6 +110,17 @@ export const NOTES_CSS = `
   line-height: 1;
 }
 .nb-pin:focus-visible { outline: 2px solid ${TEXT.primary}; outline-offset: 2px; }
+/*
+ * Resolved: still on the page so it can be reopened, but out of the way of
+ * the open ones. A surface rather than the inverted fill, and the number
+ * struck through, because a dimmer copy of the same pin reads as disabled
+ * rather than finished.
+ */
+.nb-pin[data-done] {
+  background: ${surface(5)}; color: ${TEXT.secondary};
+  box-shadow: none;
+  text-decoration: line-through;
+}
 
 .nb-surface {
   position: fixed;
@@ -323,13 +335,16 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   const actions = el('div', 'nb-row');
   const del = el('button', 'nb-btn', 'Delete');
   del.setAttribute('data-quiet', '');
+  const resolve = el('button', 'nb-btn', 'Resolve');
+  resolve.setAttribute('data-quiet', '');
+  resolve.title = 'Fixed: keep the note, leave it out of the next copy';
   const hint = el('span', 'nb-grow nb-hint', 'Enter to save');
   hint.title = 'Shift+Enter for a new line';
   const cancel = el('button', 'nb-btn', 'Cancel');
   cancel.setAttribute('data-quiet', '');
   const save = el('button', 'nb-btn', 'Save');
   save.setAttribute('data-primary', '');
-  actions.append(del, hint, cancel, save);
+  actions.append(del, resolve, hint, cancel, save);
   composer.append(shot, text, actions);
 
   const bar = el('div', 'nb-surface nb-bar');
@@ -343,10 +358,12 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   copy.setAttribute('data-primary', '');
   const clear = el('button', 'nb-btn', 'Clear');
   clear.setAttribute('data-quiet', '');
+  const clearResolved = el('button', 'nb-btn', 'Clear resolved');
+  clearResolved.setAttribute('data-quiet', '');
   const done = el('button', 'nb-btn', 'Done');
   done.setAttribute('data-quiet', '');
   done.title = 'Leave notes mode (N)';
-  bar.append(label, status, el('span', 'nb-sep'), copy, clear, done);
+  bar.append(label, status, el('span', 'nb-sep'), copy, clearResolved, clear, done);
 
   root.append(style);
   root.prepend(layer);
@@ -375,11 +392,13 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     const show = on || notes.length > 0;
     bar.toggleAttribute('data-open', show);
     const n = notes.length;
-    countText.textContent = n === 0
-      ? 'Click an element or drag an area'
-      : `${n} note${n === 1 ? '' : 's'}`;
-    copy.disabled = n === 0;
+    const open = openNotes(notes).length;
+    countText.textContent = n === 0 ? 'Click an element or drag an area' : countLabel(notes);
+    // Nothing open is nothing to copy, even with resolved notes on the page.
+    copy.disabled = open === 0;
+    copy.title = open < n ? 'Copies the open notes; resolved ones are left out' : '';
     clear.disabled = n === 0;
+    clearResolved.hidden = open === n;
     done.hidden = !on;
     if (show) requestAnimationFrame(() => { clearPageChrome(); drag.place(); });
   }
@@ -435,6 +454,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       pin.setAttribute('aria-label', `Note ${note.n}: ${note.comment.slice(0, 60)}`);
       pin.title = note.comment;
       pin.dataset['id'] = note.id;
+      pin.toggleAttribute('data-done', Boolean(note.done));
+      if (note.done) pin.setAttribute('aria-label', `Note ${note.n}, resolved: ${note.comment.slice(0, 60)}`);
       pin.addEventListener('pointerenter', () => { hoveredPin = note.id; showArea(note); });
       pin.addEventListener('pointerleave', () => { hoveredPin = null; area.removeAttribute('data-on'); });
       pin.addEventListener('click', (e) => {
@@ -776,6 +797,10 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     // Sized for what is already in it, so an edited long note opens at its length.
     requestAnimationFrame(fit);
     del.hidden = !editing;
+    resolve.hidden = !editing;
+    resolve.textContent = d.note?.done ? 'Reopen' : 'Resolve';
+    // Room for Resolve beside Delete; the hint is for writing a new note.
+    hint.textContent = editing ? '' : 'Enter to save';
     save.textContent = editing ? 'Update' : 'Save';
     save.disabled = false;
     composer.setAttribute('data-open', '');
@@ -1036,13 +1061,30 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     say(`Deleted note ${note.n}`, 1500);
   });
 
+  resolve.addEventListener('click', () => {
+    const note = draft?.note;
+    if (!note) return;
+    // Whatever was typed is kept: resolving is not a reason to lose an edit.
+    note.comment = text.value.trim() || note.comment;
+    if (note.done) delete note.done; else note.done = true;
+    persist();
+    closeComposer();
+    renderPins();
+    renderBar();
+    say(note.done ? `Resolved note ${note.n}` : `Reopened note ${note.n}`, 1500);
+  });
+
   // ── Batch controls ────────────────────────────────────────────────────────
 
   copy.addEventListener('click', async () => {
-    const md = notesToMarkdown(notes);
+    const open = openNotes(notes);
+    if (open.length === 0) return;
+    const resolved = notes.length - open.length;
+    const md = notesToMarkdown(open, { resolved });
     try {
       await navigator.clipboard.writeText(md);
-      say(`Copied ${notes.length} note${notes.length === 1 ? '' : 's'} — paste into your agent`, 2500);
+      say(`Copied ${open.length} note${open.length === 1 ? '' : 's'}`
+        + (resolved ? ` — ${resolved} resolved left out` : ' — paste into your agent'), 2500);
     } catch {
       say('The browser blocked the clipboard. Click the page once and try again.', 4000);
     }
@@ -1053,27 +1095,40 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
    * button saying what the second press does is the confirmation, and it
    * stands down by itself.
    */
-  let clearArmed: ReturnType<typeof setTimeout> | undefined;
-  clear.addEventListener('click', () => {
-    if (!clearArmed) {
-      clear.textContent = 'Clear all?';
-      clearArmed = setTimeout(() => {
-        clearArmed = undefined;
-        clear.textContent = 'Clear';
-      }, 3000);
-      return;
-    }
-    clearTimeout(clearArmed);
-    clearArmed = undefined;
-    clear.textContent = 'Clear';
-    const count = notes.length;
-    for (const note of notes) remove(note);
-    notes = [];
+  const armed = new Map<HTMLButtonElement, ReturnType<typeof setTimeout>>();
+  function twoPress(button: HTMLButtonElement, rest: string, ask: string, act: () => void): void {
+    button.addEventListener('click', () => {
+      const pending = armed.get(button);
+      if (!pending) {
+        button.textContent = ask;
+        armed.set(button, setTimeout(() => { armed.delete(button); button.textContent = rest; }, 3000));
+        return;
+      }
+      clearTimeout(pending);
+      armed.delete(button);
+      button.textContent = rest;
+      act();
+    });
+  }
+
+  function removeAll(which: readonly Note[]): number {
+    const gone = new Set(which.map((n) => n.id));
+    for (const note of which) remove(note);
+    notes = notes.filter((n) => !gone.has(n.id));
     persist();
     closeComposer();
     renderPins();
     renderBar();
-    say(`Cleared ${count} note${count === 1 ? '' : 's'}`, 1500);
+    return which.length;
+  }
+
+  twoPress(clear, 'Clear', 'Clear all?', () => {
+    const n = removeAll([...notes]);
+    say(`Cleared ${n} note${n === 1 ? '' : 's'}`, 1500);
+  });
+  twoPress(clearResolved, 'Clear resolved', 'Clear resolved?', () => {
+    const n = removeAll(notes.filter((x) => x.done));
+    say(`Cleared ${n} resolved note${n === 1 ? '' : 's'}`, 1500);
   });
 
   done.addEventListener('click', () => setMode(false));
@@ -1128,7 +1183,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     },
     destroy(): void {
       clearTimeout(statusTimer);
-      clearTimeout(clearArmed);
+      for (const t of armed.values()) clearTimeout(t);
       cancelAnimationFrame(placing);
       cancelAnimationFrame(hovering);
       removeEventListener('resize', place);

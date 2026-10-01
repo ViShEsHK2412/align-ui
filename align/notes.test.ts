@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   frameCrop, iou, looksLikeThisTab, nextNumber, notesToMarkdown, outputSize,
-  anchorIn, areaFrom, barLift, clampPin, clampToViewport, layoutPins, quote, rectFrom, reviveNotes, shorthand, subjectOf, type Note,
+  anchorIn, areaFrom, barLift, clampPin, clampToViewport, countLabel, layoutPins, openNotes, quote, rectFrom, reviveNotes, shorthand, subjectOf, type Note,
 } from './notes';
 
 const note = (p: Partial<Note> = {}): Note => ({
@@ -391,5 +391,49 @@ describe('barLift', () => {
     const a = { x: 400, y: 660, w: 100, h: 30 };
     const b = { x: 450, y: 600, w: 200, h: 90 };
     expect(barLift(bar, [a, b], vp)).toBe(703 - 600 + 8);
+  });
+});
+
+describe('resolved notes', () => {
+  const a = note({ id: 'a', n: 1 });
+  const b = note({ id: 'b', n: 2, done: true });
+  const c = note({ id: 'c', n: 3 });
+
+  it('leaves resolved notes out of what is copied', () => {
+    expect(openNotes([a, b, c]).map((n) => n.n)).toEqual([1, 3]);
+  });
+
+  it('says how many were left out, so skipped numbers are not a mystery', () => {
+    const md = notesToMarkdown(openNotes([a, b, c]), { resolved: 1 });
+    expect(md).toContain('# UI feedback — 2 notes');
+    expect(md).toContain('1 earlier note is already resolved');
+    expect(md).toContain('### 1.');
+    expect(md).toContain('### 3.');
+    expect(md).not.toContain('### 2.');
+  });
+
+  it('pluralises the left-out line', () => {
+    expect(notesToMarkdown([a], { resolved: 3 })).toContain('3 earlier notes are already resolved');
+  });
+
+  it('says nothing about resolved notes when there are none', () => {
+    expect(notesToMarkdown([a, c])).not.toContain('resolved');
+  });
+
+  it('counts open and done separately once any are done', () => {
+    expect(countLabel([])).toBe('');
+    expect(countLabel([a])).toBe('1 note');
+    expect(countLabel([a, c])).toBe('2 notes');
+    expect(countLabel([a, b, c])).toBe('2 open · 1 resolved');
+    expect(countLabel([b])).toBe('0 open · 1 resolved');
+  });
+
+  it('keeps the resolved flag through storage, and nothing else counts as done', () => {
+    const back = reviveNotes(JSON.parse(JSON.stringify([a, b, { ...c, done: 'yes' }])));
+    expect(back.map((n) => !!n.done)).toEqual([false, true, false]);
+  });
+
+  it('does not reuse a resolved note\'s number', () => {
+    expect(nextNumber([a, b])).toBe(3);
   });
 });

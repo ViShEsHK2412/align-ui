@@ -21,6 +21,11 @@
  * had already used up the headroom the last move left. Same rule: about 10%
  * over the inspected build.
  *
+ * Then it stopped being a budget. This is a personal dev tool that never
+ * ships to a user's browser, so bytes are not the constraint features are.
+ * The numbers are now set far above the build, and are there only to catch
+ * something runaway: a dependency bundled by mistake, a data file inlined.
+ *
  * If this fails, look at the per-module breakdown before changing the number:
  *
  *   npx esbuild align/index.ts --bundle --format=esm --minify \
@@ -29,8 +34,8 @@
 import { readFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-const RAW_MAX = 175 * 1024;
-const GZIP_MAX = 58 * 1024;
+const RAW_MAX = 400 * 1024;
+const GZIP_MAX = 120 * 1024;
 
 const FILE = 'dist/align.js';
 

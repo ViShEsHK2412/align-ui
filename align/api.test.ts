@@ -25,8 +25,9 @@ describe('featureOn', () => {
     expect(featureOn({ notes: 0 as unknown as boolean }, 'notes')).toBe(true);
   });
 
-  it('takes undo with guides, since undo only ever steps back through guides', () => {
-    expect(featureOn({ guides: false }, 'undo')).toBe(false);
+  it('takes undo away only when guides and edits are both off, since it steps back through both', () => {
+    expect(featureOn({ guides: false, edit: false }, 'undo')).toBe(false);
+    expect(featureOn({ guides: false }, 'undo')).toBe(true);
     expect(featureOn({}, 'undo')).toBe(true);
   });
 });

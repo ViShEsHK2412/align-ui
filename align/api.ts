@@ -16,7 +16,8 @@ export type Features = Partial<Record<Feature, boolean>>;
 
 /** Everything is on unless switched off by name. */
 export function featureOn(features: Features | null | undefined, name: Feature | ToolName): boolean {
-  if (name === 'undo') return featureOn(features, 'guides');
+  // Undo steps back through guides and edits, so it goes only when both do.
+  if (name === 'undo') return featureOn(features, 'guides') || featureOn(features, 'edit');
   return features?.[name] !== false;
 }
 

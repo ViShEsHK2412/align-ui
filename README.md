@@ -132,7 +132,8 @@ the ticks they exist to show.
 | `Alt` + drag a guide | drag a copy, leaving the original where it was |
 | arrows | nudge the selected guides by 1px; `Shift` for 10 |
 | `L` | pin that guide, so it cannot be moved or deleted |
-| `Ctrl/Cmd + Z` | undo the last change to the guides: a nudge, a drag, a delete. A held arrow key undoes as one step, not thirty |
+| `Ctrl/Cmd + Z` | undo the last change, to the guides or in edit mode, whichever came last. A slider dragged across forty values, or a held arrow key, undoes as one step |
+| `Ctrl/Cmd + Shift + Z`, `Ctrl + Y` | redo |
 | `T` | type and token readout for the locked element |
 | `\` | hide everything drawn, for a look at the page underneath. Locks, guides and layers all survive it |
 | `F` | freeze the page so a moving thing can be measured |
@@ -340,6 +341,12 @@ navigating away — nothing survives to the next page load.
 
 The footer counts what the tool has written, and `Revert all` puts the lot back
 without disarming.
+
+Every edit is undoable, one gesture at a time: a whole slider drag, a linked
+change to four sides, or a held arrow key is one step. `Ctrl/Cmd + Z` takes back
+whichever came last of an edit and a guide change, and `Ctrl/Cmd + Shift + Z`
+puts it back. `Revert all` is a step too, so it can be undone. Disarming ends
+the history along with the edits.
 
 ### Copy prompt
 

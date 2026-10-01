@@ -31,6 +31,8 @@ export interface History<T> {
   peek(): T[] | null;
   depth(): number;
   clear(): void;
+  /** When the newest entry last grew, or null when empty: orders it against other undo. */
+  lastAt(): number | null;
 }
 
 /**
@@ -66,6 +68,9 @@ export function createHistory<T>(limit = 20, idle = 1000): History<T> {
     },
     clear() {
       stack.length = 0;
+    },
+    lastAt() {
+      return stack[stack.length - 1]?.at ?? null;
     },
   };
 }

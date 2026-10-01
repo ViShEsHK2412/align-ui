@@ -353,7 +353,7 @@ const TOOLS: Tool[] = [
   { name: 'notes', label: 'Notes', key: 'N', toggle: true,
     what: 'click an element or drag an area to screenshot it and say what to fix. Copy prompt hands every note, pictures included, to your agent in one paste' },
   { name: 'undo', label: 'Undo', key: 'Ctrl/Cmd + Z', toggle: false,
-    what: 'step back through the guides — a whole run of nudges counts as one' },
+    what: 'step back through guides and edits, whichever changed last — a whole drag or run of nudges counts as one. Ctrl/Cmd + Shift + Z redoes' },
 ];
 
 export function createIndicator(

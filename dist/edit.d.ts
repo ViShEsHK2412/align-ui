@@ -49,6 +49,21 @@ export interface Editor {
     changes(): Change[];
     /** The ledger, as something you can paste at a coding agent. */
     asPrompt(): string;
+    /**
+     * Everything written between these is one step of undo: a slider dragged
+     * across forty values is one thing you did. Called around a press on the
+     * panel; writes outside a press group themselves (see `set`).
+     */
+    beginGesture(): void;
+    endGesture(): void;
+    /** Step back one gesture. Returns the elements it touched, or [] for none. */
+    undo(): Element[];
+    /** Step forward again, after an undo. */
+    redo(): Element[];
+    canUndo(): boolean;
+    canRedo(): boolean;
+    /** When the newest undo step last changed, to order it against guide undo. */
+    lastAt(): number | null;
 }
 /**
  * A property's current value, preferring what it computes to.
@@ -95,4 +110,4 @@ export interface PromptRow {
     token: string | null;
 }
 export declare function formatPrompt(rows: readonly PromptRow[]): string;
-export declare function createEditor(): Editor;
+export declare function createEditor(now?: () => number): Editor;

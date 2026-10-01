@@ -257,7 +257,18 @@ function snapshot(): Guide[] {
  */
 function record(tag = ''): void {
   history.push(snapshot(), tag);
+  // A new change to the guides ends any chance of redoing an undone one.
+  guideRedo.length = 0;
 }
+
+/** Guide states undone, newest last, for redo. */
+const guideRedo: Guide[][] = [];
+/**
+ * Which kind each undo was, newest last, so redo replays them in the order
+ * they were taken back. A kind whose own redo has since been cleared by a new
+ * change is skipped.
+ */
+const redoKinds: ('guide' | 'edit')[] = [];
 
 function activeGuide(): Guide | null {
   return guides.find((g) => g.id === activeGuideId) ?? null;
@@ -494,7 +505,7 @@ function render(cursor?: { x: number; y: number }) {
     hide: hidden,
     // Copy reads the panel, which needs something locked; undo needs a history.
     canCopy: pinned.length > 0,
-    canUndo: history.depth() > 0,
+    canUndo: history.depth() > 0 || editor.canUndo(),
     panel: boxmodel?.isOpen() ?? false,
   });
   reportTools(toolsState());
@@ -525,15 +536,63 @@ function sameGuides(a: Guide[], b: Guide[]): boolean {
   });
 }
 
+/**
+ * One Ctrl+Z, whichever of guides and edits changed most recently. Two
+ * separate undo stacks behind one key would otherwise make the key's meaning
+ * depend on which tool you happened to touch last but one.
+ */
 function undo(): void {
   // Skip anything that would restore what is already on screen. Guarding the
   // call sites catches the no-ops we know about; this catches the rest, and it
   // cannot skip a real entry -- an entry identical to the present is one whose
   // restoration you could not see.
   while (history.depth() > 0 && sameGuides(history.peek()!, guides)) history.pop();
+  const guideAt = history.lastAt();
+  const editAt = editor.lastAt();
+  if (editAt !== null && (guideAt === null || editAt >= guideAt)) {
+    if (editor.undo().length) {
+      redoKinds.push('edit');
+      afterEditHistory();
+    }
+    return;
+  }
   const before = history.pop();
   if (!before) return;
+  guideRedo.push(snapshot());
+  redoKinds.push('guide');
   setGuides(before);
+  letGoOfGuides();
+}
+
+function redo(): void {
+  while (redoKinds.length) {
+    const kind = redoKinds.pop()!;
+    if (kind === 'edit') {
+      if (!editor.canRedo()) continue;
+      editor.redo();
+      afterEditHistory();
+      return;
+    }
+    const next = guideRedo.pop();
+    if (!next) continue;
+    history.push(snapshot(), '');
+    setGuides(next);
+    letGoOfGuides();
+    return;
+  }
+}
+
+/** The panel and the readout show values read from the page, which just changed under them. */
+function afterEditHistory(): void {
+  controls?.refresh();
+  const last = pinned[pinned.length - 1];
+  if (last && last.el.isConnected) {
+    pinned = pinned.map((b) => (b.el.isConnected ? boxOf(b.el) : b));
+    boxmodel?.show(pinned[pinned.length - 1]!, gapFacts(), previousLock());
+  }
+}
+
+function letGoOfGuides(): void {
   // Whatever the pointer and the keyboard were holding may no longer exist, or
   // may have come back at a different place. Let go of all of it rather than
   // keep a reference into a list that has been replaced.
@@ -713,11 +772,15 @@ function fromOurUI(e: Event): boolean {
  * anything, so this sees the press either way.
  */
 function onPointerDownAny(e: PointerEvent): void {
-  if (fromOurUI(e)) setDimLock(true);
+  if (!fromOurUI(e)) return;
+  setDimLock(true);
+  // Everything this press writes to the page is one step of undo.
+  editor.beginGesture();
 }
 
 function onPointerUpAny(): void {
   setDimLock(false);
+  editor.endGesture();
 }
 
 function setDimLock(on: boolean): void {
@@ -1245,8 +1308,16 @@ function onKey(e: KeyboardEvent) {
     g.pinned = !g.pinned;
     setGuides([...guides]);
     render();
+  } else if (overlay && (e.ctrlKey || e.metaKey)
+             && ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y' && !e.shiftKey))) {
+    // Redo: Ctrl+Shift+Z everywhere, Ctrl+Y as Windows has it.
+    if (!on('undo') || !(editor.canRedo() || guideRedo.length)) return;
+    e.preventDefault();
+    redo();
+    render();
+    return;
   } else if (overlay && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-    if (history.depth() === 0) return;
+    if (history.depth() === 0 && !editor.canUndo()) return;
     e.preventDefault();
     onTool('undo');
     return;

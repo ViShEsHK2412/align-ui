@@ -23,6 +23,8 @@ export interface History<T> {
     peek(): T[] | null;
     depth(): number;
     clear(): void;
+    /** When the newest entry last grew, or null when empty: orders it against other undo. */
+    lastAt(): number | null;
 }
 /**
  * @param limit how many gestures to remember. Twenty is roughly a session's

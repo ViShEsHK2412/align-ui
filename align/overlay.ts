@@ -5,6 +5,7 @@ import {
   alpha, ink, pageIsDark, RULER, TYPE, WEIGHT, whenFontReady, type Ink,
 } from './theme';
 import type { Box, Guide, Segment } from './types';
+import { bandLabel, type Band } from './lint';
 
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
@@ -35,6 +36,12 @@ export interface OverlayState {
   grid: GridSpec | null;
   /** Whether to lay the pixel texture under everything. */
   pixels: boolean;
+  /**
+   * The spacing lint, measured at one scroll position. dx/dy are how far the
+   * page has scrolled since, so the bands stay on their spacing between scans
+   * instead of lagging a scroll behind it.
+   */
+  lint: { bands: Band[]; dx: number; dy: number } | null;
   guides: Guide[];
   /** The one under the cursor or being dragged, drawn at full strength. */
   liveGuide: Guide | null;
@@ -96,7 +103,7 @@ export function mountOverlay(): Overlay {
   const state: OverlayState = {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false, hidden: false,
     dimLock: false,
-    grid: null, pixels: false,
+    grid: null, pixels: false, lint: null,
     guides: [], liveGuide: null, activeGuide: null,
   };
   let c: Ink = ink(pageIsDark());
@@ -242,6 +249,73 @@ export function mountOverlay(): Overlay {
   function chip(text: string, x: number, y: number, bg: string, center = false) {
     const { w, h } = chipSize(text);
     chipAt(text, center ? x - w / 2 : x, center ? y - h / 2 : y, bg);
+  }
+
+  /**
+   * The spacing lint.
+   *
+   * On-scale spacing is a quiet wash in the guide colour, with no number: it
+   * is fine, and a page of fine numbers is a page you cannot read. Off-scale
+   * spacing is hatched in the measurement colour and carries its fix. Only the
+   * problems have text, so the eye goes straight to them.
+   *
+   * Labels that would land on a label already drawn are left out rather than
+   * stacked: a pile of overlapping chips says nothing, and the band itself is
+   * still hatched. Hover it with the tool for the exact number.
+   */
+  function lint(l: { bands: Band[]; dx: number; dy: number }) {
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    const ok = alpha(c.guide, 0.18);
+    const bad = alpha(c.measure, 0.16);
+    const hatch = alpha(c.measure, 0.6);
+    ctx.save();
+    ctx.translate(l.dx, l.dy);
+    for (const b of l.bands) {
+      const { x, y, w, h } = b.rect;
+      if (x + w + l.dx < 0 || y + h + l.dy < 0 || x + l.dx > innerWidth || y + l.dy > innerHeight) continue;
+      ctx.fillStyle = b.ok ? ok : bad;
+      ctx.fillRect(x, y, w, h);
+      if (b.ok) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      ctx.strokeStyle = hatch;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = -h; k < w; k += 5) {
+        ctx.moveTo(x + k, y + h);
+        ctx.lineTo(x + k + h, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    /*
+     * The hatching marks every off-scale band; a label only has to say what
+     * the fix is. A grid of identical cards repeats one mistake a hundred
+     * times, and a hundred "6 → --space-2" chips would cover the page they
+     * describe, so a label is not repeated near one that says the same.
+     */
+    const said: { text: string; x: number; y: number }[] = [];
+    const NEAR = 180;
+    let shown = 0;
+    for (const b of l.bands) {
+      if (b.ok || shown >= 80) continue;
+      const cx = b.rect.x + b.rect.w / 2 + l.dx;
+      const cy = b.rect.y + b.rect.h / 2 + l.dy;
+      if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) continue;
+      const text = bandLabel(b);
+      if (said.some((p) => p.text === text && Math.abs(p.x - cx) < NEAR && Math.abs(p.y - cy) < NEAR)) continue;
+      const { w, h } = chipSize(text);
+      const r = { x: cx - w / 2, y: cy - h / 2, w, h };
+      if (placed.some((p) => r.x < p.x + p.w && p.x < r.x + r.w && r.y < p.y + p.h && p.y < r.y + r.h)) continue;
+      placed.push(r);
+      said.push({ text, x: cx, y: cy });
+      chip(text, cx, cy, c.measure, true);
+      shown++;
+    }
   }
 
   /**
@@ -403,6 +477,8 @@ export function mountOverlay(): Overlay {
       if (state.grid) grid(state.grid);
       ctx.restore();
     }
+
+    if (state.lint) lint(state.lint);
 
     const lockInk = state.dimLock ? alpha(c.accent, 0.15) : c.accent;
     for (const box of state.pinned) outline(box, lockInk);

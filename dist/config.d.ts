@@ -1,4 +1,5 @@
 import type { CaptureFrame } from './capture';
+import { type LintOptions } from './lint';
 export interface Config {
     /**
      * The design grid to check against, if the project has one. There is no
@@ -56,6 +57,12 @@ export interface Config {
      * at the moment notes mode turns on.
      */
     captureFrame: CaptureFrame | null;
+    /**
+     * The spacing lint (S). It reads your spacing tokens; these are only used
+     * when the page defines none: multiples of base, plus anything in allow.
+     * Spacing wider than max is treated as layout and left alone.
+     */
+    lint: LintOptions;
 }
 export declare const DEFAULTS: Config;
 export declare function mergeConfig(partial?: Partial<Config>): Config;

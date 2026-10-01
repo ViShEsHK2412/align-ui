@@ -1,6 +1,8 @@
 import { createBoxModel, type BoxModel } from './boxmodel';
 import { createHistory } from './history';
-import { mergeConfig, type Config } from './config';
+import { mergeConfig, skipSelector, type Config } from './config';
+import { analyze, scaleFrom, type LintResult } from './lint';
+import { collectLintBoxes } from './lint-dom';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
 import { createNoteBoard, type NoteBoard } from './noteboard';
@@ -11,7 +13,7 @@ import {
 } from './measure';
 import { mountOverlay, type Overlay } from './overlay';
 import { forceTheme, loadFont, unloadFont } from './theme';
-import { describeGap, gapFactOf } from './inspect';
+import { describeGap, gapFactOf, tokensInScope } from './inspect';
 import { createPicker, type Picker } from './picker';
 import { isFrozen, setFrozen } from './freeze';
 import { setXray } from './xray';
@@ -75,6 +77,58 @@ let activeGuideId: number | null = null;
  * showing nothing looks broken, which is the same argument the modes make.
  */
 let hidden = false;
+/**
+ * The spacing lint. A mode like x-ray, so off on every open.
+ *
+ * Scanned, not drawn from live geometry each frame: a scan reads a computed
+ * style per container, which is cheap once and wasteful sixty times a second.
+ * It re-runs when something could have changed the answer — the page
+ * scrolled, resized, or changed — and between scans the bands are shifted by
+ * the scroll so they never lag behind the spacing they describe.
+ */
+let lint = false;
+let lintResult: LintResult | null = null;
+let lintAt = { x: 0, y: 0 };
+let lintTimer: ReturnType<typeof setTimeout> | undefined;
+let lintObserver: MutationObserver | null = null;
+
+function scanLint(): void {
+  lintTimer = undefined;
+  if (!lint || !overlay) return;
+  const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const scale = scaleFrom(tokensInScope(document.documentElement), cfg.lint, rootFont);
+  lintResult = analyze(collectLintBoxes(skipSelector(cfg)), scale, cfg.lint);
+  lintAt = { x: scrollX, y: scrollY };
+  render();
+}
+
+/** Coalesce a burst of changes — a scroll, a typed value, an animation — into one scan. */
+function queueLint(): void {
+  if (!lint || lintTimer !== undefined) return;
+  lintTimer = setTimeout(scanLint, 150);
+}
+
+function setLint(on: boolean): void {
+  lint = on;
+  clearTimeout(lintTimer);
+  lintTimer = undefined;
+  lintObserver?.disconnect();
+  lintObserver = null;
+  removeEventListener('scroll', queueLint, true);
+  if (!on) { lintResult = null; return; }
+  /*
+   * Body, not the document: the tool's own UI hangs off <html>, so nothing it
+   * does to itself can trigger a rescan of the page. Edits made in edit mode
+   * are inline styles on page elements, and do — which is the point: the
+   * hatching updates as you drag a padding slider onto the scale.
+   */
+  lintObserver = new MutationObserver(queueLint);
+  if (document.body) {
+    lintObserver.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  }
+  addEventListener('scroll', queueLint, { capture: true, passive: true });
+  scanLint();
+}
 /*
  * True while a pointer is down on one of our own controls.
  *
@@ -310,6 +364,9 @@ function render(cursor?: { x: number; y: number }) {
     hidden,
     dimLock,
     grid: grid && cfg.grid ? cfg.grid : null,
+    lint: lint && lintResult
+      ? { bands: lintResult.bands, dx: lintAt.x - scrollX, dy: lintAt.y - scrollY }
+      : null,
     pixels,
     guides,
     liveGuide: dragging ?? hoverGuide,
@@ -320,6 +377,8 @@ function render(cursor?: { x: number; y: number }) {
   indicator?.update(pinned.length, {
     edit: editor.armed,
     notes: noteboard?.mode() ?? false,
+    lint,
+    lintIssues: lintResult?.issues ?? 0,
     rulers,
     xray,
     grid,
@@ -423,6 +482,7 @@ function onTool(name: ToolName): void {
       if (pinned.length) render();
       break;
     case 'notes': noteboard?.setMode(!noteboard.mode()); break;
+    case 'lint': setLint(!lint); break;
     case 'undo': undo(); break;
   }
   render();
@@ -704,6 +764,7 @@ function panelSignature(): string {
 
 /** The canvas has to be refitted on resize; the boxes are handled by watch(). */
 function onViewportChange() {
+  queueLint();
   overlay?.resize();
 }
 
@@ -734,7 +795,7 @@ function activate() {
   picker = createPicker(overlay.root);
   indicator.update(0, {
     rulers, xray, grid, pixels, freeze: isFrozen(), type: false, panel: false,
-    hide: false, edit: false, notes: false, canCopy: false, canUndo: false,
+    hide: false, edit: false, notes: false, lint: false, lintIssues: 0, canCopy: false, canUndo: false,
   });
   addEventListener('pointerdown', onPointerDownAny, { capture: true });
   addEventListener('pointerup', onPointerUpAny, { capture: true });
@@ -773,6 +834,7 @@ function deactivate() {
   controls?.destroy();
   controls = null;
   noteboard?.destroy();
+  setLint(false);
   noteboard = null;
   picker?.destroy();
   picker = null;
@@ -906,6 +968,12 @@ function onKey(e: KeyboardEvent) {
     // what tells you it worked rather than the key doing it quietly.
     e.preventDefault();
     onTool('edit');
+    return;
+  } else if (overlay && e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // Never with a modifier: Ctrl/Cmd+S is save, and taking it would be the
+    // tool eating a keystroke that was never meant for it.
+    e.preventDefault();
+    onTool('lint');
     return;
   } else if (overlay && e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     // Notes. Not while a modifier is held: Ctrl+N is a new window, and taking

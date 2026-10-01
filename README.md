@@ -135,6 +135,7 @@ the ticks they exist to show.
 | `X` | x-ray: outline every element on the page |
 | `G` | the design grid, when one is configured |
 | `K` | a 10px pixel grid, for reading an offset off the page |
+| `S` | spacing lint: every gap and padding on screen, checked against your spacing tokens |
 | `P` | pick a colour from anywhere on screen |
 | `E` | arm edit mode, and disarm it. Disarming puts everything back |
 | `N` | notes mode: click an element or drag an area to screenshot it and say what to fix |
@@ -238,6 +239,32 @@ one configured. There is no default, because a guessed grid is worse than none.
 
 `K` lays a 10px lattice over the page in screen space, for reading an offset off
 without measuring it.
+
+### Spacing lint
+
+`S` shades every padding and every gap between siblings on screen. On-scale
+ones are tinted, off-scale ones are hatched and labelled with the fix, and the
+button counts them.
+
+The scale is read from the page's own tokens: any custom property whose name
+says spacing (`--space-4`, `--gap-md`, `--spacing-inline-sm`, `--size-3`) and
+whose value is a length. `--radius-md: 8px` holds a spacing-shaped number and
+is not spacing; names decide, not values. So the label says the token to write,
+`14 → --space-4`, rather than a number to hardcode. When two tokens hold one
+value, the one from the larger family wins: `--space-4` over an alias
+`--gap-md`.
+
+With fewer than three spacing tokens there is no scale to read, and it falls
+back to multiples of a base: Tailwind v4's `--spacing` unit when the page has
+one, 4px otherwise.
+
+Left alone, because nobody chose them: `space-between` and its relatives,
+gaps between absolutely positioned elements, rows and cells placed by table
+layout, overlaps, wrapped lines, and anything wider than `max`. Fractions are
+always flagged, however close: 15.5 is a layout accident, not a decision.
+
+It rescans as the page changes and as you scroll, so it follows edit mode.
+Only what is on screen is measured.
 
 ### Freeze
 
@@ -423,6 +450,11 @@ initAlign({
   // columns at 24 means nothing without knowing whose system it is, and a
   // guessed grid is worse than none, because it looks authoritative.
   grid: { columns: 12, gutter: 24, margin: 24, maxWidth: 1200 },
+
+  // The spacing lint, for `S`. Only used when the page defines no spacing
+  // tokens: multiples of `base`, plus anything in `allow`. Gaps wider than
+  // `max` are layout, not spacing, and are never checked.
+  lint: { base: 4, allow: [], max: 128 },
 });
 ```
 

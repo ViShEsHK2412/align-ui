@@ -14,6 +14,13 @@
  * feature. Raising it to whatever today's build happens to weigh would make it
  * decorative; leaving it where it was would make every commit red.
  *
+ * It moved again for the spacing lint, at 155KB raw and 53KB gzipped. The
+ * build that crossed it was 158.7KB, and the 7.1KB it grew by was checked
+ * module by module: lint.ts 2.9KB, lint-dom.ts 1.5KB, and the rest its
+ * drawing, its button and its wiring. Notes, selectors and the capture hook
+ * had already used up the headroom the last move left. Same rule: about 10%
+ * over the inspected build.
+ *
  * If this fails, look at the per-module breakdown before changing the number:
  *
  *   npx esbuild align/index.ts --bundle --format=esm --minify \
@@ -22,8 +29,8 @@
 import { readFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
-const RAW_MAX = 155 * 1024;
-const GZIP_MAX = 53 * 1024;
+const RAW_MAX = 175 * 1024;
+const GZIP_MAX = 58 * 1024;
 
 const FILE = 'dist/align.js';
 

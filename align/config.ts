@@ -1,4 +1,5 @@
 import type { CaptureFrame } from './capture';
+import { LINT_DEFAULTS, type LintOptions } from './lint';
 
 export interface Config {
   /**
@@ -49,6 +50,12 @@ export interface Config {
    * at the moment notes mode turns on.
    */
   captureFrame: CaptureFrame | null;
+  /**
+   * The spacing lint (S). It reads your spacing tokens; these are only used
+   * when the page defines none: multiples of base, plus anything in allow.
+   * Spacing wider than max is treated as layout and left alone.
+   */
+  lint: LintOptions;
 }
 
 export const DEFAULTS: Config = {
@@ -61,10 +68,11 @@ export const DEFAULTS: Config = {
   theme: 'auto',
   notesEndpoint: '/__align/notes',
   captureFrame: null,
+  lint: { ...LINT_DEFAULTS },
 };
 
 export function mergeConfig(partial: Partial<Config> = {}): Config {
-  return { ...DEFAULTS, ...partial };
+  return { ...DEFAULTS, ...partial, lint: { ...DEFAULTS.lint, ...(partial.lint ?? {}) } };
 }
 
 /** Elements that are never worth measuring, plus the user's escape hatch. */

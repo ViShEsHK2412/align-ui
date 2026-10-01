@@ -1,5 +1,6 @@
 import { type GridSpec } from './measure';
 import type { Box, Guide, Segment } from './types';
+import { type Band } from './lint';
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
  * Everything draws inside a single requestAnimationFrame — never synchronously
@@ -31,6 +32,16 @@ export interface OverlayState {
     grid: GridSpec | null;
     /** Whether to lay the pixel texture under everything. */
     pixels: boolean;
+    /**
+     * The spacing lint, measured at one scroll position. dx/dy are how far the
+     * page has scrolled since, so the bands stay on their spacing between scans
+     * instead of lagging a scroll behind it.
+     */
+    lint: {
+        bands: Band[];
+        dx: number;
+        dy: number;
+    } | null;
     guides: Guide[];
     /** The one under the cursor or being dragged, drawn at full strength. */
     liveGuide: Guide | null;

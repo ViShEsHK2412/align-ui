@@ -3,6 +3,8 @@ import {
   WEIGHT,
 } from './theme';
 import { icon, type IconName } from './icons';
+import { INK, themed } from './theme';
+const INK_MEASURE = themed(INK.measure);
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 
 /**
@@ -29,6 +31,9 @@ export interface ToolState {
   edit: boolean;
   /** Whether notes mode is catching clicks. */
   notes: boolean;
+  /** Whether the spacing lint is on, and how many problems it is showing. */
+  lint: boolean;
+  lintIssues: number;
   /** Whether the two one-shots have anything to act on right now. */
   canCopy: boolean;
   canUndo: boolean;
@@ -36,7 +41,7 @@ export interface ToolState {
 
 /** A control does one of these when pressed; index.ts owns what they mean. */
 export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze'
-  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes';
+  | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes' | 'lint';
 
 export interface Indicator {
   update(locked: number, state: ToolState): void;
@@ -187,6 +192,16 @@ const CSS = DRAG_CSS + `
  * already means a measurement here, and a second meaning for it would cost
  * more than the emphasis is worth.
  */
+.tool[data-count] { position: relative; }
+.tool[data-count]::after {
+  content: attr(data-count);
+  position: absolute; top: -4px; right: -4px;
+  min-width: 14px; height: 14px; padding: 0 3px;
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: ${WEIGHT.semibold}; line-height: 1;
+  background: ${INK_MEASURE}; color: ${GROUND};
+  pointer-events: none;
+}
 .tool[data-tool='edit'][data-on] {
   background: ${TEXT.primary};
   color: ${GROUND};
@@ -315,6 +330,8 @@ const TOOLS: Tool[] = [
     what: 'the grid your design is built on, columns filled and gutters left empty. Needs one configured' },
   { name: 'pixels', label: 'Pixel grid', key: 'K', toggle: true,
     what: 'a ten-pixel lattice over the page, to read an offset off without measuring it' },
+  { name: 'lint', label: 'Spacing', key: 'S', toggle: true,
+    what: 'every gap and padding on screen, checked against your spacing tokens. Off-scale ones are hatched and show the token that fixes them' },
   { name: 'type', label: 'Type', key: 'T', toggle: true,
     what: 'add size, weight, line height and tracking to the panel, each checked against your scale' },
   { name: 'panel', label: 'Box model', key: 'B', toggle: true,
@@ -476,6 +493,14 @@ ${t.what}`;
         buttons.get(t.name)?.toggleAttribute('data-on', state[t.name as keyof ToolState] === true);
       }
       // The two one-shots go dead when there is nothing for them to act on.
+      // The lint's count rides on its own button: the number of problems is
+      // the reason to look, and it belongs where the switch is.
+      const lintBtn = buttons.get('lint');
+      if (lintBtn) {
+        const n = state.lint ? state.lintIssues : 0;
+        if (n > 0) lintBtn.setAttribute('data-count', n > 99 ? '99+' : String(n));
+        else lintBtn.removeAttribute('data-count');
+      }
       const copy = buttons.get('copy');
       if (copy) copy.disabled = !state.canCopy;
       const undo = buttons.get('undo');

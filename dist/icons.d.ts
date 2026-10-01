@@ -132,6 +132,7 @@ export declare const ICONS: {
      */
     readonly check: readonly [Shape];
     readonly notes: readonly [Shape, Shape, Shape];
+    readonly lint: readonly [Shape, Shape, Shape, Shape, Shape];
     readonly trash: readonly [Shape, Shape, Shape];
     readonly warning: readonly [Shape, Shape, Shape];
     readonly cross: readonly [Shape, Shape];

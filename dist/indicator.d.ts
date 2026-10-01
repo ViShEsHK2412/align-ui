@@ -21,12 +21,15 @@ export interface ToolState {
     edit: boolean;
     /** Whether notes mode is catching clicks. */
     notes: boolean;
+    /** Whether the spacing lint is on, and how many problems it is showing. */
+    lint: boolean;
+    lintIssues: number;
     /** Whether the two one-shots have anything to act on right now. */
     canCopy: boolean;
     canUndo: boolean;
 }
 /** A control does one of these when pressed; index.ts owns what they mean. */
-export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes';
+export type ToolName = 'rulers' | 'xray' | 'grid' | 'pixels' | 'freeze' | 'type' | 'panel' | 'hide' | 'copy' | 'pick' | 'undo' | 'edit' | 'notes' | 'lint';
 export interface Indicator {
     update(locked: number, state: ToolState): void;
     /**

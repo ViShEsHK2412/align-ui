@@ -226,6 +226,14 @@ export const ICONS = {
     p('M12 7v6'),
     p('M9 10h6'),
   ],
+  // Two blocks and the space between them, marked: spacing, checked.
+  lint: [
+    p('M3 4h6v16H3z', 0.45),
+    p('M15 4h6v16h-6z', 0.45),
+    p('M9 12h6'),
+    p('M10.5 10l-1.5 2 1.5 2'),
+    p('M13.5 10l1.5 2-1.5 2'),
+  ],
   trash: [
     p('M3 6h18'),
     p('M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'),

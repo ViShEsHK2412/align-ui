@@ -1,5 +1,6 @@
 import type { CaptureFrame } from './capture';
 import type { GridConfig } from './grid';
+import type { Features, PortalTarget, ToolsState } from './api';
 import { type LintOptions } from './lint';
 export interface Config {
     /**
@@ -63,6 +64,30 @@ export interface Config {
      * Spacing wider than max is treated as layout and left alone.
      */
     lint: LintOptions;
+    /**
+     * Tools to leave out. `{ notes: false }` removes the button, the key and the
+     * help row; `guides: false` removes guides and the keys that work them.
+     * Everything not named stays on.
+     */
+    features: Features;
+    /**
+     * Where the overlay mounts: an element, or a function returning one, read
+     * each time the tool opens. The page's root when left out, or when the
+     * element is not in the document. Point it inside a modal `<dialog>` to
+     * keep the tool usable while the modal makes the rest of the page inert.
+     */
+    portalTarget: PortalTarget;
+    /**
+     * 'local' shares guides, notes and preferences across tabs, as before.
+     * 'session' keeps them per tab, so two tabs on one app stay apart.
+     */
+    storage: 'local' | 'session';
+    /**
+     * Called with the tool's state whenever it changes: opened, closed, a tool
+     * switched, an element locked. Also dispatched on window as an
+     * `align:tools` CustomEvent, for code that cannot pass a callback.
+     */
+    onToolsChange: ((state: ToolsState) => void) | null;
 }
 export declare const DEFAULTS: Config;
 export declare function mergeConfig(partial?: Partial<Config>): Config;

@@ -74,7 +74,7 @@ export interface Overlay {
   destroy(): void;
 }
 
-export function mountOverlay(): Overlay {
+export function mountOverlay(target: HTMLElement = document.documentElement): Overlay {
   const host = document.createElement('div');
   host.id = '__align_host';
   host.setAttribute('data-align-ignore', '');
@@ -84,7 +84,7 @@ export function mountOverlay(): Overlay {
   // would fight us during hydration.
   host.style.cssText = 'all: initial; position: fixed; inset: 0; ' +
     'z-index: 2147483647; pointer-events: none;';
-  document.documentElement.appendChild(host);
+  target.appendChild(host);
 
   /*
    * Open, not closed.

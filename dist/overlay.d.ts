@@ -67,4 +67,4 @@ export interface Overlay {
     resize(): void;
     destroy(): void;
 }
-export declare function mountOverlay(): Overlay;
+export declare function mountOverlay(target?: HTMLElement): Overlay;

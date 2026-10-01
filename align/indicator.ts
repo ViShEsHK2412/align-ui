@@ -359,7 +359,10 @@ const TOOLS: Tool[] = [
 export function createIndicator(
   root: ShadowRoot,
   onTool: (name: ToolName) => void,
+  /** Tools switched off in the config: no button, no row in the key list. */
+  enabled: (name: ToolName | 'guides') => boolean = () => true,
 ): Indicator {
+  const shown = TOOLS.filter((t) => enabled(t.name));
   const style = document.createElement('style');
   style.textContent = CSS;
   root.appendChild(style);
@@ -378,8 +381,8 @@ export function createIndicator(
   const acks = new Map<ToolName, ReturnType<typeof setTimeout>>();
   const tools = document.createElement('div');
   tools.className = 'tools';
-  for (const t of TOOLS) {
-    if (t.name === 'freeze' || t.name === 'copy') {
+  for (const t of shown) {
+    if ((t.name === 'freeze' || t.name === 'copy') && tools.lastElementChild?.className !== 'sep' && tools.childElementCount) {
       const rule = document.createElement('span');
       rule.className = 'sep';
       tools.appendChild(rule);
@@ -436,8 +439,9 @@ ${t.what}`;
   // The tools first, because that is what the bar above shows and this is the
   // only place the icons are ever named.
   heading('The bar, left to right');
-  for (const t of TOOLS) row(t.key, `${t.label} — ${t.what}`, t.name as IconName);
+  for (const t of shown) row(t.key, `${t.label} — ${t.what}`, t.name as IconName);
   for (const group of GESTURES) {
+    if (group.title === 'Guides' && !enabled('guides')) continue;
     heading(group.title);
     for (const [key, what] of group.rows) row(key, what);
   }
@@ -490,7 +494,7 @@ ${t.what}`;
       const gutter = state.rulers && !state.hide;
       flag.toggleAttribute('data-rulers', gutter);
       help.toggleAttribute('data-rulers', gutter);
-      for (const t of TOOLS) {
+      for (const t of shown) {
         if (!t.toggle) continue;
         // Explicitly a boolean: toggleAttribute with undefined flips the
         // attribute rather than setting it, which reads as a flickering button.

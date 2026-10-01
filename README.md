@@ -496,8 +496,42 @@ initAlign({
   // tokens: multiples of `base`, plus anything in `allow`. Gaps wider than
   // `max` are layout, not spacing, and are never checked.
   lint: { base: 4, allow: [], max: 128 },
+
+  // Tools to leave out: no button, no key, no row in the key list. Everything
+  // not named stays on. `guides: false` also takes the guide keys and undo.
+  features: { notes: false, pick: false },
+
+  // Where the overlay mounts, read each time the tool opens. See below.
+  portalTarget: () => document.querySelector('dialog[open]'),
+
+  // 'session' keeps guides, notes and preferences per tab.
+  storage: 'local',
+
+  // Told whenever what the tool is doing changes. See below.
+  onToolsChange: (state) => console.log(state),
 });
 ```
+
+### Host integration
+
+`portalTarget` exists for modals. A modal `<dialog>` makes everything outside
+it inert, the tool included, so open the dialog first and the tool mounts
+inside it. Anything unusable, such as a function that throws or an element no
+longer in the document, falls back to the page root.
+
+`onToolsChange` is called with the tool's state whenever it changes: opened,
+closed, a tool switched, an element locked, a guide added. Never per frame: a
+state identical to the last one is not reported. The same state is dispatched
+on `window` as an `align:tools` event, for code that cannot pass a callback:
+
+```ts
+addEventListener('align:tools', (e) => {
+  const { open, locked, guides, notes, rulers, edit, noting } = e.detail;
+  // e.g. pause your own keyboard shortcuts while align is open
+});
+```
+
+A listener that throws is logged and never breaks the tool.
 
 `maxWidth` is the content width the grid is centred in; `0` fills the window.
 The centring is against the layout viewport rather than `window.innerWidth`, so
@@ -607,6 +641,7 @@ npm run size        # fails over 80 KB
 | `tokens.html` | tokens and provenance: where a gap came from, which numbers are on the scale |
 | `stress.html` | the hard cases, each section stating what the right answer is |
 | `grids.html` | every kind of grid layer at once: page columns, a card's own columns, rows, a baseline |
+| `api.html` | the host API: tools switched off, per-tab storage, a live log of `align:tools`, and a modal the tool mounts inside |
 
 `stress.html` is the one to reach for when changing anything: scaled subtrees,
 every shape a grid and a flex row come in, out-of-flow children, scroll

@@ -56,4 +56,6 @@ export interface Indicator {
 export declare const INSET: 16;
 export declare const FLAG_H = 36;
 export declare const STEP: 8;
-export declare function createIndicator(root: ShadowRoot, onTool: (name: ToolName) => void): Indicator;
+export declare function createIndicator(root: ShadowRoot, onTool: (name: ToolName) => void, 
+/** Tools switched off in the config: no button, no row in the key list. */
+enabled?: (name: ToolName | 'guides') => boolean): Indicator;

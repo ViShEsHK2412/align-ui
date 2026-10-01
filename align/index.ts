@@ -8,6 +8,7 @@ import {
   clearAxis, dragGroup, duplicate, guidesIn, prune, removeSelected, shift, toggle,
 } from './guide-select';
 import type { GridDraw } from './overlay';
+import { CLOSED, createToolsReporter, featureOn, resolvePortal, type Feature, type ToolsState } from './api';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
 import { createNoteBoard, type NoteBoard } from './noteboard';
@@ -22,7 +23,7 @@ import { describeGap, gapFactOf, tokensInScope } from './inspect';
 import { createPicker, type Picker } from './picker';
 import { isFrozen, setFrozen } from './freeze';
 import { setXray } from './xray';
-import { loadFlag, loadGuides, saveFlag, saveGuides } from './store';
+import { loadFlag, loadGuides, saveFlag, saveGuides, useStorage } from './store';
 import type { GapLine } from './boxmodel';
 import type { Box, Guide, Segment } from './types';
 
@@ -33,9 +34,13 @@ import type { Box, Guide, Segment } from './types';
 
 export type { Box, Bands, Segment } from './types';
 export type { Config } from './config';
+export type { Feature, Features, PortalTarget, ToolsState } from './api';
+export type { GridConfig, GridLayer } from './grid';
+export type { CaptureFrame } from './capture';
 
 declare global {
   interface Window { __align?: boolean }
+  interface WindowEventMap { 'align:tools': CustomEvent<ToolsState> }
 }
 
 let cfg: Config;
@@ -56,13 +61,14 @@ let noteboard: NoteBoard | null = null;
 const editor: Editor = createEditor();
 /** X-ray is the one thing that writes to the page, so it is tracked here. */
 let xray = false;
-let grid = loadFlag('grid');
-let pixels = loadFlag('pixels');
+/** Read in initAlign, once the config has said which storage to read. */
+let grid = false;
+let pixels = false;
 let hover: Box | null = null;
 let pinned: Box[] = [];
 let watching = 0;
 /** Sticky across open and close, like the panel's position. */
-let rulers = loadFlag('rulers');
+let rulers = false;
 /** Guides live for the session: across toggling, gone on reload. */
 let guides: Guide[] = [];
 let nextGuideId = 1;
@@ -97,6 +103,29 @@ function settleSelection(): void {
  * showing nothing looks broken, which is the same argument the modes make.
  */
 let hidden = false;
+
+/** Whether the config left this tool in. Everything is, unless named off. */
+function on(name: Feature | ToolName): boolean {
+  return featureOn(cfg.features, name);
+}
+
+/** The host's view of the tool, reported only when it changes. */
+const reportTools = createToolsReporter(() => cfg?.onToolsChange);
+function toolsState(): ToolsState {
+  return {
+    open: overlay !== null,
+    locked: pinned.length,
+    guides: guides.length,
+    notes: noteboard?.count() ?? 0,
+    rulers, xray, grid, pixels, lint,
+    type: boxmodel?.showsType() ?? false,
+    panel: boxmodel?.isOpen() ?? false,
+    hide: hidden,
+    freeze: isFrozen(),
+    edit: editor.armed,
+    noting: noteboard?.mode() ?? false,
+  };
+}
 
 /**
  * The layout grids, laid out fresh for each frame drawn.
@@ -468,6 +497,7 @@ function render(cursor?: { x: number; y: number }) {
     canUndo: history.depth() > 0,
     panel: boxmodel?.isOpen() ?? false,
   });
+  reportTools(toolsState());
 }
 
 /**
@@ -526,6 +556,8 @@ function undo(): void {
  * and the feature read as broken.
  */
 function onTool(name: ToolName): void {
+  // Switched off in the config: the button is not there, and the key is not either.
+  if (!on(name)) return;
   switch (name) {
     case 'rulers': rulers = !rulers; saveFlag('rulers', rulers); break;
     case 'xray': xray = !xray; setXray(xray); break;
@@ -536,7 +568,7 @@ function onTool(name: ToolName): void {
     case 'panel': boxmodel?.toggle(); break;
     case 'hide':
       hidden = !hidden;
-      boxmodel?.setHidden(hidden);
+      boxmodel?.setHidden(hidden || !on('panel'));
       if (hidden) picker?.close();
       break;
     case 'copy': copyReading(); break;
@@ -715,7 +747,7 @@ function onMouseDown(e: MouseEvent) {
   // Precedence, so the gestures never fight: a rule starts a new guide, a
   // guide under the cursor gets picked up, anything else locks an element.
   const fromRuler = inRuler(e.clientX, e.clientY);
-  if (fromRuler) {
+  if (fromRuler && on('guides')) {
     swallow(e);
     grabFrom = null;
     dragging = addGuide(fromRuler, e.clientX, e.clientY, free(e));
@@ -924,14 +956,15 @@ function activate() {
   // ids come from a counter that is certainly initialised by now.
   if (!restored) {
     restored = true;
-    guides = loadGuides().map((g) => ({ ...g, id: nextGuideId++ }));
+    guides = on('guides') ? loadGuides().map((g) => ({ ...g, id: nextGuideId++ })) : [];
   }
   if (overlay) return;
   // Loaded here rather than at init, so the tool still costs nothing at rest.
   loadFont();
-  overlay = mountOverlay();
+  overlay = mountOverlay(resolvePortal(cfg.portalTarget, document.documentElement));
   boxmodel = createBoxModel(overlay.root);
-  indicator = createIndicator(overlay.root, onTool);
+  if (!on('panel')) boxmodel.setHidden(true);
+  indicator = createIndicator(overlay.root, onTool, on);
   controls = createControls(overlay.root, editor);
   noteboard = createNoteBoard({
     root: overlay.root,
@@ -1012,6 +1045,9 @@ function deactivate() {
   hoverGuide = null;
   group = null;
   marquee = null;
+  // Closed: every tool reads as off, whatever its saved preference, because
+  // none of them is drawing. Guides are still there for next time.
+  reportTools({ ...CLOSED, guides: guides.length });
 }
 
 /**
@@ -1069,7 +1105,7 @@ function onKey(e: KeyboardEvent) {
       settleSelection();
     }
     render();
-  } else if (overlay && cursorAt && (e.key.toLowerCase() === cfg.guideKeys.vertical
+  } else if (overlay && cursorAt && on('guides') && (e.key.toLowerCase() === cfg.guideKeys.vertical
                                   || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
     e.preventDefault();
     const axis = e.key.toLowerCase() === cfg.guideKeys.vertical ? 'x' : 'y';
@@ -1230,6 +1266,11 @@ export function initAlign(partial: Partial<Config> = {}): void {
 
   cfg = mergeConfig(partial);
   gridLayers = null;
+  useStorage(cfg.storage);
+  // Preferences that survive a reload, unless the tool they belong to is off.
+  rulers = on('rulers') && loadFlag('rulers');
+  grid = on('grid') && loadFlag('grid');
+  pixels = on('pixels') && loadFlag('pixels');
   forceTheme(cfg.theme);
 
   // Until the first toggle this listener is the tool's entire footprint.

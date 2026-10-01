@@ -1,4 +1,5 @@
 import type { Guide } from './types';
+export declare function useStorage(kind: 'local' | 'session'): void;
 export declare function loadGuides(): Guide[];
 export declare function saveGuides(guides: Guide[]): void;
 export declare function loadFlag(name: string): boolean;

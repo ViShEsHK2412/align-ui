@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Align — host API</title>
+  <style>
+    body { margin: 0; background: #0f1217; color: #cbd3e1; font: 14px/20px system-ui, sans-serif; }
+    .bar { padding: 12px 24px; background: #161b23; border-bottom: 1px solid #262d39; }
+    main { max-width: 760px; margin: 0 auto; padding: 24px; }
+    h2 { font-size: 16px; margin: 24px 0 8px; }
+    p { margin: 0 0 12px; color: #8d99ad; }
+    button { font: inherit; padding: 8px 14px; background: #2b3341; color: #e6ebf3; border: 0; cursor: pointer; }
+    #log { font: 12px/18px ui-monospace, monospace; background: #161b23; padding: 12px; min-height: 120px; white-space: pre-wrap; }
+    dialog { background: #1b2029; color: #cbd3e1; border: 1px solid #2b3341; padding: 24px; width: 360px; }
+    dialog::backdrop { background: rgb(0 0 0 / 0.5); }
+    .card { padding: 16px; background: #232a36; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <header class="bar">Align — host API &nbsp;·&nbsp; <a href="/">simple page</a></header>
+  <main>
+    <h2>Features</h2>
+    <p>Notes and the colour picker are switched off: no buttons, and N and P do nothing.</p>
+    <h2>Storage</h2>
+    <p>storage: 'session'. Guides and preferences stay in this tab.</p>
+    <h2>Modal</h2>
+    <p>A modal dialog makes the rest of the page inert. The tool mounts inside the open dialog
+      when it is opened, so open the dialog first, then the tool.</p>
+    <button id="open" type="button">Open dialog</button>
+    <h2>onToolsChange and align:tools</h2>
+    <div id="log"></div>
+  </main>
+  <dialog id="dlg">
+    <strong>Inside a modal</strong>
+    <div class="card" id="in-modal">Measure me</div>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+  <script type="module" src="./api.ts"></script>
+</body>
+</html>

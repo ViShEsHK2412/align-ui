@@ -16,13 +16,23 @@ import type { Guide } from './types';
 const NS = 'align-ui';
 
 /**
+ * Which storage: shared by every tab on the origin, or kept per tab. Set once
+ * from the config before anything is read.
+ */
+let area: 'local' | 'session' = 'local';
+export function useStorage(kind: 'local' | 'session'): void {
+  area = kind;
+}
+const storage = (): Storage => (area === 'session' ? sessionStorage : localStorage);
+
+/**
  * Storage throws rather than returning null in more places than you would
  * expect — Safari in private browsing, a page served from file://, an embedded
  * webview with site data switched off. None of that is worth a broken tool.
  */
 function read(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    return storage().getItem(key);
   } catch {
     return null;
   }
@@ -30,7 +40,7 @@ function read(key: string): string | null {
 
 function write(key: string, value: string): void {
   try {
-    localStorage.setItem(key, value);
+    storage().setItem(key, value);
   } catch {
     /* full, or denied: the tool works fine without it */
   }

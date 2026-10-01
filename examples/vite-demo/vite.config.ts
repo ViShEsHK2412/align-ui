@@ -2,8 +2,8 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import { notesMiddleware } from '../../align/notes-server';
 
-// Six pages: the simple fixtures, the hard cases, the token set, the slider
-// bench, edit mode's contract, and layered grids.
+// Seven pages: the simple fixtures, the hard cases, the token set, the slider
+// bench, edit mode's contract, layered grids, and the host API.
 export default defineConfig({
   /*
    * The demo loads the tool straight from source rather than through the
@@ -25,6 +25,7 @@ export default defineConfig({
         slider: resolve(import.meta.dirname, 'slider.html'),
         edit: resolve(import.meta.dirname, 'edit.html'),
         grids: resolve(import.meta.dirname, 'grids.html'),
+        api: resolve(import.meta.dirname, 'api.html'),
       },
     },
   },

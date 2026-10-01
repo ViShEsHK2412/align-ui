@@ -1,13 +1,18 @@
 import type { CaptureFrame } from './capture';
+import type { GridConfig } from './grid';
 import { LINT_DEFAULTS, type LintOptions } from './lint';
 
 export interface Config {
   /**
-   * The design grid to check against, if the project has one. There is no
+   * The layout grids to check against, if the project has them. There is no
    * sensible default — twelve columns at 24 means nothing without knowing the
    * system — so it stays off until described.
+   *
+   * One grid in the original shape, { columns, gutter, margin, maxWidth }, or
+   * a list of layers: columns, rows and baselines, each across the page or,
+   * with a selector, inside every element it matches.
    */
-  grid: { columns: number; gutter: number; margin: number; maxWidth: number } | null;
+  grid: GridConfig | null;
   /** Extra CSS selector to skip when hit-testing. */
   ignore: string;
   hotkey: string;

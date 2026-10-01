@@ -133,7 +133,7 @@ the ticks they exist to show.
 | `\` | hide everything drawn, for a look at the page underneath. Locks, guides and layers all survive it |
 | `F` | freeze the page so a moving thing can be measured |
 | `X` | x-ray: outline every element on the page |
-| `G` | the design grid, when one is configured |
+| `G` | the layout grids, when configured: columns, rows, baselines |
 | `K` | a 10px pixel grid, for reading an offset off the page |
 | `S` | spacing lint: every gap and padding on screen, checked against your spacing tokens |
 | `P` | pick a colour from anywhere on screen |
@@ -233,9 +233,29 @@ nothing, since there is no gap to report.
 
 ### Grids
 
-`G` draws the grid your design is built on, columns filled and gutters left
-empty, so an element sitting in a gutter is visibly in the wrong place. It needs
-one configured. There is no default, because a guessed grid is worse than none.
+`G` draws the grids your design is built on, columns filled and gutters left
+empty, so an element sitting in a gutter is visibly in the wrong place. They
+need configuring. There is no default, because a guessed grid is worse than
+none.
+
+A design rarely has only one, so `grid` takes a list of layers: columns, rows
+and a baseline. A layer with a `selector` is drawn inside the content box of
+every element it matches (up to 50 on screen) instead of across the page, so a
+card's own four columns sit inside each card and follow it as it moves. Rows
+and baselines on the page are anchored to the document and scroll with it. The
+single-grid shape from earlier versions still works unchanged.
+
+```ts
+grid: [
+  { type: 'columns', count: 12, gutter: 24, margin: 24, maxWidth: 1200 },
+  { type: 'columns', count: 4, gutter: 8, selector: '.card', color: '#2dd4bf' },
+  { type: 'rows', height: 48, gutter: 16 },   // or count: 6 to stretch six rows
+  { type: 'baseline', size: 4, offset: 0 },
+],
+```
+
+A layer that cannot be drawn, such as zero columns or an unknown type, is
+skipped rather than stopping the tool from starting.
 
 `K` lays a 10px lattice over the page in screen space, for reading an offset off
 without measuring it.
@@ -457,7 +477,8 @@ initAlign({
 
   // The grid the design is built on, for `G`. There is no default: twelve
   // columns at 24 means nothing without knowing whose system it is, and a
-  // guessed grid is worse than none, because it looks authoritative.
+  // guessed grid is worse than none, because it looks authoritative. One grid
+  // in this shape, or a list of layers: see Grids above.
   grid: { columns: 12, gutter: 24, margin: 24, maxWidth: 1200 },
 
   // The spacing lint, for `S`. Only used when the page defines no spacing
@@ -566,7 +587,7 @@ npm run size        # fails over 80 KB
 
 ### The demo pages
 
-`npm run demo` serves four:
+`npm run demo` serves these:
 
 | | |
 |---|---|
@@ -574,6 +595,7 @@ npm run size        # fails over 80 KB
 | `complex.html` | twelve hard cases, each stating the numbers it should produce |
 | `tokens.html` | tokens and provenance: where a gap came from, which numbers are on the scale |
 | `stress.html` | the hard cases, each section stating what the right answer is |
+| `grids.html` | every kind of grid layer at once: page columns, a card's own columns, rows, a baseline |
 
 `stress.html` is the one to reach for when changing anything: scaled subtrees,
 every shape a grid and a flex row come in, out-of-flow children, scroll

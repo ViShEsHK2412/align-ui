@@ -3,6 +3,8 @@ import { createHistory } from './history';
 import { mergeConfig, skipSelector, type Config } from './config';
 import { analyze, scaleFrom, type LintResult } from './lint';
 import { collectLintBoxes } from './lint-dom';
+import { contentBoxes, gridShapes, normalizeGrids, type GridLayer } from './grid';
+import type { GridDraw } from './overlay';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
 import { createNoteBoard, type NoteBoard } from './noteboard';
@@ -77,6 +79,50 @@ let activeGuideId: number | null = null;
  * showing nothing looks broken, which is the same argument the modes make.
  */
 let hidden = false;
+
+/**
+ * The layout grids, laid out fresh for each frame drawn.
+ *
+ * The page's grids are anchored to the document, so rows and baselines scroll
+ * with it; columns are centred in the layout viewport, not `innerWidth`,
+ * because a classic scrollbar takes width from what the browser centres in.
+ * A scoped grid is drawn in the content box of every element its selector
+ * matches, wherever that element is this frame.
+ */
+let gridLayers: GridLayer[] | null = null;
+function layers(): GridLayer[] {
+  return (gridLayers ??= normalizeGrids(cfg.grid));
+}
+function gridDraw(): GridDraw[] | null {
+  const list = layers();
+  if (!list.length) return null;
+  const root = document.documentElement;
+  const page = { x: 0, y: -scrollY, w: root.clientWidth, h: Math.max(root.scrollHeight, innerHeight) };
+  const view = { top: 0, bottom: innerHeight };
+  return list.map((layer) => {
+    const out: GridDraw = { fills: [], lines: [] };
+    if (layer.color) out.color = layer.color;
+    for (const area of layer.selector ? contentBoxes(layer.selector) : [page]) {
+      const s = gridShapes(layer, area, view);
+      out.fills.push(...s.fills);
+      out.lines.push(...s.lines);
+    }
+    return out;
+  });
+}
+/** Where the scoped grids' elements were last drawn, to notice them move without a scroll. */
+let scopedAt = '';
+function scopedSignature(): string {
+  if (!grid) return '';
+  let sig = '';
+  for (const layer of layers()) {
+    if (!layer.selector) continue;
+    for (const r of contentBoxes(layer.selector)) sig += `${Math.round(r.x)},${Math.round(r.y)},${Math.round(r.w)},${Math.round(r.h)};`;
+    sig += '|';
+  }
+  return sig;
+}
+
 /**
  * The spacing lint. A mode like x-ray, so off on every open.
  *
@@ -363,7 +409,7 @@ function render(cursor?: { x: number; y: number }) {
     rulers,
     hidden,
     dimLock,
-    grid: grid && cfg.grid ? cfg.grid : null,
+    grid: grid ? gridDraw() : null,
     lint: lint && lintResult
       ? { bands: lintResult.bands, dx: lintAt.x - scrollX, dy: lintAt.y - scrollY }
       : null,
@@ -718,8 +764,13 @@ function watch() {
   const nextHover = hover && hover.el.isConnected ? boxOf(hover.el) : null;
 
   const scrolled = scrollX !== drawnAtX || scrollY !== drawnAtY;
+  // A component with its own grid can move or resize without a scroll: an
+  // accordion opening above it, a panel animating in.
+  const scoped = scopedSignature();
+  const gridMoved = scoped !== scopedAt;
+  scopedAt = scoped;
   const moved =
-    scrolled ||
+    scrolled || gridMoved ||
     next.length !== pinned.length ||
     next.some((b, i) => !sameRect(b, pinned[i]!)) ||
     (hover === null) !== (nextHover === null) ||
@@ -1046,6 +1097,7 @@ export function initAlign(partial: Partial<Config> = {}): void {
   window.__align = true;
 
   cfg = mergeConfig(partial);
+  gridLayers = null;
   forceTheme(cfg.theme);
 
   // Until the first toggle this listener is the tool's entire footprint.

@@ -1,11 +1,15 @@
 import {
-  fmt, gridColumns, guideAt, pixelGridStep, spreadLabels, type GridSpec,
+  fmt, guideAt, pixelGridStep, spreadLabels,
 } from './measure';
 import {
   alpha, ink, pageIsDark, RULER, TYPE, WEIGHT, whenFontReady, type Ink,
 } from './theme';
 import type { Box, Guide, Segment } from './types';
 import { bandLabel, type Band } from './lint';
+import type { GridShapes } from './grid';
+
+/** One grid layer, laid out for this frame. */
+export interface GridDraw extends GridShapes { color?: string }
 
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
@@ -32,8 +36,8 @@ export interface OverlayState {
    * you are watching, and this only quiets the one mark that competes.
    */
   dimLock: boolean;
-  /** The design grid to check against, or null for none. */
-  grid: GridSpec | null;
+  /** The layout grids, already laid out in viewport pixels, or null for none. */
+  grid: GridDraw[] | null;
   /** Whether to lay the pixel texture under everything. */
   pixels: boolean;
   /**
@@ -440,15 +444,30 @@ export function mountOverlay(): Overlay {
     ctx.stroke();
   }
 
-  /** The design grid: columns filled, gutters left empty. */
-  function grid(spec: GridSpec) {
-    // The layout viewport, not `innerWidth`: a classic scrollbar takes width
-    // from what the browser centres in, so centring in `innerWidth` would put
-    // the grid half a scrollbar to the right of everything it measures.
-    const cols = gridColumns(spec, document.documentElement.clientWidth);
-    ctx.fillStyle = alpha(c.measure, 0.08);
-    for (const col of cols) {
-      ctx.fillRect(snap(col.left), -0.5, Math.round(col.width), innerHeight + 1);
+  /**
+   * The layout grids: columns and rows filled, gutters left empty, baselines
+   * as hairlines. A layer with its own colour keeps the same weight as the
+   * default, so two grids laid over each other stay readable as two.
+   */
+  function grid(layers: GridDraw[]) {
+    for (const g of layers) {
+      ctx.save();
+      ctx.fillStyle = alpha(c.measure, 0.08);
+      if (g.color) {
+        ctx.fillStyle = g.color; // an invalid colour is ignored, keeping the default
+        ctx.globalAlpha = 0.12;
+      }
+      for (const f of g.fills) {
+        const x = snap(f.x);
+        const y = snap(f.y);
+        ctx.fillRect(x, y, Math.round(f.x + f.w) - 0.5 - x, Math.round(f.y + f.h) - 0.5 - y);
+      }
+      if (g.lines.length) {
+        if (g.color) ctx.globalAlpha = 0.3;
+        else ctx.fillStyle = alpha(c.measure, 0.16);
+        for (const l of g.lines) ctx.fillRect(snap(l.x), snap(l.y), Math.round(l.w), 1);
+      }
+      ctx.restore();
     }
   }
 

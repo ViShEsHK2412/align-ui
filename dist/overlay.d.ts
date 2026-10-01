@@ -1,6 +1,10 @@
-import { type GridSpec } from './measure';
 import type { Box, Guide, Segment } from './types';
 import { type Band } from './lint';
+import type { GridShapes } from './grid';
+/** One grid layer, laid out for this frame. */
+export interface GridDraw extends GridShapes {
+    color?: string;
+}
 /**
  * Canvas rendering. One of the two modules allowed to write to the DOM.
  * Everything draws inside a single requestAnimationFrame — never synchronously
@@ -28,8 +32,8 @@ export interface OverlayState {
      * you are watching, and this only quiets the one mark that competes.
      */
     dimLock: boolean;
-    /** The design grid to check against, or null for none. */
-    grid: GridSpec | null;
+    /** The layout grids, already laid out in viewport pixels, or null for none. */
+    grid: GridDraw[] | null;
     /** Whether to lay the pixel texture under everything. */
     pixels: boolean;
     /**

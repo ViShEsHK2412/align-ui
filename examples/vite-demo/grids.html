@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Align — layout grids</title>
+  <style>
+    body { margin: 0; background: #0f1217; color: #cbd3e1; font: 14px/20px system-ui, sans-serif; }
+    .bar { padding: 12px 24px; background: #161b23; border-bottom: 1px solid #262d39; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px; }
+    h2 { font-size: 16px; line-height: 24px; margin: 32px 0 8px; }
+    p { margin: 0 0 16px; color: #8d99ad; }
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .card { padding: 16px; background: #1b2029; border: 1px solid #2b3341; }
+    .card .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .card .cell { height: 40px; background: #263042; }
+    .card .cell.off { margin-left: 5px; }
+    .tall { height: 1600px; }
+    .grow { transition: margin-top 300ms; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    Align — layout grids &nbsp;·&nbsp; Ctrl/Cmd+Shift+A, then G &nbsp;·&nbsp; <a href="/">simple page</a>
+  </header>
+  <main>
+    <h2>1 · Page columns, card columns, and a baseline under both</h2>
+    <p>The page is twelve columns across 960. Each card has four columns of its own,
+      drawn in its content box. One cell in the second card sits 5px off its column.
+      Text sits on a 4px baseline.</p>
+    <div class="cards">
+      <div class="card"><div class="row"><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div></div>
+      <div class="card"><div class="row"><div class="cell"></div><div class="cell off"></div><div class="cell"></div><div class="cell"></div></div></div>
+    </div>
+    <h2>2 · Rows that scroll with the page</h2>
+    <p>48px rows with 16px gutters, anchored to the top of the document.</p>
+    <div class="tall"></div>
+  </main>
+  <script type="module" src="./grids.ts"></script>
+</body>
+</html>

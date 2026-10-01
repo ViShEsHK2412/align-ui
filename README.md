@@ -364,6 +364,27 @@ for the moment each screenshot is taken.
 Decline the share and notes still work, just without pictures. Press `N` twice
 to be asked again.
 
+#### Skipping the prompt: `captureFrame`
+
+A host that can capture the tab itself (an extension, Electron, a test runner)
+can hand frames to align-ui, and the share prompt never appears. It returns the
+whole visible tab as a PNG `Blob`, a data URL, a canvas or an `ImageBitmap`, at
+any resolution; align-ui crops it. Plugin options are JSON and cannot carry a
+function, so set it on `window`:
+
+```js
+window.__alignCaptureFrame = async () => {
+  // e.g. in an extension: chrome.tabs.captureVisibleTab() returns a data URL
+  return await getVisibleTabAsDataUrl();
+};
+```
+
+Or pass `captureFrame` to `initAlign` directly. It is read each time notes mode
+turns on, so it can be set after the tool has loaded. If it throws, returns
+nothing, takes longer than five seconds, or returns an image that is not the
+shape of the viewport, that note saves without a screenshot and says why. It
+never falls back to the prompt.
+
 ### Where they go
 
 With the Vite plugin, each screenshot is written to `.align/notes/` in your

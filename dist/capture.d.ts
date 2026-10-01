@@ -27,7 +27,8 @@ export type GrabResult = {
     height: number;
 } | {
     ok: false;
-    reason: 'inactive' | 'wrong-surface' | 'empty' | 'failed';
+    reason: 'inactive' | 'wrong-surface' | 'empty' | 'failed' | 'timeout' | 'nothing';
+    detail?: string;
 };
 export interface TabCapture {
     active(): boolean;
@@ -44,3 +45,24 @@ export interface TabCapture {
     onEnded(cb: () => void): void;
 }
 export declare function createTabCapture(): TabCapture;
+/**
+ * What a host supplies to take screenshots without the share prompt.
+ *
+ * It returns the whole visible tab, the way chrome.tabs.captureVisibleTab
+ * does — a PNG Blob, a data URL, a canvas or an ImageBitmap — and the tool
+ * crops it. Asking the host for the whole frame rather than a region keeps the
+ * contract to one thing every capture API can already do, and keeps the crop
+ * maths, and its checks, in one place.
+ */
+export type CaptureFrame = () => Promise<Blob | string | HTMLCanvasElement | ImageBitmap | null | undefined>;
+/** How long a host gets to produce a frame before the note goes on without one. */
+export declare const HOOK_TIMEOUT = 5000;
+/**
+ * A capture backed by the host's hook instead of screen sharing.
+ *
+ * Always active and never prompts: if the host can supply frames there is
+ * nothing to ask. A hook that throws, hangs or returns the wrong shape costs
+ * that one screenshot and says why — it never falls back to the share prompt,
+ * which would surprise anyone whose setup exists to avoid it.
+ */
+export declare function createHookCapture(hook: CaptureFrame): TabCapture;

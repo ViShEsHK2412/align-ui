@@ -1,5 +1,5 @@
 import type { Config } from './config';
-import { createTabCapture, type TabCapture } from './capture';
+import { createHookCapture, createTabCapture, type CaptureFrame, type TabCapture } from './capture';
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { icon } from './icons';
 import { selectorOf } from './inspect';
@@ -302,7 +302,20 @@ const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).sli
 export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
   const { root, cfg, changesFor, onChange } = options;
   const host = root.host as HTMLElement;
-  const capture: TabCapture = createTabCapture();
+  const tabCapture: TabCapture = createTabCapture();
+  /*
+   * The host's hook when there is one, screen sharing otherwise. Chosen each
+   * time notes mode turns on, so a hook registered after the tool loaded is
+   * picked up the next time you press N.
+   */
+  let capture: TabCapture = tabCapture;
+  let hooked = false;
+  function chooseCapture(): void {
+    const hook = cfg.captureFrame
+      ?? (window as Window & { __alignCaptureFrame?: CaptureFrame }).__alignCaptureFrame;
+    hooked = typeof hook === 'function';
+    capture = hooked ? createHookCapture(hook!) : tabCapture;
+  }
 
   let notes: Note[] = reviveNotes(loadNotes());
   let on = false;
@@ -744,6 +757,13 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       const result = await capture.grab(crop, hideTool);
       if (result.ok) {
         blob = result.blob;
+      } else if (hooked) {
+        // The hook's own failure, said plainly. Never a fallback to the share
+        // prompt: a setup with a hook exists to avoid it.
+        say(result.reason === 'timeout' ? 'The capture hook took too long; saved without a screenshot.'
+          : result.reason === 'nothing' ? 'The capture hook returned no image; saved without a screenshot.'
+          : result.reason === 'wrong-surface' ? 'The capture hook returned an image that is not this viewport.'
+          : `The capture hook failed${result.detail ? `: ${result.detail}` : ''}.`, 4000);
       } else if (result.reason === 'wrong-surface') {
         capture.stop();
         say('That share was not this tab. Screenshots are off — press N twice to share again.');
@@ -1133,7 +1153,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
 
   done.addEventListener('click', () => setMode(false));
 
-  capture.onEnded(() => {
+  tabCapture.onEnded(() => {
     say('Screen sharing stopped. New notes save without a screenshot — press N twice to share again.');
   });
 
@@ -1153,6 +1173,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     renderBar();
     onChange();
 
+    if (on) chooseCapture();
+    if (on && hooked) say('Click an element or drag an area', 1500);
     if (on && !capture.active() && !declined) {
       say('Choose "This tab" to include screenshots…');
       const result = await capture.start();
@@ -1188,7 +1210,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
       cancelAnimationFrame(hovering);
       removeEventListener('resize', place);
       closeComposer();
-      capture.stop();
+      tabCapture.stop();
       drag.destroy();
       layer.remove();
       area.remove();

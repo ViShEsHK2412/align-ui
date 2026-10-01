@@ -1,3 +1,4 @@
+import type { CaptureFrame } from './capture';
 export interface Config {
     /**
      * The design grid to check against, if the project has one. There is no
@@ -46,6 +47,15 @@ export interface Config {
      * first save finds that out and falls back to the downloads folder.
      */
     notesEndpoint: string | null;
+    /**
+     * Supplies the visible tab as an image, so notes never ask to share it.
+     *
+     * For hosts that can capture on their own: an extension, Electron, a test
+     * runner. A function cannot travel through the Vite plugin's options, which
+     * are JSON, so the same hook is also read from window.__alignCaptureFrame,
+     * at the moment notes mode turns on.
+     */
+    captureFrame: CaptureFrame | null;
 }
 export declare const DEFAULTS: Config;
 export declare function mergeConfig(partial?: Partial<Config>): Config;

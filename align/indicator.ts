@@ -80,12 +80,16 @@ const GESTURES: { title: string; rows: [string, string][] }[] = [
     rows: [
       ['Drag from a rule', 'pull out a guide; drag it back into the rule to throw it away'],
       ['V  /  H', 'drop a vertical or horizontal guide at the cursor'],
+      ['Shift+V  /  Shift+H', 'clear every vertical or horizontal guide; pinned ones stay'],
+      ['Shift+click a guide', 'add it to the selection, or take it out'],
+      ['Shift+drag the page', 'select every guide the box crosses'],
+      ['Alt+drag a guide', 'drag a copy, leaving the original'],
       ['Hover a guide', 'its distance to every locked element'],
       ['Click a guide', 'keep those distances up; click again to release'],
-      ['Arrows', 'nudge the guide you last touched. Shift for 10px'],
+      ['Arrows', 'nudge the selected guides. Shift for 10px'],
       ['L', 'pin a guide, so it cannot be moved or deleted by accident'],
       ['Ctrl/Cmd while placing', 'ignore snapping'],
-      ['Del', 'remove the guide under the cursor. Shift+Del for all of them'],
+      ['Del', 'remove the guide under the cursor, or the selection. Shift+Del for all of them'],
     ],
   },
 ];

@@ -51,6 +51,10 @@ export interface OverlayState {
   liveGuide: Guide | null;
   /** The one the keyboard is pointing at, marked with end handles. */
   activeGuide: number | null;
+  /** Every guide that moves with it, marked the same way. */
+  selectedGuides: number[];
+  /** A Shift-drag selecting guides, in viewport pixels. */
+  marquee: { x: number; y: number; w: number; h: number } | null;
 }
 
 const CAP = 5;          // end-cap length on a distance line
@@ -108,7 +112,7 @@ export function mountOverlay(): Overlay {
     hover: null, pinned: [], lines: [], cursor: null, rulers: false, hidden: false,
     dimLock: false,
     grid: null, pixels: false, lint: null,
-    guides: [], liveGuide: null, activeGuide: null,
+    guides: [], liveGuide: null, activeGuide: null, selectedGuides: [], marquee: null,
   };
   let c: Ink = ink(pageIsDark());
   let frame = 0;
@@ -522,8 +526,8 @@ export function mountOverlay(): Overlay {
       else { ctx.moveTo(0, at); ctx.lineTo(innerWidth, at); }
       ctx.stroke();
 
-      // Handles at both ends mark the guide the arrow keys will move.
-      if (state.activeGuide === g.id) {
+      // Handles at both ends mark the guides the arrow keys will move.
+      if (state.activeGuide === g.id || state.selectedGuides.includes(g.id)) {
         ctx.lineWidth = 3;
         ctx.setLineDash([]);
         ctx.beginPath();
@@ -537,6 +541,17 @@ export function mountOverlay(): Overlay {
         }
         ctx.stroke();
       }
+    }
+
+    if (state.marquee) {
+      const m = state.marquee;
+      ctx.fillStyle = alpha(c.guide, 0.08);
+      ctx.fillRect(snap(m.x), snap(m.y), Math.round(m.w), Math.round(m.h));
+      ctx.strokeStyle = c.guide;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(Math.round(m.x), Math.round(m.y), Math.round(m.w), Math.round(m.h));
+      ctx.setLineDash([]);
     }
 
     for (const seg of state.lines) {

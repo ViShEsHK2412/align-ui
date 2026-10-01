@@ -4,6 +4,9 @@ import { mergeConfig, skipSelector, type Config } from './config';
 import { analyze, scaleFrom, type LintResult } from './lint';
 import { collectLintBoxes } from './lint-dom';
 import { contentBoxes, gridShapes, normalizeGrids, type GridLayer } from './grid';
+import {
+  clearAxis, dragGroup, duplicate, guidesIn, prune, removeSelected, shift, toggle,
+} from './guide-select';
 import type { GridDraw } from './overlay';
 import { createIndicator, type Indicator, type ToolName } from './indicator';
 import { createControls, type Controls } from './controls';
@@ -74,6 +77,21 @@ let restored = false;
  * this gives the keyboard reach to the thing you just clicked.
  */
 let activeGuideId: number | null = null;
+/**
+ * The guides that move, nudge and delete together. Always holds the active
+ * guide when there is one; Shift-click and a Shift-drag marquee add to it.
+ */
+let selection = new Set<number>();
+function selectOnly(id: number | null): void {
+  activeGuideId = id;
+  selection = id === null ? new Set() : new Set([id]);
+}
+/** After anything that can remove guides: forget the ids that are gone. */
+function settleSelection(): void {
+  selection = prune(selection, guides);
+  if (!guides.some((g) => g.id === activeGuideId)) activeGuideId = [...selection].pop() ?? null;
+  if (hoverGuide && !guides.some((g) => g.id === hoverGuide!.id)) hoverGuide = null;
+}
 /**
  * Everything drawn, held back for a moment. Not persisted: a tool that reopens
  * showing nothing looks broken, which is the same argument the modes make.
@@ -232,6 +250,13 @@ let hoverGuide: Guide | null = null;
  * it, or lock it. A press that never really moves is a click.
  */
 let grabFrom: { x: number; y: number } | null = null;
+/**
+ * A drag of several guides: where each selected guide started, where the
+ * pointer started, and whether the guides being dragged are fresh copies.
+ */
+let group: { from: Map<number, number>; x: number; y: number; copies: boolean } | null = null;
+/** A Shift-drag on the page, selecting every guide it crosses. */
+let marquee: { x0: number; y0: number; x1: number; y1: number; target: Box } | null = null;
 /** Hand-twitch allowance, in px. Below this a press is a click, not a drag. */
 const CLICK_SLOP = 3;
 
@@ -260,12 +285,13 @@ function free(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
 }
 
 /** Place a guide, pulling it onto a nearby candidate unless asked not to. */
-function placeGuide(g: Guide, x: number, y: number, free: boolean) {
+function placeGuide(g: Guide, x: number, y: number, free: boolean, moving?: ReadonlySet<number>) {
   const under = hitTest(x, y, cfg);
   const viewport = g.axis === 'x' ? x : y;
-  // Every guide but this one: a guide cannot usefully snap to itself.
+  // Every guide but this one: a guide cannot usefully snap to itself, nor to
+  // the others in a group dragged with it, which move as it does.
   const others = guides
-    .filter((o) => o.id !== g.id)
+    .filter((o) => o.id !== g.id && !moving?.has(o.id))
     .map((o) => ({ axis: o.axis, at: viewportGuide(o).pos }));
   const snapped = snapTo(viewport, snapCandidates(under, g.axis, others), free);
   g.at = snapped.at + (g.axis === 'x' ? scrollX : scrollY);
@@ -283,7 +309,7 @@ function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
   // keyboard that one rather than stacking a second behind it.
   const twin = guides.find((o) => o.axis === g.axis && Math.abs(o.at - g.at) < 0.5);
   if (twin) {
-    activeGuideId = twin.id;
+    selectOnly(twin.id);
     return twin;
   }
 
@@ -293,7 +319,7 @@ function addGuide(axis: 'x' | 'y', x: number, y: number, free: boolean): Guide {
   // Without this a guide dropped with V or H could not be nudged at all until
   // it had been clicked, which is a strange thing to have to do to something
   // you placed a moment ago.
-  activeGuideId = g.id;
+  selectOnly(g.id);
   return g;
 }
 
@@ -417,6 +443,11 @@ function render(cursor?: { x: number; y: number }) {
     guides,
     liveGuide: dragging ?? hoverGuide,
     activeGuide: activeGuideId,
+    selectedGuides: [...selection],
+    marquee: marquee
+      ? { x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1),
+        w: Math.abs(marquee.x1 - marquee.x0), h: Math.abs(marquee.y1 - marquee.y0) }
+      : null,
     lines,
     ...(cursor ? { cursor } : {}),
   });
@@ -479,7 +510,9 @@ function undo(): void {
   hoverGuide = null;
   dragging = null;
   grabFrom = null;
-  if (!before.some((g) => g.id === activeGuideId)) activeGuideId = null;
+  group = null;
+  marquee = null;
+  settleSelection();
 }
 
 /**
@@ -539,13 +572,22 @@ let cursorAt: { x: number; y: number } | null = null;
 
 function onMouseMove(e: MouseEvent) {
   cursorAt = { x: e.clientX, y: e.clientY };
+  if (marquee) {
+    marquee.x1 = e.clientX;
+    marquee.y1 = e.clientY;
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
   if (dragging) {
     if (grabFrom && Math.hypot(e.clientX - grabFrom.x, e.clientY - grabFrom.y) > CLICK_SLOP) {
       grabFrom = null;     // travelled: this is a drag now, and stays one
     }
     if (!grabFrom && !dragging.pinned) {
-      placeGuide(dragging, e.clientX, e.clientY, free(e));
-      setGuides([...guides]);
+      const moving = group && selection.size > 1 ? selection : undefined;
+      placeGuide(dragging, e.clientX, e.clientY, free(e), moving);
+      setGuides(moving && group
+        ? dragGroup(guides, selection, dragging.id, group.from, { x: e.clientX - group.x, y: e.clientY - group.y })
+        : [...guides]);
     }
     render({ x: e.clientX, y: e.clientY });
     return;
@@ -556,20 +598,43 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseUp(e: MouseEvent) {
+  if (marquee) {
+    const m = marquee;
+    marquee = null;
+    if (Math.hypot(m.x1 - m.x0, m.y1 - m.y0) > CLICK_SLOP) {
+      const hit = guidesIn(guides, { x: m.x0, y: m.y0, w: m.x1 - m.x0, h: m.y1 - m.y0 }, { x: scrollX, y: scrollY });
+      selection = new Set([...selection, ...hit]);
+      if (hit.length) activeGuideId = hit[hit.length - 1]!;
+    } else {
+      // Shift held but never dragged: an ordinary click, which locks.
+      lockOnly(m.target);
+    }
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
   if (!dragging) return;
-  // Pressed and released without going anywhere: a click, which locks the
-  // guide so it keeps measuring after the pointer leaves. Click again to let
-  // it go quiet.
   if (grabFrom) {
-    dragging.locked = !dragging.locked;
-    activeGuideId = dragging.id;
-    setGuides([...guides]);
+    if (group?.copies) {
+      // Alt-pressed and let go in place: copies on top of their originals are
+      // indistinguishable from them, so this was not a duplicate after all.
+      undo();
+    } else {
+      // Pressed and released without going anywhere: a click, which locks the
+      // guide so it keeps measuring after the pointer leaves. Click again to
+      // let it go quiet. A click also narrows a selection to this one.
+      dragging.locked = !dragging.locked;
+      selectOnly(dragging.id);
+      setGuides([...guides]);
+    }
   } else if (inRuler(e.clientX, e.clientY) || e.clientX < RULER || e.clientY < RULER) {
-    // Dropped back in a rule: that is how you throw a guide away.
-    removeGuide(dragging);
+    // Dropped back in a rule: that is how you throw a guide away, and a
+    // dragged group goes with it. Recorded when the press began.
+    setGuides(removeSelected(guides, selection.has(dragging.id) ? selection : new Set([dragging.id])));
+    settleSelection();
   }
   grabFrom = null;
   dragging = null;
+  group = null;
   render({ x: e.clientX, y: e.clientY });
 }
 
@@ -660,24 +725,59 @@ function onMouseDown(e: MouseEvent) {
   const grabbed = guideUnder(guides, e.clientX, e.clientY);
   if (grabbed) {
     swallow(e);
+    if (e.shiftKey) {
+      // Shift-click adds a guide to the selection, or takes it out. Nothing
+      // moves and nothing locks, so there is nothing to undo.
+      selection = toggle(selection, grabbed.id);
+      activeGuideId = selection.has(grabbed.id) ? grabbed.id : [...selection].pop() ?? null;
+      render({ x: e.clientX, y: e.clientY });
+      return;
+    }
     // One entry for the whole press, whether it turns out to be a drag or the
     // click that toggles the lock. The moves in between record nothing.
     record();
-    activeGuideId = grabbed.id;
+    let target = grabbed;
+    if (!selection.has(grabbed.id)) selectOnly(grabbed.id);
+    else activeGuideId = grabbed.id;
+    if (e.altKey) {
+      // Alt-drag leaves the originals where they are and drags copies, as in
+      // Figma. Every selected guide is copied when the grab is on one of them.
+      const { copies, map } = duplicate(guides, selection, () => nextGuideId++);
+      setGuides([...guides, ...copies]);
+      selection = new Set(map.values());
+      target = copies.find((c) => c.id === map.get(grabbed.id))!;
+      activeGuideId = target.id;
+    }
+    group = {
+      from: new Map(guides.filter((g) => selection.has(g.id)).map((g) => [g.id, g.at])),
+      x: e.clientX, y: e.clientY, copies: e.altKey,
+    };
     // A pinned guide still takes focus and still clicks, it just cannot travel.
-    dragging = grabbed;
+    dragging = target;
     grabFrom = { x: e.clientX, y: e.clientY };
     render({ x: e.clientX, y: e.clientY });
     return;
   }
 
   swallow(e);
+  if (e.shiftKey && guides.length) {
+    // Shift-drag draws a marquee over guides. Whether it was a drag or a
+    // click is only known on release, so the lock waits until then.
+    marquee = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, target: onPage };
+    render({ x: e.clientX, y: e.clientY });
+    return;
+  }
+  lockOnly(onPage);
+  render({ x: e.clientX, y: e.clientY });
+}
+
+/** Lock exactly this element, as a plain click does. */
+function lockOnly(onPage: Box): void {
   indicator?.closeHelp();
   pinned = [onPage];
   hover = onPage;
   boxmodel?.show(onPage, gapFacts(), previousLock());
   controls?.show(onPage.el);
-  render({ x: e.clientX, y: e.clientY });
 }
 
 /**
@@ -910,6 +1010,8 @@ function deactivate() {
   dragging = null;
   grabFrom = null;
   hoverGuide = null;
+  group = null;
+  marquee = null;
 }
 
 /**
@@ -955,6 +1057,18 @@ function onKey(e: KeyboardEvent) {
     // already owns, so while someone is typing the tool has nothing to say.
     // The hotkey above is deliberately outside this: you must always be able
     // to switch the tool off.
+  } else if (overlay && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
+             && (e.key.toLowerCase() === cfg.guideKeys.vertical || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
+    // Shift+V clears every vertical guide, Shift+H every horizontal one.
+    // Pinned guides stay, and the whole clear is one step of undo.
+    e.preventDefault();
+    const next = clearAxis(guides, e.key.toLowerCase() === cfg.guideKeys.vertical ? 'x' : 'y');
+    if (next.length !== guides.length) {
+      record();
+      setGuides(next);
+      settleSelection();
+    }
+    render();
   } else if (overlay && cursorAt && (e.key.toLowerCase() === cfg.guideKeys.vertical
                                   || e.key.toLowerCase() === cfg.guideKeys.horizontal)) {
     e.preventDefault();
@@ -979,25 +1093,37 @@ function onKey(e: KeyboardEvent) {
       grabFrom = null;
       // Only if the keyboard's guide was actually one of the ones taken — a
       // pinned guide survives the wipe and should keep the keyboard with it.
-      if (!guides.some((g) => g.id === activeGuideId)) activeGuideId = null;
-    } else if (hoverGuide) removeGuide(hoverGuide);
+      settleSelection();
+    } else if (hoverGuide && !selection.has(hoverGuide.id)) {
+      removeGuide(hoverGuide);
+      settleSelection();
+    } else if (selection.size > 1 || hoverGuide) {
+      // The selection, when there is one or the pointer is on part of it.
+      // One step of undo however many it held.
+      const next = removeSelected(guides, selection);
+      if (next.length !== guides.length) {
+        record();
+        setGuides(next);
+      }
+      settleSelection();
+    }
     render();
   } else if (overlay && e.key.startsWith('Arrow')) {
     // Arrows move the guide the keyboard is pointing at. Horizontal keys move
     // vertical guides and vice versa: you push the line, not the axis it names.
-    const g = activeGuide();
+    // Every selected guide on that axis moves together.
     const wants = e.key === 'ArrowLeft' || e.key === 'ArrowRight' ? 'x' : 'y';
-    if (!g || g.axis !== wants) return;
+    const moving = guides.filter((g) => selection.has(g.id) && g.axis === wants);
+    if (!moving.length) return;
     e.preventDefault();
-    if (g.pinned) return;
+    if (moving.every((g) => g.pinned)) return;
     // A held arrow key is one gesture however many times it repeats, so the
     // whole run shares a tag and collapses to a single step.
-    record(`nudge:${g.id}`);
+    record(`nudge:${wants}:${moving.map((g) => g.id).join(',')}`);
     const step = e.shiftKey ? 10 : 1;
-    g.at += (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -step : step;
-    // Nudged by hand, so whatever it had snapped to is no longer what it is on.
-    g.caught = '';
-    setGuides([...guides]);
+    // Nudged by hand, so whatever they had snapped to is no longer what they are on.
+    setGuides(shift(guides, selection, wants, (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -step : step));
+    if (hoverGuide) hoverGuide = guides.find((g) => g.id === hoverGuide!.id) ?? null;
     render();
   } else if (overlay && e.key.toLowerCase() === 'g') {
     e.preventDefault();
@@ -1086,6 +1212,12 @@ function onKey(e: KeyboardEvent) {
     if (noteboard?.escape()) return;
     if (picker?.close()) return;
     if (indicator?.closeHelp()) return;
+    if (marquee || selection.size > 1) {
+      marquee = null;
+      selectOnly(activeGuideId);
+      render();
+      return;
+    }
     if (pinned.length) { pinned = []; boxmodel?.hide(); controls?.show(null); render(); }
     else deactivate();
   }

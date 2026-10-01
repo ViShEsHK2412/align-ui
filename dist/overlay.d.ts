@@ -51,6 +51,15 @@ export interface OverlayState {
     liveGuide: Guide | null;
     /** The one the keyboard is pointing at, marked with end handles. */
     activeGuide: number | null;
+    /** Every guide that moves with it, marked the same way. */
+    selectedGuides: number[];
+    /** A Shift-drag selecting guides, in viewport pixels. */
+    marquee: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    } | null;
 }
 export interface Overlay {
     root: ShadowRoot;

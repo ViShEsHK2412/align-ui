@@ -126,7 +126,11 @@ the ticks they exist to show.
 | `R` | rulers along the top and left edges |
 | drag from a rule | pull out a guide; drag it back to remove |
 | `V` / `H` | vertical / horizontal guide at the cursor |
-| arrows | nudge the last guide you touched by 1px; `Shift` for 10 |
+| `Shift + V` / `Shift + H` | clear every vertical / horizontal guide. Pinned ones stay |
+| `Shift` + click a guide | add it to the selection, or take it out |
+| `Shift` + drag on the page | select every guide the box crosses |
+| `Alt` + drag a guide | drag a copy, leaving the original where it was |
+| arrows | nudge the selected guides by 1px; `Shift` for 10 |
 | `L` | pin that guide, so it cannot be moved or deleted |
 | `Ctrl/Cmd + Z` | undo the last change to the guides: a nudge, a drag, a delete. A held arrow key undoes as one step, not thirty |
 | `T` | type and token readout for the locked element |
@@ -141,8 +145,8 @@ the ticks they exist to show.
 | `N` | notes mode: click an element or drag an area to screenshot it and say what to fix |
 | `C` | copy the numbers in the panel |
 | `Ctrl/Cmd` while placing | ignore snapping |
-| `Del` / `Shift + Del` | remove the guide under the cursor / all of them |
-| `Esc` | close the key list, then the locks, then the tool |
+| `Del` / `Shift + Del` | remove the guide under the cursor, or the selection / all of them |
+| `Esc` | close the key list, then a guide selection, then the locks, then the tool |
 
 Single-letter keys are ignored while you are typing in an input, a textarea or
 anything `contenteditable`, so the tool never eats a keystroke meant for the
@@ -226,6 +230,13 @@ and onto other guides, because a guide meant to sit on a card's edge has to sit
 *on* it rather than a pixel off and quietly lying. Hold `Ctrl/Cmd` to place one
 freely. The guide's chip names what it caught (`x 760 · div.card left`), since a
 guide that snapped and one that missed by a pixel look identical otherwise.
+
+Guides that belong together move together. `Shift`-click guides to select
+several, or `Shift`-drag a box across the page to select every guide it
+crosses; a `Shift`-click that does not move still locks the element under it.
+Dragging any selected guide moves the whole selection as one, the arrows nudge
+it, and `Del` removes it. `Alt`-drag drags a copy and leaves the original. Each
+of these is one step of undo however many guides it touched.
 
 And they measure: hover a guide and it draws its distance to every locked
 element; click it to keep those up. A guide passing *through* an element draws

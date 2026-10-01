@@ -226,6 +226,7 @@ export interface Controls {
  */
 const PANEL_W = 320;
 
+
 const CSS = PICKER_CSS + DRAG_CSS + `
 /*
  * The reset the shadow root does not come with.
@@ -739,6 +740,20 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     markTouched();
   }
 
+  /**
+   * Double-click on a control: this value back to what the page had, and the
+   * rest of the row left alone. A linked group resets as a group, because the
+   * link is what you were editing. One step of undo, the clicks included.
+   */
+  function resetValue(spec: Spec, prop: string, since: number): void {
+    if (!target) return;
+    const props = spec.sides && linked.has(spec.prop) ? spec.sides : [prop];
+    for (const p of props) editor.revert(target, p);
+    editor.collapseSince(since, target);
+    for (const row of rows) if (row.spec.prop === spec.prop) row.sync();
+    markTouched();
+  }
+
   function buildSlider(spec: Spec, prop: string, label: string): { el: HTMLElement; sync: () => void; slider: Slider } {
     const slider = createSlider(root, {
       label,
@@ -747,6 +762,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       max: spec.max ?? 100,
       step: spec.step ?? 1,
       ...(spec.unit ? { unit: spec.unit } : {}),
+      onReset: (since) => resetValue(spec, prop, since),
       onChange: (v) => {
         const value = `${v}${spec.unit ?? ''}`;
         if (spec.sides && linked.has(spec.prop)) {
@@ -795,6 +811,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       axis: vertical ? 'y' : 'x',
       // A corner has no single edge to draw, so it keeps its words.
       ...(glyph ? { glyph } : { text: short }),
+      onReset: (since) => resetValue(spec, prop, since),
       onChange: (v) => {
         const value = `${v}${spec.unit ?? ''}`;
         if (linked.has(spec.prop) && spec.sides) {

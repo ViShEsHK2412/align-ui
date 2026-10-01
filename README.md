@@ -362,6 +362,11 @@ that springs, plus scrub badges for the four-sided properties: drag a padding
 badge sideways for left and right, up and down for top and bottom, exactly as
 the edge it names moves.
 
+Double-click any slider or badge to put that one value back to what the page
+had; a linked group resets as a group. It is one step of undo, the two clicks
+included, so `Ctrl/Cmd + Z` lands where you were before double-clicking.
+Click a value to type one; `Esc` throws the typing away.
+
 Colour opens a picker of our own rather than the browser's, which is sRGB-only
 and cannot express alpha. The field is OKLCH and each row is normalised to the
 chroma available at that lightness, so every pixel of it is a colour your

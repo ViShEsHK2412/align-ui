@@ -71,6 +71,13 @@ export interface Editor {
   canRedo(): boolean;
   /** When the newest undo step last changed, to order it against guide undo. */
   lastAt(): number | null;
+  /**
+   * Fold every step since `t` into one, when they all touched only `el`.
+   * A double-click to reset is two clicks first, and each click on a slider
+   * moves it: without this, undoing the reset would land on the half-clicked
+   * value instead of where you were before you double-clicked.
+   */
+  collapseSince(t: number, el: Element): void;
 }
 
 /** One property's move inside an undo step: inline values and ledger entries either side. */
@@ -406,6 +413,31 @@ export function createEditor(now: () => number = Date.now): Editor {
       undoStack.push(e);
       burst = null;
       return elementsOf(e);
+    },
+
+    collapseSince(t, el) {
+      let i = undoStack.length;
+      while (i > 0) {
+        const e = undoStack[i - 1]!;
+        if (e.at < t || e.steps.size !== 1 || !e.steps.has(el)) break;
+        i -= 1;
+      }
+      const run = undoStack.splice(i);
+      if (run.length < 2) {
+        undoStack.push(...run);
+        return;
+      }
+      // Earliest "before" wins, latest "after" wins, per property.
+      const merged: UndoEntry = { steps: new Map(), at: run[run.length - 1]!.at, gesture: 0 };
+      for (const e of run) {
+        for (const s of stepsOf(e)) {
+          const step = record(merged, s.el, s.prop, s.before, s.original);
+          step.after = s.after;
+          step.originalAfter = s.originalAfter;
+        }
+      }
+      undoStack.push(merged);
+      burst = null;
     },
 
     canUndo: () => armed && undoStack.length > 0,

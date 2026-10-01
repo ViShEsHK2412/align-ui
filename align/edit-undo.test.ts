@@ -131,6 +131,47 @@ describe('edit undo', () => {
     expect(ed.lastAt()).toBe(5000);
   });
 
+  describe('collapseSince, for a double-click reset', () => {
+    it('folds the two clicks and the reset into one step, landing before the clicks', async () => {
+      ed.beginGesture(); ed.set(el, 'padding-top', '30px'); ed.endGesture(); await tick();
+      t += 5000;
+      // The double-click: two clicks that each move the slider, then the reset.
+      ed.beginGesture(); ed.set(el, 'padding-top', '50px'); ed.endGesture(); t += 120;
+      ed.beginGesture(); ed.set(el, 'padding-top', '52px'); ed.endGesture(); t += 30;
+      ed.revert(el, 'padding-top');
+      ed.collapseSince(t - 800, el);
+      expect(style('padding-top')).toBe('4px');
+      ed.undo();
+      expect(style('padding-top')).toBe('30px');
+      ed.undo();
+      expect(style('padding-top')).toBe('4px');
+      expect(ed.canUndo()).toBe(false);
+    });
+
+    it('leaves alone steps that are older, or touched another element', async () => {
+      const other = document.createElement('p');
+      document.body.append(other);
+      ed.set(other, 'color', 'red'); await tick();
+      t += 50;
+      ed.set(el, 'padding-top', '50px'); await tick();
+      t += 2000;
+      ed.revert(el, 'padding-top');
+      ed.collapseSince(t - 800, el);
+      ed.undo();
+      expect(style('padding-top')).toBe('50px');
+      ed.undo();
+      expect(style('padding-top')).toBe('4px');
+      expect(other.style.color).toBe('red');
+    });
+
+    it('does nothing with a single step', async () => {
+      ed.set(el, 'padding-top', '50px'); await tick();
+      ed.collapseSince(0, el);
+      ed.undo();
+      expect(ed.canUndo()).toBe(false);
+    });
+  });
+
   it('nothing to undo is a no-op, not an error', () => {
     expect(ed.undo()).toEqual([]);
     expect(ed.redo()).toEqual([]);

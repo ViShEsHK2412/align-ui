@@ -229,6 +229,12 @@ export interface SliderOptions {
   onChange: (value: number) => void;
   /** Called once when a gesture ends, so the ledger gets one entry per drag. */
   onCommit?: (value: number) => void;
+  /**
+   * Double-click: put this value back to what the page had. `since` is when
+   * the first of its two clicks pressed, so the clicks can be folded into the
+   * reset and one undo lands where you were before double-clicking.
+   */
+  onReset?: (since: number) => void;
 }
 
 export interface Slider {
@@ -674,15 +680,18 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
 
     const close = (apply: boolean) => {
       if (!input) return;
+      const field = input;
+      // Let go of the field before removing it. Removing a focused input fires
+      // blur, and blur closes *with* applying: Escape kept what you typed.
+      input = null;
       if (apply) {
-        const parsed = parseFloat(input.value);
+        const parsed = parseFloat(field.value);
         if (Number.isFinite(parsed)) {
           commit(Math.max(min, Math.min(max, parsed)), true);
           options.onCommit?.(value);
         }
       }
-      input.remove();
-      input = null;
+      field.remove();
       valueEl.style.display = '';
       setEditable(false);
       el.focus();
@@ -760,6 +769,17 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
   // The first paint has to wait for a layout pass: offsetWidth is 0 until the
   // element is in the document, and every position here is a fraction of it.
   requestAnimationFrame(paint);
+
+  // Double-click resets, as every design tool's sliders do. Not inside the
+  // typed value: there a double-click selects a word, which is what it is for.
+  const presses: number[] = [];
+  el.addEventListener('pointerdown', () => { presses.push(Date.now()); if (presses.length > 2) presses.shift(); }, { capture: true });
+  el.addEventListener('dblclick', (e) => {
+    if (!options.onReset || (e.target as Element).closest?.('input')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    options.onReset(presses[0] ?? Date.now());
+  });
 
   return {
     el,

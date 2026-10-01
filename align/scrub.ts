@@ -82,6 +82,12 @@ export interface ScrubOptions {
   text?: string;
   onChange: (value: number) => void;
   onCommit?: (value: number) => void;
+  /**
+   * Double-click: put this value back to what the page had. `since` is when
+   * the first of its two clicks pressed, so the clicks can be folded into the
+   * reset and one undo lands where you were before double-clicking.
+   */
+  onReset?: (since: number) => void;
 }
 
 export interface Scrub {
@@ -242,6 +248,8 @@ export function createScrub(root: ShadowRoot, options: ScrubOptions): Scrub {
   // ── Typing ────────────────────────────────────────────────────────────────
 
   let input: HTMLInputElement | null = null;
+  /** Closes the typing field without applying it, when one is open. */
+  let cancelInput: (() => void) | null = null;
 
   function openInput(): void {
     if (input) return;
@@ -257,15 +265,20 @@ export function createScrub(root: ShadowRoot, options: ScrubOptions): Scrub {
 
     const close = (apply: boolean) => {
       if (!input) return;
+      const field = input;
+      // Let go of the field before removing it. Removing a focused input fires
+      // blur, and blur closes *with* applying: Escape kept what you typed.
+      input = null;
       if (apply) {
-        const parsed = parseScrub(input.value, min, max);
+        const parsed = parseScrub(field.value, min, max);
         if (parsed !== null) commit(parsed, false);
       }
-      input.remove();
-      input = null;
+      field.remove();
+      cancelInput = null;
       readout.style.display = '';
       el.focus();
     };
+    cancelInput = () => close(false);
 
     input.addEventListener('keydown', (ev) => {
       ev.stopPropagation();
@@ -282,6 +295,18 @@ export function createScrub(root: ShadowRoot, options: ScrubOptions): Scrub {
     // finished dragging would make the control unusable.
     if (dragged) { dragged = false; return; }
     openInput();
+  });
+
+  // Double-click resets. The first click of it opened the typing field, which
+  // a reset makes pointless, so it closes without applying what it held.
+  const presses: number[] = [];
+  el.addEventListener('pointerdown', () => { presses.push(Date.now()); if (presses.length > 2) presses.shift(); }, { capture: true });
+  el.addEventListener('dblclick', (e) => {
+    if (!options.onReset) return;
+    e.preventDefault();
+    e.stopPropagation();
+    cancelInput?.();
+    options.onReset(presses[0] ?? Date.now());
   });
 
   el.addEventListener('keydown', (e) => {

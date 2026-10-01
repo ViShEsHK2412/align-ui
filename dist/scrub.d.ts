@@ -56,6 +56,12 @@ export interface ScrubOptions {
     text?: string;
     onChange: (value: number) => void;
     onCommit?: (value: number) => void;
+    /**
+     * Double-click: put this value back to what the page had. `since` is when
+     * the first of its two clicks pressed, so the clicks can be folded into the
+     * reset and one undo lands where you were before double-clicking.
+     */
+    onReset?: (since: number) => void;
 }
 export interface Scrub {
     el: HTMLElement;

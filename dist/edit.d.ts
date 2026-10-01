@@ -64,6 +64,13 @@ export interface Editor {
     canRedo(): boolean;
     /** When the newest undo step last changed, to order it against guide undo. */
     lastAt(): number | null;
+    /**
+     * Fold every step since `t` into one, when they all touched only `el`.
+     * A double-click to reset is two clicks first, and each click on a slider
+     * moves it: without this, undoing the reset would land on the half-clicked
+     * value instead of where you were before you double-clicked.
+     */
+    collapseSince(t: number, el: Element): void;
 }
 /**
  * A property's current value, preferring what it computes to.

@@ -1,6 +1,7 @@
 import {
   looksLikeColour, matchColourTokens, matchTokens, selectorOf, tokensInScope, type Token,
 } from './inspect';
+import { stableSelector } from './selector';
 
 /**
  * Edit mode.
@@ -112,6 +113,13 @@ export function tokenFor(value: string, tokens: readonly Token[]): string | null
  */
 export interface PromptRow {
   selector: string;
+  /**
+   * A selector that finds this one element. Rows are grouped by it, not by
+   * the readable selector: four tabs are all `a.tab`, and grouping on that
+   * printed edits to different tabs as one block whose values contradicted
+   * each other.
+   */
+  locator?: string;
   prop: string;
   from: string;
   to: string;
@@ -124,9 +132,10 @@ export function formatPrompt(rows: readonly PromptRow[]): string {
 
   const bySelector = new Map<string, PromptRow[]>();
   for (const row of rows) {
-    const list = bySelector.get(row.selector) ?? [];
+    const key = row.locator ?? row.selector;
+    const list = bySelector.get(key) ?? [];
     list.push(row);
-    bySelector.set(row.selector, list);
+    bySelector.set(key, list);
   }
 
   const out: string[] = [
@@ -134,8 +143,11 @@ export function formatPrompt(rows: readonly PromptRow[]): string {
     'Apply them, preferring the named token wherever one is given.',
     '',
   ];
-  for (const [selector, list] of bySelector) {
-    out.push(`${selector} {`);
+  for (const [, list] of bySelector) {
+    const { selector, locator } = list[0]!;
+    // The readable selector opens the block, because it is what the
+    // stylesheet says; the locator says which element, when they differ.
+    out.push(locator && locator !== selector ? `${selector} { /* ${locator} */` : `${selector} {`);
     for (const row of list) {
       // The token goes in the declaration and the raw value in the comment, so
       // the line can be pasted as-is and still says what it resolves to.
@@ -243,13 +255,14 @@ export function createEditor(): Editor {
       for (const [el, props] of ledger) {
         const tokens = tokensInScope(el);
         const selector = selectorOf(el);
+        const locator = stableSelector(el);
         for (const [prop, original] of props) {
           const to = readValue(el, prop);
           // A property written back to the value it already had is not a
           // change, and a diff that lists it wastes the reader's attention on
           // a line that says nothing.
           if (to === original.computed) continue;
-          rows.push({ selector, prop, from: original.computed, to, token: tokenFor(to, tokens) });
+          rows.push({ selector, locator, prop, from: original.computed, to, token: tokenFor(to, tokens) });
         }
       }
       return formatPrompt(rows);

@@ -81,6 +81,13 @@ export declare function tokenFor(value: string, tokens: readonly Token[]): strin
  */
 export interface PromptRow {
     selector: string;
+    /**
+     * A selector that finds this one element. Rows are grouped by it, not by
+     * the readable selector: four tabs are all `a.tab`, and grouping on that
+     * printed edits to different tabs as one block whose values contradicted
+     * each other.
+     */
+    locator?: string;
     prop: string;
     from: string;
     to: string;

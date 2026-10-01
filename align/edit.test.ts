@@ -104,6 +104,24 @@ describe('formatPrompt', () => {
     expect(out).toContain('.other {');
   });
 
+  it('keeps two elements apart even when they share a class', () => {
+    // Four tabs are all a.tab. Grouped on that, edits to tab one and tab two
+    // printed as one block with two contradictory padding lines.
+    const out = formatPrompt([
+      row({ selector: 'a.tab', locator: '#tabs > a:nth-of-type(1)', to: '8px' }),
+      row({ selector: 'a.tab', locator: '#tabs > a:nth-of-type(2)', to: '20px' }),
+    ]);
+    expect(out.match(/a\.tab \{/g)).toHaveLength(2);
+    expect(out).toContain('a.tab { /* #tabs > a:nth-of-type(1) */');
+    expect(out).toContain('a.tab { /* #tabs > a:nth-of-type(2) */');
+  });
+
+  it('does not repeat the locator when it is the selector', () => {
+    const out = formatPrompt([row({ selector: '#hero', locator: '#hero' })]);
+    expect(out).toContain('#hero {');
+    expect(out).not.toContain('/* #hero */');
+  });
+
   it('says the changes are not in the source yet', () => {
     // The whole point of the paste is that an agent knows these are live edits
     // rather than something it can find by reading the repository.

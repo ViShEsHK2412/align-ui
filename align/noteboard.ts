@@ -3,6 +3,7 @@ import { createTabCapture, type TabCapture } from './capture';
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { icon } from './icons';
 import { selectorOf } from './inspect';
+import { resolveStable, stableSelector } from './selector';
 import { bandsOf, boxOf, hitTestThrough } from './measure';
 import {
   anchorIn, areaFrom, barLift, clampPin, clampToViewport, layoutPins, nextNumber, notesToMarkdown,
@@ -459,17 +460,20 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     if (held?.isConnected) return held;
     const t = note.target;
     if (!t) return null;
-    for (const query of [t.path, t.selector]) {
+    /*
+     * The stored selector, then an older note's path. Whatever it finds has to
+     * be the same kind of element with the same text: a positional selector
+     * can land on a different element once the page has changed, and a pin on
+     * the wrong thing is worse than falling back to where the note was taken.
+     */
+    const tag = t.label.split(/[.#[]/)[0]!.toLowerCase();
+    for (const query of [t.selector, t.path]) {
       if (!query) continue;
-      try {
-        const found = document.querySelector(query);
-        if (found && selectorOf(found) === t.selector) {
-          elements.set(note.id, found);
-          return found;
-        }
-      } catch {
-        /* a path written by an older version may not parse */
-      }
+      const found = resolveStable(query);
+      if (!found || found.tagName.toLowerCase() !== tag) continue;
+      if (t.text && !textOf(found).startsWith(t.text.replace(/…$/, ''))) continue;
+      elements.set(note.id, found);
+      return found;
     }
     return null;
   }
@@ -864,43 +868,18 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     return t.length > max ? `${t.slice(0, max - 1)}…` : t;
   }
 
-  /**
-   * A path an agent can follow: up to four ancestors, stopping at an id, with
-   * a position wherever a sibling shares the selector.
-   *
-   * `selectorOf` alone names a kind of element, and four tabs are all `a.tab`.
-   * The position is what picks out the second one.
-   */
-  function pathOf(node: Element): string {
-    const steps: string[] = [];
-    let at: Element | null = node;
-    for (let depth = 0; at && depth < 5; depth++) {
-      if (at === document.body || at === document.documentElement) break;
-      let step = selectorOf(at);
-      const parent: Element | null = at.parentElement;
-      if (parent && !at.id) {
-        const same = Array.from(parent.children).filter((c) => selectorOf(c) === step);
-        if (same.length > 1) step += `:nth-of-type(${Array.from(parent.children)
-          .filter((c) => c.tagName === at!.tagName).indexOf(at) + 1})`;
-      }
-      steps.unshift(step);
-      if (at.id) break;
-      at = parent;
-    }
-    return steps.join(' > ');
-  }
-
   function targetData(target: Element): NonNullable<Note['target']> {
     const b = boxOf(target);
     const bands = bandsOf(target);
     const data: NonNullable<Note['target']> = {
-      selector: selectorOf(target),
+      // A locator, not a description: unique, class-free, and still right
+      // after a rebuild. The label carries the readable selector.
+      selector: stableSelector(target),
       label: b.label,
       size: { w: b.width / b.scale.x, h: b.height / b.scale.y },
       padding: bands.padding,
       border: bands.border,
       margin: bands.margin,
-      path: pathOf(target),
     };
     const text = textOf(target);
     if (text) data.text = text;

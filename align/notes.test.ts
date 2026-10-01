@@ -133,6 +133,18 @@ describe('notesToMarkdown', () => {
     expect(plain).not.toContain('red arrows');
   });
 
+  it('ends with a check for the changes notes carry, and none for words alone', () => {
+    const target = {
+      selector: '#cta', label: 'button.cta', size: { w: 1, h: 1 },
+      padding: [0, 0, 0, 0] as [number, number, number, number], border: [0, 0, 0, 0] as [number, number, number, number],
+      margin: [0, 0, 0, 0] as [number, number, number, number],
+    };
+    const md = notesToMarkdown([note({ target, changes: [{ prop: 'padding-top', from: '8px', to: '12px' }] })]);
+    expect(md).toContain('["#cta","padding-top","12px"]');
+    expect(notesToMarkdown([note({ target })])).not.toContain('```js');
+    expect(notesToMarkdown([note({ target, region: true, changes: [{ prop: 'gap', from: '1px', to: '2px' }] })])).not.toContain('```js');
+  });
+
   it('names the file when the image only reached the downloads folder', () => {
     const md = notesToMarkdown([note({ image: { file: 'align-note-1.png' } })]);
     expect(md).toContain('`align-note-1.png` (downloads folder)');

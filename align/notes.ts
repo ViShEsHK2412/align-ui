@@ -19,6 +19,7 @@
  */
 
 import type { Quad } from './types';
+import { checkScript } from './checks';
 
 /** A rectangle in page pixels: it stays on the same content as you scroll. */
 export interface Rect { x: number; y: number; w: number; h: number }
@@ -303,6 +304,19 @@ export function notesToMarkdown(notes: readonly Note[], options: { resolved?: nu
       }
       out.push('');
     }
+  }
+
+  /*
+   * Notes that carry a tried-in-the-browser change can be checked, per page:
+   * the agent proves each value landed instead of saying so. A note that is
+   * only words has nothing to check, and gets nothing.
+   */
+  for (const [path, list] of pages) {
+    const checks = list.flatMap((n) => (n.target && !n.region && n.changes?.length
+      ? n.changes.map((c) => ({ selector: n.target!.selector, prop: c.prop, value: c.to }))
+      : []));
+    const script = checkScript(path, checks);
+    if (script) out.push(script, '');
   }
 
   return out.join('\n').trimEnd() + '\n';

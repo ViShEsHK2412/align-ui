@@ -2,6 +2,7 @@ import {
   looksLikeColour, matchColourTokens, matchTokens, selectorOf, tokensInScope, type Token,
 } from './inspect';
 import { stableSelector } from './selector';
+import { checkScript } from './checks';
 
 /**
  * Edit mode.
@@ -172,7 +173,11 @@ export interface PromptRow {
   token: string | null;
 }
 
-export function formatPrompt(rows: readonly PromptRow[]): string {
+/**
+ * @param path the page the changes were made on. With it, the prompt ends in a
+ *   check the agent runs there to prove each value landed.
+ */
+export function formatPrompt(rows: readonly PromptRow[], path?: string): string {
   if (rows.length === 0) return '';
 
   const bySelector = new Map<string, PromptRow[]>();
@@ -201,6 +206,9 @@ export function formatPrompt(rows: readonly PromptRow[]): string {
       out.push(`  ${row.prop}: ${value};${note}`);
     }
     out.push('}', '');
+  }
+  if (path) {
+    out.push(checkScript(path, rows.map((r) => ({ selector: r.locator ?? r.selector, prop: r.prop, value: r.to }))));
   }
   return out.join('\n').trimEnd();
 }
@@ -477,7 +485,7 @@ export function createEditor(now: () => number = Date.now): Editor {
           rows.push({ selector, locator, prop, from: original.computed, to, token: tokenFor(to, tokens) });
         }
       }
-      return formatPrompt(rows);
+      return formatPrompt(rows, location.pathname);
     },
   };
 }

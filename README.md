@@ -355,6 +355,14 @@ property, old value, new value, and a selector for the element. It is meant to
 be pasted at whatever is going to make the change permanent, whether that is a
 person or a model. The tool never edits your source.
 
+It ends with a check: a snippet to run on the page once the change is in. It
+finds each element and compares what it computes to with what was asked, then
+prints `all 3 checks pass` or exactly what is still off (`#card padding-top:
+12px, want 16px`). It compares computed values, so writing the suggested token
+instead of the number still passes. An agent can run it in its browser tool and
+prove the change landed rather than saying so. Notes that carry a change tried
+in the browser end with the same check.
+
 ### The controls
 
 Numbers are sliders with a drag that tracks your pointer exactly and a click

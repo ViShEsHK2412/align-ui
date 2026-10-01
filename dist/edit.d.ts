@@ -116,5 +116,9 @@ export interface PromptRow {
     /** A token holding the same value, when one exists. */
     token: string | null;
 }
-export declare function formatPrompt(rows: readonly PromptRow[]): string;
+/**
+ * @param path the page the changes were made on. With it, the prompt ends in a
+ *   check the agent runs there to prove each value landed.
+ */
+export declare function formatPrompt(rows: readonly PromptRow[], path?: string): string;
 export declare function createEditor(now?: () => number): Editor;

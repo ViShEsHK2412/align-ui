@@ -136,6 +136,7 @@ export declare const ICONS: {
     readonly trash: readonly [Shape, Shape, Shape];
     readonly warning: readonly [Shape, Shape, Shape];
     readonly cross: readonly [Shape, Shape];
+    readonly chevron: readonly [Shape];
     readonly arrow: readonly [Shape, Shape];
 };
 export type IconName = keyof typeof ICONS;

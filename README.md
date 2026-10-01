@@ -375,6 +375,11 @@ had; a linked group resets as a group. It is one step of undo, the two clicks
 included, so `Ctrl/Cmd + Z` lands where you were before double-clicking.
 Click a value to type one; `Esc` throws the typing away.
 
+Each group's name folds it away, and the arrow beside it resets the whole group
+to what the page had, as one step of undo. The arrow is always there and only
+lit when the group holds an edit, so the header never shifts as you work.
+Which groups are folded, and where the panel is scrolled to, survive a reload.
+
 Colour opens a picker of our own rather than the browser's, which is sRGB-only
 and cannot express alpha. The field is OKLCH and each row is normalised to the
 chroma available at that lightness, so every pixel of it is a colour your

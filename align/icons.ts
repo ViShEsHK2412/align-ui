@@ -245,6 +245,8 @@ export const ICONS = {
     p('M12 17h.01'),
   ],
   cross: [p('M18 6 6 18'), p('m6 6 12 12')],
+  // Open: pointing down at what it shows. Rotated to point right when shut.
+  chevron: [p('m6 9 6 6 6-6')],
   // Pointing at something on a screenshot.
   arrow: [p('M7 17 17 7'), p('M8 7h9v9')],
 } as const;

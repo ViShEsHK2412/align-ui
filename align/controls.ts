@@ -10,6 +10,7 @@ import { createPicker, PICKER_CSS, type Picker } from './colour-picker';
 import { formatColour, formatOf, parseColour } from './oklch';
 import { colourTokens, tokenIn, type ColourToken } from './colour-tokens';
 import { tokensInScope } from './inspect';
+import { loadFlag, loadPoint, saveFlag, savePoint } from './store';
 import {
   axisOf, confineToAxis, EMPTY_SHADOW, formatBackdropBlur, formatShadows,
   moveLayer, parseBackdropBlur, parseShadows, type Confine, type Shadow,
@@ -368,6 +369,33 @@ const CSS = PICKER_CSS + DRAG_CSS + `
  * case and tracking, which is what carries emphasis without making the
  * important thing large or the subordinate thing unreadable.
  */
+/*
+ * The group header: a toggle that is the whole name, and a reset that is
+ * always there and only lit when the group holds an edit. Always there so the
+ * header never shifts as you work, which is what sank the per-row revert.
+ */
+.edit-group-head { display: flex; align-items: center; gap: ${SPACE.tight}px; margin: 0 0 ${SPACE.base}px; }
+.edit-group-toggle {
+  flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0;
+  padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; color: ${TEXT.secondary};
+}
+.edit-group-toggle:hover { color: ${TEXT.primary}; }
+.edit-group-toggle:focus-visible, .edit-group-reset:focus-visible { outline: 2px solid ${TEXT.secondary}; outline-offset: 2px; }
+.edit-group-toggle svg { flex: none; transition: rotate ${MOTION.ui}; }
+.edit-group[data-collapsed] .edit-group-toggle svg { rotate: -90deg; }
+.edit-group-reset {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  border: 0; border-radius: 0; background: none; color: ${TEXT.secondary}; cursor: pointer;
+}
+.edit-group-reset:hover:not(:disabled) { background: ${surface(3)}; color: ${TEXT.primary}; }
+.edit-group-reset:disabled { color: ${TEXT.disabled}; cursor: default; }
+/* Collapse by grid row, so the height animates without being measured. */
+.edit-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows ${MOTION.ui}, opacity ${MOTION.ui}; }
+.edit-fold > .edit-rows { min-height: 0; overflow: hidden; }
+.edit-group[data-collapsed] .edit-fold { grid-template-rows: 0fr; opacity: 0; }
+.edit-group[data-collapsed] .edit-group-head { margin-bottom: 0; }
+.edit-group-head .edit-group-name { margin: 0; }
 .edit-group-name {
   display: block;
   margin: 0 0 ${SPACE.base}px 2px;
@@ -669,6 +697,14 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
 
   const body = document.createElement('div');
   body.className = 'edit-body';
+  /** Each group's reset, and what it resets, so it can be lit when there is something to reset. */
+  const groupHeads: { reset: HTMLButtonElement; props: readonly string[] }[] = [];
+  // The scroll position is a preference like the panel's place: kept, not undone.
+  let scrollSave: ReturnType<typeof setTimeout> | undefined;
+  body.addEventListener('scroll', () => {
+    clearTimeout(scrollSave);
+    scrollSave = setTimeout(() => savePoint('edit-scroll', { x: 0, y: body.scrollTop }), 150);
+  }, { passive: true });
 
   const foot = document.createElement('div');
   foot.className = 'edit-foot';
@@ -728,6 +764,7 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
    */
   function markTouched(): void {
     if (!target) return;
+    for (const g of groupHeads) g.reset.disabled = !g.props.some((p) => editor.touched(target as Element, p));
     for (const row of rows) {
       const props = row.spec.sides ?? [row.spec.prop];
       const touched = props.some((p) => editor.touched(target as Element, p));
@@ -1495,15 +1532,50 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
       return;
     }
 
+    groupHeads.length = 0;
     for (const group of GROUPS) {
       if (group.when && !group.when(target)) continue;
       const specs = group.specs.filter((s) => showMore || !s.more);
       if (specs.length === 0) continue;
       const section = document.createElement('section');
       section.className = 'edit-group';
+      const key = `edit-collapsed:${group.name}`;
+      section.toggleAttribute('data-collapsed', loadFlag(key));
+
+      const head = document.createElement('div');
+      head.className = 'edit-group-head';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'edit-group-toggle';
+      toggle.append(icon('chevron', 12));
       const name = document.createElement('span');
       name.className = 'edit-group-name';
       name.textContent = group.name;
+      toggle.append(name);
+      toggle.setAttribute('aria-expanded', String(!section.hasAttribute('data-collapsed')));
+      toggle.addEventListener('click', () => {
+        const shut = !section.hasAttribute('data-collapsed');
+        section.toggleAttribute('data-collapsed', shut);
+        toggle.setAttribute('aria-expanded', String(!shut));
+        // A workspace preference, not an edit: not undoable, and it survives a reload.
+        saveFlag(key, shut);
+      });
+
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'edit-group-reset';
+      reset.append(icon('undo', 13));
+      reset.setAttribute('aria-label', `Reset ${group.name.toLowerCase()}`);
+      reset.title = `Reset ${group.name.toLowerCase()}: put every value in this group back to what the page had`;
+      // Every property the group can edit, the hidden "more" ones included:
+      // a reset that leaves an edit behind because it was folded away is not one.
+      const props = group.specs.flatMap((s) => s.sides ?? [s.prop]);
+      reset.addEventListener('click', () => resetGroup(props));
+      head.append(toggle, reset);
+      groupHeads.push({ reset, props });
+
+      const fold = document.createElement('div');
+      fold.className = 'edit-fold';
       const list = document.createElement('div');
       list.className = 'edit-rows';
       for (const spec of specs) {
@@ -1511,7 +1583,8 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
         rows.push(row);
         list.appendChild(row.el);
       }
-      section.append(name, list);
+      fold.append(list);
+      section.append(head, fold);
       body.appendChild(section);
     }
 
@@ -1522,6 +1595,19 @@ export function createControls(root: ShadowRoot, editor: Editor): Controls {
     more.addEventListener('click', () => { showMore = !showMore; build(); });
     body.appendChild(more);
 
+    for (const row of rows) row.sync();
+    markTouched();
+    // Back where you were reading, after a rebuild or a reload.
+    const at = loadPoint('edit-scroll');
+    if (at) body.scrollTop = at.y;
+  }
+
+  /** One step of undo for the whole group, however many properties it held. */
+  function resetGroup(props: readonly string[]): void {
+    if (!target) return;
+    const since = Date.now();
+    for (const p of props) if (editor.touched(target, p)) editor.revert(target, p);
+    editor.collapseSince(since, target);
     for (const row of rows) row.sync();
     markTouched();
   }

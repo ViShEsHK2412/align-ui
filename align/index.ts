@@ -783,6 +783,22 @@ function onPointerUpAny(): void {
   editor.endGesture();
 }
 
+/**
+ * The window lost focus mid-gesture: Alt+Tab, a system dialog, DevTools. The
+ * release happens somewhere this page never hears about, so the gesture ends
+ * here instead. A dragged guide stays where it was taken to, a marquee
+ * selects nothing, and the edit in progress is closed as one step.
+ */
+function onWindowBlur(): void {
+  onPointerUpAny();
+  if (!dragging && !marquee) return;
+  dragging = null;
+  grabFrom = null;
+  group = null;
+  marquee = null;
+  render();
+}
+
 function setDimLock(on: boolean): void {
   clearTimeout(undim);
   if (on) {
@@ -1066,6 +1082,7 @@ function activate() {
   addEventListener('pointerup', onPointerUpAny, { capture: true });
   addEventListener('pointercancel', onPointerUpAny, { capture: true });
   addEventListener('mousemove', onMouseMove);
+  addEventListener('blur', onWindowBlur);
   addEventListener('mousedown', onMouseDown, { capture: true });
   addEventListener('mouseup', onMouseUp, { capture: true });
   addEventListener('click', onClick, { capture: true });
@@ -1081,6 +1098,7 @@ function activate() {
 
 function deactivate() {
   removeEventListener('mousemove', onMouseMove);
+  removeEventListener('blur', onWindowBlur);
   removeEventListener('mousedown', onMouseDown, { capture: true });
   removeEventListener('mouseup', onMouseUp, { capture: true });
   removeEventListener('click', onClick, { capture: true });

@@ -2,6 +2,7 @@ import {
   clamp, css, fitGamut, formatColour, formatOf, maxChroma,
   parseColour, colourToRgb, type Colour, type Format, type Space,
 } from './oklch';
+import { holdPointer } from './hold-pointer';
 import {
   GROUND, HAIRLINE, MOTION, SHADOW_LIFTED, SPACE, TEXT, TYPE, WEIGHT, surface,
 } from './theme';
@@ -473,7 +474,7 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
     plane.focus({ preventScroll: true });
     // Throws for a pointer that is already up. Losing the gesture is worse
     // than losing the capture.
-    try { plane.setPointerCapture(e.pointerId); } catch { /* fine */ }
+    holdPointer(plane, e.pointerId);
     planeMove(e);
   });
   plane.addEventListener('pointermove', (e) => {
@@ -562,7 +563,7 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
       if (e.button !== 0) return;
       e.preventDefault();
       node.focus({ preventScroll: true });
-      try { node.setPointerCapture(e.pointerId); } catch { /* fine */ }
+      holdPointer(node, e.pointerId);
       const f = fractionAt(e);
       // Springs to where you pressed, then tracks you exactly from there.
       springTo(f);
@@ -584,6 +585,8 @@ export function createPicker(root: ShadowRoot, opts: PickerOptions): Picker {
     };
     node.addEventListener('pointerup', release);
     node.addEventListener('pointercancel', release);
+    // Window lost focus mid-drag: the track stops following a pointer nobody is pressing.
+    node.addEventListener('lostpointercapture', () => { dragging = false; });
     node.addEventListener('keydown', (e) => {
       const step = e.shiftKey ? 0.1 : 0.01;
       const d = e.key === 'ArrowRight' ? step

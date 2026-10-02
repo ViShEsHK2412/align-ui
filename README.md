@@ -380,6 +380,11 @@ to what the page had, as one step of undo. The arrow is always there and only
 lit when the group holds an edit, so the header never shifts as you work.
 Which groups are folded, and where the panel is scrolled to, survive a reload.
 
+Every drag ends cleanly if the window loses focus partway through it: Alt+Tab,
+a system dialog, a click into DevTools. The release happens somewhere the page
+never hears about, so without this a slider would go on following a pointer
+nobody is pressing. Whatever you had dragged to stays; a notes area is dropped.
+
 Colour opens a picker of our own rather than the browser's, which is sRGB-only
 and cannot express alpha. The field is OKLCH and each row is normalised to the
 chroma available at that lightness, so every pixel of it is a colour your

@@ -1,20 +1,4 @@
 /**
- * Drag a floating surface by a handle.
- *
- * Three panels needed this and one had it: the box model grew a drag, and the
- * toolbar and the edit dock stayed pinned to the corner the CSS put them in.
- * Writing it twice more would have meant three subtly different answers to the
- * same questions — what counts as a handle, what happens at the viewport edge,
- * what a button inside the handle does — so it is one answer, here.
- *
- * The offset is a `transform`, deliberately, and never `translate`, `top` or
- * `left`. Those three are already spoken for: the edit dock animates its
- * entrance with `translate`, the toolbar transitions `top` to make room for
- * the rulers, and both are positioned by `top`/`right`. `transform` is a
- * separate property that composes with all of them, so a drag cannot fight an
- * animation and an animation cannot undo a drag.
- */
-/**
  * How far the surface may be pushed, given where it would sit untouched.
  *
  * Pure, and the only part worth testing: everything else is pointer plumbing.

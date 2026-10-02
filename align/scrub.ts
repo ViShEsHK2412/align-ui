@@ -1,4 +1,5 @@
 import { icon, type IconName } from './icons';
+import { holdPointer } from './hold-pointer';
 import { scaleOf } from './measure';
 import { HAIRLINE, MOTION, surface, TEXT, TYPE, WEIGHT } from './theme';
 
@@ -214,7 +215,7 @@ export function createScrub(root: ShadowRoot, options: ScrubOptions): Scrub {
     if (input || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    try { el.setPointerCapture(e.pointerId); } catch { /* already gone */ }
+    holdPointer(el, e.pointerId);
     from = { x: e.clientX, y: e.clientY, value };
     dragged = false;
     // The panel can be inside a page the browser is scaling, and a scrub
@@ -244,6 +245,7 @@ export function createScrub(root: ShadowRoot, options: ScrubOptions): Scrub {
   };
   el.addEventListener('pointerup', endScrub);
   el.addEventListener('pointercancel', endScrub);
+  el.addEventListener('lostpointercapture', endScrub);
 
   // ── Typing ────────────────────────────────────────────────────────────────
 

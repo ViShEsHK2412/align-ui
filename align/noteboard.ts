@@ -1,4 +1,5 @@
 import type { Config } from './config';
+import { holdPointer } from './hold-pointer';
 import { createHookCapture, createTabCapture, type CaptureFrame, type TabCapture } from './capture';
 import { DRAG_CSS, makeDraggable, type Draggable } from './draggable';
 import { icon } from './icons';
@@ -700,7 +701,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     e.preventDefault();
     press = { x: e.clientX, y: e.clientY, id: e.pointerId };
     banding = false;
-    try { layer.setPointerCapture(e.pointerId); } catch { /* already up */ }
+    holdPointer(layer, e.pointerId);
   });
 
   layer.addEventListener('pointerup', (e) => {
@@ -727,11 +728,14 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     void take({ x: r.left, y: r.top, w: r.width, h: r.height }, target, false);
   });
 
-  layer.addEventListener('pointercancel', () => {
+  // Cancelled, or capture lost because the window lost focus mid-drag: no note.
+  const dropPress = (): void => {
     press = null;
     banding = false;
     band.removeAttribute('data-on');
-  });
+  };
+  layer.addEventListener('pointercancel', dropPress);
+  layer.addEventListener('lostpointercapture', dropPress);
 
   // ── Taking a note ─────────────────────────────────────────────────────────
 
@@ -955,7 +959,7 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     const p = toFraction(e.clientX, e.clientY, box);
     live = { kind: markTool, points: markTool === 'arrow' ? [p, p] : [p], width: MARK_WIDTH / box.w };
     livePointer = e.pointerId;
-    try { d.canvas.setPointerCapture(e.pointerId); } catch { /* already up */ }
+    holdPointer(d.canvas, e.pointerId);
   });
 
   shot.addEventListener('pointermove', (e) => {
@@ -980,6 +984,8 @@ export function createNoteBoard(options: NoteBoardOptions): NoteBoard {
     text.focus({ preventScroll: true });
   }
   shot.addEventListener('pointerup', (e) => endMark(e, true));
+  // The window lost focus mid-stroke: keep what was drawn, as a release would.
+  shot.addEventListener('lostpointercapture', (e) => endMark(e, true));
   shot.addEventListener('pointercancel', (e) => endMark(e, false));
 
   const pick = (tool: Stroke['kind']) => () => { markTool = tool; paintMarks(); text.focus({ preventScroll: true }); };

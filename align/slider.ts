@@ -1,4 +1,5 @@
 import { HAIRLINE, MOTION, ROW, surface, TEXT, TYPE, WEIGHT } from './theme';
+import { holdPointer } from './hold-pointer';
 import { scaleOf } from './measure';
 
 /**
@@ -599,7 +600,7 @@ export function createSlider(root: ShadowRoot, options: SliderOptions): Slider {
      * released will both produce, and letting that abort the handler leaves a
      * gesture that never recorded its starting point and can never end.
      */
-    try { el.setPointerCapture(e.pointerId); } catch { /* already gone */ }
+    holdPointer(el, e.pointerId);
     downAt = { x: e.clientX, y: e.clientY };
     isClick = true;
     rect = el.getBoundingClientRect();

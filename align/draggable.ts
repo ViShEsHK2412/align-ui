@@ -1,3 +1,5 @@
+import { holdPointer } from './hold-pointer';
+
 /**
  * Drag a floating surface by a handle.
  *
@@ -159,7 +161,7 @@ export function makeDraggable(options: DraggableOptions): Draggable {
     pending = true;
     // Throws for a pointer that is already up. Losing the capture is better
     // than losing the gesture.
-    try { surface.setPointerCapture(e.pointerId); } catch { /* fine */ }
+    holdPointer(surface, e.pointerId);
   }
 
   function onPointerMove(e: PointerEvent): void {
@@ -238,6 +240,8 @@ export function makeDraggable(options: DraggableOptions): Draggable {
   surface.addEventListener('pointerdown', onPointerDown);
   surface.addEventListener('pointermove', onPointerMove);
   surface.addEventListener('pointerup', onPointerUp);
+  // Capture taken away (the window lost focus mid-drag): stop where it is.
+  surface.addEventListener('lostpointercapture', () => end());
   surface.addEventListener('pointercancel', onPointerUp);
   surface.addEventListener('dblclick', onDoubleClick);
   addEventListener('keydown', onKey, true);
